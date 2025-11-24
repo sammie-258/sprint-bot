@@ -39,6 +39,8 @@ const MONGO_URI = process.env.MONGO_URI;
 
 mongoose.connect(MONGO_URI).then(() => {
     const store = new MongoStore({ mongoose: mongoose });
+    
+    // MEMORY OPTIMIZATION SETTINGS
     const client = new Client({
         authStrategy: new RemoteAuth({
             store: store,
@@ -49,11 +51,11 @@ mongoose.connect(MONGO_URI).then(() => {
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage', // Uses disk instead of memory for temp files
-                '--disable-accelerated-2d-canvas', // Disables graphics heavy features
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process', // Forces Chrome to use one process (saves RAM)
+                '--single-process',
                 '--disable-gpu'
             ]
         }
@@ -70,9 +72,27 @@ mongoose.connect(MONGO_URI).then(() => {
 
         const chatId = chat.id._serialized;
         const message = msg.body.toLowerCase().trim();
-        const contact = await msg.getContact();
-        const senderId = contact.id._serialized;
-        const senderName = contact.pushname || contact.number;
+
+        // --- SAFETY NET: PREVENT CONTACT CRASH ---
+        let senderId;
+        let senderName;
+        let contact;
+        let contactObj; // We need this specific object for mentions
+
+        try {
+            contact = await msg.getContact();
+            senderId = contact.id._serialized;
+            senderName = contact.pushname || contact.number;
+            contactObj = contact;
+        } catch (err) {
+            console.log("⚠️ WhatsApp Contact Error bypassed.");
+            // Fallback values if WhatsApp fails
+            senderId = msg.author || msg.from; 
+            senderName = "Writer"; 
+            // Create a fake contact object so mentions don't break
+            contactObj = { id: { user: "unknown", _serialized: senderId } };
+        }
+        // ------------------------------------------
 
         if (!sprintData.has(chatId)) {
             sprintData.set(chatId, { active: false, collecting: false, participants: new Map() });
@@ -134,9 +154,8 @@ mongoose.connect(MONGO_URI).then(() => {
             await msg.reply(`⏳ **Time Remaining:** ${minutes}m ${seconds}s`);
         }
 
-        // --- COMMAND: !WC (Fixed to work during sprint) ---
+        // --- COMMAND: !WC ---
         if (message.startsWith('!wc')) {
-            // Allow if active OR collecting
             if (!currentSprint.active && !currentSprint.collecting) return;
 
             const args = message.split(' ');
@@ -152,17 +171,16 @@ mongoose.connect(MONGO_URI).then(() => {
 
             if (isNaN(countInput)) return;
 
-            let userData = currentSprint.participants.get(senderId) || { name: senderName, count: 0, contactObj: contact };
+            let userData = currentSprint.participants.get(senderId) || { name: senderName, count: 0, contactObj: contactObj };
             
             if (isAdditive) {
                 userData.count += countInput;
-                // Only reply with text if we are in collection mode (to avoid spam during sprint)
                 if(currentSprint.collecting) await msg.reply(`➕ Added ${countInput}. Total: *${userData.count}*`);
                 else await msg.react('✍️'); 
             } else {
                 userData.count = countInput;
                 if(currentSprint.collecting) await msg.react('✅');
-                else await msg.react('✍️'); // React with writing hand during sprint
+                else await msg.react('✍️');
             }
 
             currentSprint.participants.set(senderId, userData);
@@ -189,11 +207,11 @@ mongoose.connect(MONGO_URI).then(() => {
                 const wpm = Math.round(p.count / currentSprint.duration);
 
                 leaderboard += `${medal} @${p.contactObj.id.user} : *${p.count}* (${wpm} wpm)\n`;
-                mentions.push(p.contactObj);
+                if(p.contactObj.id.user !== "unknown") mentions.push(p.contactObj);
 
                 try {
                     await DailyStats.findOneAndUpdate(
-                        { userId: p.contactObj.id._serialized, groupId: chatId, date: todayDate },
+                        { userId: senderId, groupId: chatId, date: todayDate },
                         { $inc: { words: p.count }, $setOnInsert: { name: p.name } },
                         { upsert: true, new: true }
                     );
