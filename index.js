@@ -40,8 +40,23 @@ const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI).then(() => {
     const store = new MongoStore({ mongoose: mongoose });
     const client = new Client({
-        authStrategy: new RemoteAuth({ store: store, backupSyncIntervalMs: 300000 }),
-        puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }
+        authStrategy: new RemoteAuth({
+            store: store,
+            backupSyncIntervalMs: 300000
+        }),
+        puppeteer: {
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage', // Uses disk instead of memory for temp files
+                '--disable-accelerated-2d-canvas', // Disables graphics heavy features
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process', // Forces Chrome to use one process (saves RAM)
+                '--disable-gpu'
+            ]
+        }
     });
 
     const sprintData = new Map();
