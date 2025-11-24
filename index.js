@@ -11,12 +11,19 @@ const port = process.env.PORT || 3000;
 let qrCodeData = null;
 let isConnected = false;
 
+// Website to display QR Code and Status
 app.get('/', async (req, res) => {
     if (isConnected) {
         res.send('<h1>✅ Sprint Bot is Connected!</h1>');
     } else if (qrCodeData) {
         const qrImage = await QRCode.toDataURL(qrCodeData);
-        res.send(`<div style="text-align:center;"><h1>Scan with WhatsApp</h1><img src="${qrImage}" style="border:1px solid #ccc;"></div>`);
+        res.send(`
+            <div style="text-align:center; font-family: sans-serif; padding-top: 50px;">
+                <h1>Scan with WhatsApp</h1>
+                <img src="${qrImage}" style="border:1px solid #ccc; width:300px;">
+                <p>Refresh page if code expires.</p>
+            </div>
+        `);
     } else {
         res.send('<h1>⏳ Booting up... refresh in 10s.</h1>');
     }
@@ -40,7 +47,7 @@ const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI).then(() => {
     const store = new MongoStore({ mongoose: mongoose });
     
-    // MEMORY OPTIMIZATION SETTINGS
+    // MEMORY OPTIMIZATION SETTINGS (Prevents crashes on Render Free Tier)
     const client = new Client({
         authStrategy: new RemoteAuth({
             store: store,
@@ -61,6 +68,7 @@ mongoose.connect(MONGO_URI).then(() => {
         }
     });
 
+    // In-memory storage for active sprints
     const sprintData = new Map();
 
     client.on('qr', (qr) => { qrCodeData = qr; console.log('New QR Code generated'); });
@@ -68,32 +76,43 @@ mongoose.connect(MONGO_URI).then(() => {
 
     client.on('message', async msg => {
         const chat = await msg.getChat();
-        if (!chat.isGroup) return;
+        if (!chat.isGroup) return; // Only work in groups
 
         const chatId = chat.id._serialized;
         const message = msg.body.toLowerCase().trim();
 
-        // --- SAFETY NET: PREVENT CONTACT CRASH ---
-        let senderId;
-        let senderName;
-        let contact;
-        let contactObj; // We need this specific object for mentions
+        // --- SMART CONTACT RECOVERY (The MacGyver Fix) ---
+        // Tries to get the official contact, but falls back to raw data if it fails
+        let senderId = msg.author || msg.from;
+        let senderName = "Writer"; 
+        let contactObj;
 
         try {
-            contact = await msg.getContact();
+            // 1. Try the official way
+            const contact = await msg.getContact();
             senderId = contact.id._serialized;
             senderName = contact.pushname || contact.number;
             contactObj = contact;
         } catch (err) {
-            console.log("⚠️ WhatsApp Contact Error bypassed.");
-            // Fallback values if WhatsApp fails
-            senderId = msg.author || msg.from; 
-            senderName = "Writer"; 
-            // Create a fake contact object so mentions don't break
-            contactObj = { id: { user: "unknown", _serialized: senderId } };
+            // 2. If official way fails, use raw message data
+            // console.log("Using fallback name logic");
+            if (msg._data && msg._data.notifyName) {
+                senderName = msg._data.notifyName;
+            } else {
+                senderName = senderId.split('@')[0]; 
+            }
+            
+            // Create a manual contact object so mentions still work
+            contactObj = { 
+                id: { user: senderId.split('@')[0], _serialized: senderId }, 
+                pushname: senderName,
+                number: senderId.split('@')[0],
+                isMyContact: false
+            };
         }
-        // ------------------------------------------
+        // ----------------------------------------------------
 
+        // Initialize group data if missing
         if (!sprintData.has(chatId)) {
             sprintData.set(chatId, { active: false, collecting: false, participants: new Map() });
         }
@@ -121,135 +140,6 @@ mongoose.connect(MONGO_URI).then(() => {
 
             const args = message.split(' ');
             let duration = parseInt(args[1]) || 15;
-            if (duration > 180) duration = 180;
+            if (duration > 180) duration = 180; // Cap at 3 hours
 
-            currentSprint.active = true;
-            currentSprint.collecting = false;
-            currentSprint.duration = duration;
-            currentSprint.participants.clear();
-            currentSprint.startTime = Date.now();
-            currentSprint.endTime = Date.now() + (duration * 60 * 1000);
-
-            await chat.sendMessage(`🚀 **SPRINT STARTED!**\n\n⏱️ **${duration} Minutes** on the clock.\n🏁 Go write!`);
-
-            setTimeout(async () => {
-                if (!currentSprint.active) return;
-                currentSprint.active = false;
-                currentSprint.collecting = true;
-                
-                await chat.sendMessage(
-                    `🛑 **TIME'S UP!**\n\n` +
-                    `Reply with *!wc [number]* to log your words.\n` +
-                    `Type *!finish* to see the leaderboard.`
-                );
-            }, duration * 60 * 1000);
-        }
-
-        // --- COMMAND: !TIME ---
-        if (message === '!time') {
-            if (!currentSprint.active) return msg.reply('❌ No sprint running.');
-            const remainingMs = currentSprint.endTime - Date.now();
-            const minutes = Math.floor((remainingMs / 1000) / 60);
-            const seconds = Math.floor((remainingMs / 1000) % 60);
-            await msg.reply(`⏳ **Time Remaining:** ${minutes}m ${seconds}s`);
-        }
-
-        // --- COMMAND: !WC ---
-        if (message.startsWith('!wc')) {
-            if (!currentSprint.active && !currentSprint.collecting) return;
-
-            const args = message.split(' ');
-            let countInput = 0;
-            let isAdditive = false;
-
-            if (args[1] === 'add' || args[1] === '+') {
-                countInput = parseInt(args[2]);
-                isAdditive = true;
-            } else {
-                countInput = parseInt(args[1]);
-            }
-
-            if (isNaN(countInput)) return;
-
-            let userData = currentSprint.participants.get(senderId) || { name: senderName, count: 0, contactObj: contactObj };
-            
-            if (isAdditive) {
-                userData.count += countInput;
-                if(currentSprint.collecting) await msg.reply(`➕ Added ${countInput}. Total: *${userData.count}*`);
-                else await msg.react('✍️'); 
-            } else {
-                userData.count = countInput;
-                if(currentSprint.collecting) await msg.react('✅');
-                else await msg.react('✍️');
-            }
-
-            currentSprint.participants.set(senderId, userData);
-        }
-
-        // --- COMMAND: !FINISH ---
-        if (message === '!finish') {
-            if (!currentSprint.collecting && !currentSprint.active) return;
-            
-            if (currentSprint.participants.size === 0) {
-                currentSprint.active = false;
-                currentSprint.collecting = false;
-                return msg.reply('❌ Sprint ended. No words logged.');
-            }
-
-            const sortedResults = Array.from(currentSprint.participants.values()).sort((a, b) => b.count - a.count);
-            let leaderboard = `🏆 **SPRINT RESULTS** 🏆\n\n`;
-            const mentions = [];
-            const todayDate = new Date().toISOString().split('T')[0];
-
-            for (let i = 0; i < sortedResults.length; i++) {
-                const p = sortedResults[i];
-                const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : '🎖️'));
-                const wpm = Math.round(p.count / currentSprint.duration);
-
-                leaderboard += `${medal} @${p.contactObj.id.user} : *${p.count}* (${wpm} wpm)\n`;
-                if(p.contactObj.id.user !== "unknown") mentions.push(p.contactObj);
-
-                try {
-                    await DailyStats.findOneAndUpdate(
-                        { userId: senderId, groupId: chatId, date: todayDate },
-                        { $inc: { words: p.count }, $setOnInsert: { name: p.name } },
-                        { upsert: true, new: true }
-                    );
-                } catch (err) { console.error("DB Error:", err); }
-            }
-
-            leaderboard += `\nStats saved to Daily Leaderboard! ✅`;
-            leaderboard += `\n\nGreat job everyone! Type *!sprint* to go again.`;
-            
-            await chat.sendMessage(leaderboard, { mentions: mentions });
-
-            currentSprint.collecting = false;
-            currentSprint.active = false;
-        }
-
-        // --- COMMAND: !DAILY ---
-        if (message === '!daily') {
-            const todayDate = new Date().toISOString().split('T')[0];
-            const stats = await DailyStats.find({ groupId: chatId, date: todayDate }).sort({ words: -1 });
-
-            if (stats.length === 0) return msg.reply('📅 No stats recorded today.');
-
-            let response = `📅 **DAILY LEADERBOARD (${todayDate})**\n\n`;
-            stats.forEach((s, index) => {
-                response += `${index + 1}. ${s.name}: *${s.words} words*\n`;
-            });
-            await chat.sendMessage(response);
-        }
-
-        // --- COMMAND: !CANCEL ---
-        if (message === '!cancel') {
-            if (currentSprint.active || currentSprint.collecting) {
-                currentSprint.active = false;
-                currentSprint.collecting = false;
-                await msg.reply('🚫 Sprint cancelled.');
-            }
-        }
-    });
-
-    client.initialize();
-}).catch(err => console.error("MongoDB connection error:", err));
+            currentSprint
