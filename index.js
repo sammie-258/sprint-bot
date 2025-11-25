@@ -258,35 +258,43 @@ mongoose.connect(MONGO_URI)
                     let mentions = [];
                     
                     for (let i = 0; i < leaderboardArray.length; i++) {
-    let p = leaderboardArray[i];
+                        let p = leaderboardArray[i];
+                        
+                        // --- MANUAL TAGGING LOGIC ---
+                        // We extract the number directly from the ID (e.g. "23480...@c.us" -> "23480...")
+                        const userId = p.uid;
+                        const userNumber = userId.split('@')[0];
 
-    if (p.contact) {
-        // Perfect tagging with ZERO-WIDTH JOINER
-        leaderboardText += `${i + 1}. @${p.contact.id.user}\u200D — ${p.words} words\n`;
-        mentions.push(p.contact);
-    } else {
-        leaderboardText += `${i + 1}. ${p.name} — ${p.words} words\n`;
-    }
+                        // 1. Build the text string with the @ symbol
+                        leaderboardText += `${i + 1}. @${userNumber} — ${p.words} words\n`;
+                        
+                        // 2. Build a "Fake" Contact object that satisfies WhatsApp's requirements
+                        // This bypasses the broken "getContact()" function entirely
+                        mentions.push({ 
+                            id: { 
+                                _serialized: userId 
+                            } 
+                        });
 
-    try {
-        await DailyStats.findOneAndUpdate(
-            { userId: p.uid, groupId: chatId, date },
-            { name: p.name, $inc: { words: p.words } },
-            { upsert: true, new: true }
-        );
-    } catch (err) {
-        console.error("DB Save Error", err);
-    }
-}
-
+                        // Save to DB
+                        try {
+                            await DailyStats.findOneAndUpdate(
+                                { userId: p.uid, groupId: chatId, date },
+                                { name: p.name, $inc: { words: p.words } },
+                                { upsert: true, new: true }
+                            );
+                        } catch (err) {
+                            console.error("DB Save Error", err);
+                        }
+                    }
 
                     delete activeSprints[chatId];
                     
-                    // Send with mentions (only the safe ones)
+                    // Send with our manually constructed mentions
                     await chat.sendMessage(leaderboardText, { mentions: mentions });
                     return;
                 }
-
+                
                 // =======================
                 //      DAILY STATS
                 // =======================
