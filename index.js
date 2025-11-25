@@ -259,22 +259,24 @@ mongoose.connect(MONGO_URI)
                     
                     for (let i = 0; i < leaderboardArray.length; i++) {
                         let p = leaderboardArray[i];
+                        const userNumber = p.uid.split('@')[0];
                         
-                        // --- MANUAL TAGGING LOGIC ---
-                        // We extract the number directly from the ID (e.g. "23480...@c.us" -> "23480...")
-                        const userId = p.uid;
-                        const userNumber = userId.split('@')[0];
-
-                        // 1. Build the text string with the @ symbol
+                        // 1. Prepare the text (Visible name)
                         leaderboardText += `${i + 1}. @${userNumber} — ${p.words} words\n`;
-                        
-                        // 2. Build a "Fake" Contact object that satisfies WhatsApp's requirements
-                        // This bypasses the broken "getContact()" function entirely
-                        mentions.push({ 
-                            id: { 
-                                _serialized: userId 
-                            } 
-                        });
+
+                        // 2. Try to get the REAL contact object for tagging
+                        // We use the client to fetch it properly instead of faking it
+                        try {
+                            const contact = await client.getContactById(p.uid);
+                            if (contact) {
+                                mentions.push(contact);
+                            }
+                        } catch (err) {
+                            // If fetching fails, we just ignore it. 
+                            // The name will show in text, but won't be a blue link.
+                            // This prevents the bot from crashing.
+                            console.log(`Could not fetch contact for tagging: ${p.uid}`);
+                        }
 
                         // Save to DB
                         try {
@@ -290,7 +292,9 @@ mongoose.connect(MONGO_URI)
 
                     delete activeSprints[chatId];
                     
-                    // Send with our manually constructed mentions
+                    // Send message
+                    // If mentions array is empty, it sends normal text.
+                    // If mentions array has valid contacts, it creates blue tags.
                     await chat.sendMessage(leaderboardText, { mentions: mentions });
                     return;
                 }
