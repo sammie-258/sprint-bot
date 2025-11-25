@@ -140,9 +140,6 @@ mongoose.connect(MONGO_URI)
                 const args = msg.body.trim().split(" ");
                 const command = args[0].toLowerCase();
 
-                // --- HELPER: Today String ---
-                const todayString = () => new Date().toISOString().split("T")[0];
-
                 // --- HELP COMMAND ---
                 if (command === "!help") {
                     return msg.reply(
@@ -254,28 +251,38 @@ mongoose.connect(MONGO_URI)
                         return msg.reply("🏁 Sprint ended! No entries recorded.");
                     }
 
-                    let leaderboardText = `🏁 *Sprint Finished!*\n📅 Date: ${date}\n\n*Leaderboard:*\n`;
+                    // Ensure we have canonical Contact objects for mentions (safe, non-fatal)
                     let mentions = [];
-                    
+                    try {
+                        for (let p of leaderboardArray) {
+                            if (p.contact && p.contact.id && p.contact.id._serialized) {
+                                try {
+                                    // Get the canonical Contact object right before sending
+                                    const canonical = await client.getContactById(p.contact.id._serialized);
+                                    if (canonical && canonical.id) {
+                                        p.contact = canonical;
+                                        mentions.push(canonical);
+                                    }
+                                } catch (err) {
+                                    // don't throw — keep going, we'll use plain text for this entry
+                                    console.warn("Could not refresh contact for mention:", p.contact && p.contact.id && p.contact.id._serialized, err && err.message);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        // Very defensive: if anything unexpected happens, clear mentions so we don't pass bad data
+                        console.warn("Unexpected error while preparing mentions, proceeding without mentions:", err && err.message);
+                        mentions = [];
+                    }
+
+                    // Build leaderboard text using the refreshed contacts
+                    let leaderboardText = `🏁 *Sprint Finished!*\n📅 Date: ${date}\n\n*Leaderboard:*\n`;
                     for (let i = 0; i < leaderboardArray.length; i++) {
                         let p = leaderboardArray[i];
-                        const userNumber = p.uid.split('@')[0];
-                        
-                        // 1. Prepare the text (Visible name)
-                        leaderboardText += `${i + 1}. @${userNumber} — ${p.words} words\n`;
-
-                        // 2. Try to get the REAL contact object for tagging
-                        // We use the client to fetch it properly instead of faking it
-                        try {
-                            const contact = await client.getContactById(p.uid);
-                            if (contact) {
-                                mentions.push(contact);
-                            }
-                        } catch (err) {
-                            // If fetching fails, we just ignore it. 
-                            // The name will show in text, but won't be a blue link.
-                            // This prevents the bot from crashing.
-                            console.log(`Could not fetch contact for tagging: ${p.uid}`);
+                        if (p.contact && p.contact.id && p.contact.id.user) {
+                            leaderboardText += `${i + 1}. @${p.contact.id.user} — ${p.words} words\n`;
+                        } else {
+                            leaderboardText += `${i + 1}. ${p.name} — ${p.words} words\n`;
                         }
 
                         // Save to DB
@@ -291,14 +298,25 @@ mongoose.connect(MONGO_URI)
                     }
 
                     delete activeSprints[chatId];
-                    
-                    // Send message
-                    // If mentions array is empty, it sends normal text.
-                    // If mentions array has valid contacts, it creates blue tags.
-                    await chat.sendMessage(leaderboardText, { mentions: mentions });
+
+                    // Try sending with mentions, but gracefully fall back to sending without them if anything fails
+                    try {
+                        if (mentions.length > 0) {
+                            await chat.sendMessage(leaderboardText, { mentions });
+                        } else {
+                            await chat.sendMessage(leaderboardText);
+                        }
+                    } catch (err) {
+                        console.warn("Sending leaderboard with mentions failed, retrying without mentions:", err && err.message);
+                        try {
+                            await chat.sendMessage(leaderboardText);
+                        } catch (err2) {
+                            console.error("Failed to send leaderboard message:", err2);
+                        }
+                    }
                     return;
                 }
-                
+
                 // =======================
                 //      DAILY STATS
                 // =======================
