@@ -64,7 +64,6 @@ let activeSprints = {};
 // =======================
 //   MAIN LOGIC WRAPPER
 // =======================
-// We wrap everything in the DB connection to prevent the "undefined collection" crash
 mongoose.connect(MONGO_URI)
     .then(() => {
         console.log("✅ MongoDB connected successfully");
@@ -96,7 +95,7 @@ mongoose.connect(MONGO_URI)
         // =======================
 
         client.on("qr", qr => {
-            qrCodeData = qr; // Save for website
+            qrCodeData = qr; 
             console.log("New QR Code generated");
         });
 
@@ -112,18 +111,21 @@ mongoose.connect(MONGO_URI)
         client.on("message", async msg => {
             try {
                 const chat = await msg.getChat();
-                if (!chat.isGroup) return; // Ignore private messages
+                if (!chat.isGroup) return; 
 
                 const chatId = chat.id._serialized;
 
                 // --- 🛡️ SAFETY NET: SMART NAME RECOVERY ---
                 let senderId = msg.author || msg.from;
                 let senderName = "Writer"; 
+                let realContactObj = null; // Store the REAL object if we find it
                 
                 try {
                     const contact = await msg.getContact();
                     senderId = contact.id._serialized;
                     senderName = contact.pushname || contact.name || contact.number;
+                    // SAVE THIS! This is the only object safe to tag
+                    realContactObj = contact; 
                 } catch (err) {
                     // Fallback to raw data
                     if (msg._data && msg._data.notifyName) {
@@ -133,7 +135,6 @@ mongoose.connect(MONGO_URI)
                     }
                 }
 
-                // Ignore non-commands
                 if (!msg.body.startsWith("!")) return;
 
                 const args = msg.body.trim().split(" ");
@@ -170,7 +171,7 @@ mongoose.connect(MONGO_URI)
 
                     activeSprints[chatId] = {
                         endsAt: Date.now() + minutes * 60000,
-                        participants: {} // userId → { name, words }
+                        participants: {} 
                     };
 
                     await chat.sendMessage(
@@ -209,9 +210,19 @@ mongoose.connect(MONGO_URI)
                         return msg.reply("❌ Invalid number.\nUse: `!wc 456`");
                     }
 
-                    // Initialize user in sprint if new
+                    // Initialize or Update User
+                    // We save 'realContactObj' here so we can use it later for tagging
                     if (!sprint.participants[senderId]) {
-                        sprint.participants[senderId] = { name: senderName, words: 0 };
+                        sprint.participants[senderId] = { 
+                            name: senderName, 
+                            words: 0,
+                            contact: realContactObj 
+                        };
+                    } else {
+                        // If we didn't have the contact object before but we do now, update it
+                        if (realContactObj) {
+                            sprint.participants[senderId].contact = realContactObj;
+                        }
                     }
 
                     if (isAdding) {
@@ -235,7 +246,7 @@ mongoose.connect(MONGO_URI)
 
                     const date = todayString();
                     const leaderboardArray = Object.entries(sprint.participants)
-                        .map(([uid, data]) => ({ ...data, uid })) // Keep UID for DB
+                        .map(([uid, data]) => ({ ...data, uid })) 
                         .sort((a, b) => b.words - a.words);
 
                     if (leaderboardArray.length === 0) {
@@ -244,11 +255,20 @@ mongoose.connect(MONGO_URI)
                     }
 
                     let leaderboardText = `🏁 *Sprint Finished!*\n📅 Date: ${date}\n\n*Leaderboard:*\n`;
+                    let mentions = [];
                     
-                    // Loop through results
                     for (let i = 0; i < leaderboardArray.length; i++) {
                         let p = leaderboardArray[i];
-                        leaderboardText += `${i + 1}. *${p.name}* — ${p.words} words\n`;
+                        
+                        // SAFE TAGGING LOGIC
+                        if (p.contact) {
+                            // If we have a REAL contact object, use the @ tag
+                            leaderboardText += `${i + 1}. @${p.contact.id.user} — ${p.words} words\n`;
+                            mentions.push(p.contact);
+                        } else {
+                            // If it's a fallback contact, just print the text name (No Tag)
+                            leaderboardText += `${i + 1}. ${p.name} — ${p.words} words\n`;
+                        }
 
                         // Save to DB
                         try {
@@ -264,8 +284,8 @@ mongoose.connect(MONGO_URI)
 
                     delete activeSprints[chatId];
                     
-                    // Send without mentions to avoid crashing
-                    await chat.sendMessage(leaderboardText);
+                    // Send with mentions (only the safe ones)
+                    await chat.sendMessage(leaderboardText, { mentions: mentions });
                     return;
                 }
 
