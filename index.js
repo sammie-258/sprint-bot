@@ -1,443 +1,357 @@
-const { Client, RemoteAuth } = require('whatsapp-web.js');
-
+// =======================
+//       IMPORTS
+// =======================
+const { Client, RemoteAuth } = require("whatsapp-web.js");
 const { MongoStore } = require('wwebjs-mongo');
-
-const mongoose = require('mongoose');
-
+const mongoose = require("mongoose");
 const QRCode = require('qrcode');
-
 const express = require('express');
+require("dotenv").config();
 
-
-
-// --- 1. SETUP SERVER ---
-
+// =======================
+//   SERVER & WEB QR SETUP
+// =======================
 const app = express();
-
-const port = process.env.PORT || 3000;
-
-
+const PORT = process.env.PORT || 3000;
 
 let qrCodeData = null;
-
 let isConnected = false;
 
-
-
+// Web page to display QR Code
 app.get('/', async (req, res) => {
-
     if (isConnected) {
-
         res.send('<h1>✅ Sprint Bot is Connected!</h1>');
-
     } else if (qrCodeData) {
-
         const qrImage = await QRCode.toDataURL(qrCodeData);
-
-        res.send(`<div style="text-align:center;"><h1>Scan with WhatsApp</h1><img src="${qrImage}" style="border:1px solid #ccc;"></div>`);
-
+        res.send(`
+            <div style="text-align:center; font-family: sans-serif; padding-top: 50px;">
+                <h1>Scan with WhatsApp</h1>
+                <img src="${qrImage}" style="border:1px solid #ccc; width:300px;">
+                <p>Refresh page if code expires.</p>
+            </div>
+        `);
     } else {
-
         res.send('<h1>⏳ Booting up... refresh in 10s.</h1>');
-
     }
-
 });
 
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
 
+// =======================
+//   DATABASE & MONGOOSE
+// =======================
 
-app.listen(port, '0.0.0.0', () => console.log(`Server running on port ${port}`));
-
-
-
-// --- 2. DATABASE SCHEMA ---
-
+// Daily stats schema
 const dailyStatsSchema = new mongoose.Schema({
-
     userId: String,
-
     name: String,
-
     groupId: String,
-
     date: String,
-
-    words: Number
-
+    words: { type: Number, default: 0 }
 });
+const DailyStats = mongoose.model("DailyStats", dailyStatsSchema);
 
-const DailyStats = mongoose.model('DailyStats', dailyStatsSchema);
-
-
-
-// --- 3. BOT LOGIC ---
-
+// Connection Check
 const MONGO_URI = process.env.MONGO_URI; 
+if (!MONGO_URI) {
+    console.error("❌ ERROR: MONGO_URI is missing in Render Environment Variables!");
+    process.exit(1);
+}
 
+// In-memory storage for active sprints
+let activeSprints = {}; 
 
+// =======================
+//   MAIN LOGIC WRAPPER
+// =======================
+mongoose.connect(MONGO_URI)
+    .then(() => {
+        console.log("✅ MongoDB connected successfully");
 
-mongoose.connect(MONGO_URI).then(() => {
+        const store = new MongoStore({ mongoose: mongoose });
 
-    const store = new MongoStore({ mongoose: mongoose });
-
-    const client = new Client({
-
-        authStrategy: new RemoteAuth({ store: store, backupSyncIntervalMs: 300000 }),
-
-        puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }
-
-    });
-
-
-
-    const sprintData = new Map();
-
-
-
-    client.on('qr', (qr) => { qrCodeData = qr; console.log('New QR Code generated'); });
-
-    client.on('ready', () => { isConnected = true; console.log('Client is ready!'); });
-
-
-
-    client.on('message', async msg => {
-
-        const chat = await msg.getChat();
-
-        if (!chat.isGroup) return;
-
-
-
-        const chatId = chat.id._serialized;
-
-        const message = msg.body.toLowerCase().trim();
-
-        const contact = await msg.getContact();
-
-        const senderId = contact.id._serialized;
-
-        const senderName = contact.pushname || contact.number;
-
-
-
-        if (!sprintData.has(chatId)) {
-
-            sprintData.set(chatId, { active: false, collecting: false, participants: new Map() });
-
-        }
-
-        const currentSprint = sprintData.get(chatId);
-
-
-
-        // --- COMMAND: !HELP ---
-
-        if (message === '!help' || message === '!commands') {
-
-            await msg.reply(
-
-                `🤖 **SPRINT BOT COMMANDS**\n\n` +
-
-                `🏃 **!sprint 15** → Start a 15 min sprint\n` +
-
-                `⏳ **!time** → Check remaining time\n` +
-
-                `📝 **!wc 500** → Log 500 words\n` +
-
-                `➕ **!wc add 200** → Add 200 to your score\n` +
-
-                `🏁 **!finish** → End sprint & show results\n` +
-
-                `📅 **!daily** → Show today's leaderboard\n` +
-
-                `🚫 **!cancel** → Cancel current sprint`
-
-            );
-
-        }
-
-
-
-        // --- COMMAND: !SPRINT ---
-
-        if (message.startsWith('!sprint')) {
-
-            if (currentSprint.active || currentSprint.collecting) {
-
-                return msg.reply('⚠️ Sprint already in progress!');
-
+        const client = new Client({
+            authStrategy: new RemoteAuth({
+                store: store,
+                backupSyncIntervalMs: 300000
+            }),
+            puppeteer: {
+                headless: true,
+                args: [
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-accelerated-2d-canvas",
+                    "--no-first-run",
+                    "--no-zygote",
+                    "--single-process",
+                    "--disable-gpu"
+                ]
             }
+        });
 
+        // =======================
+        //   CLIENT EVENT LISTENERS
+        // =======================
 
+        client.on("qr", qr => {
+            qrCodeData = qr; 
+            console.log("New QR Code generated");
+        });
 
-            const args = message.split(' ');
+        client.on("ready", () => {
+            isConnected = true;
+            console.log("Client is ready!");
+        });
 
-            let duration = parseInt(args[1]) || 15;
+        // =======================
+        //     MESSAGE HANDLER
+        // =======================
 
-            if (duration > 180) duration = 180;
+        client.on("message", async msg => {
+            try {
+                const chat = await msg.getChat();
+                if (!chat.isGroup) return; 
 
+                const chatId = chat.id._serialized;
 
-
-            currentSprint.active = true;
-
-            currentSprint.collecting = false;
-
-            currentSprint.duration = duration;
-
-            currentSprint.participants.clear();
-
-            currentSprint.startTime = Date.now();
-
-            currentSprint.endTime = Date.now() + (duration * 60 * 1000);
-
-
-
-            await chat.sendMessage(`🚀 **SPRINT STARTED!**\n\n⏱️ **${duration} Minutes** on the clock.\n🏁 Go write!`);
-
-
-
-            setTimeout(async () => {
-
-                if (!currentSprint.active) return;
-
-                currentSprint.active = false;
-
-                currentSprint.collecting = true;
-
+                // --- 🛡️ SAFETY NET: SMART NAME RECOVERY ---
+                let senderId = msg.author || msg.from;
+                let senderName = "Writer"; 
+                let realContactObj = null; // Store the REAL object if we find it
                 
-
-                await chat.sendMessage(
-
-                    `🛑 **TIME'S UP!**\n\n` +
-
-                    `Reply with *!wc [number]* to log your words.\n` +
-
-                    `Type *!finish* to see the leaderboard.`
-
-                );
-
-            }, duration * 60 * 1000);
-
-        }
-
-
-
-        // --- COMMAND: !TIME ---
-
-        if (message === '!time') {
-
-            if (!currentSprint.active) return msg.reply('❌ No sprint running.');
-
-            const remainingMs = currentSprint.endTime - Date.now();
-
-            const minutes = Math.floor((remainingMs / 1000) / 60);
-
-            const seconds = Math.floor((remainingMs / 1000) % 60);
-
-            await msg.reply(`⏳ **Time Remaining:** ${minutes}m ${seconds}s`);
-
-        }
-
-
-
-        // --- COMMAND: !WC (Fixed to work during sprint) ---
-
-        if (message.startsWith('!wc')) {
-
-            // Allow if active OR collecting
-
-            if (!currentSprint.active && !currentSprint.collecting) return;
-
-
-
-            const args = message.split(' ');
-
-            let countInput = 0;
-
-            let isAdditive = false;
-
-
-
-            if (args[1] === 'add' || args[1] === '+') {
-
-                countInput = parseInt(args[2]);
-
-                isAdditive = true;
-
-            } else {
-
-                countInput = parseInt(args[1]);
-
-            }
-
-
-
-            if (isNaN(countInput)) return;
-
-
-
-            let userData = currentSprint.participants.get(senderId) || { name: senderName, count: 0, contactObj: contact };
-
-            
-
-            if (isAdditive) {
-
-                userData.count += countInput;
-
-                // Only reply with text if we are in collection mode (to avoid spam during sprint)
-
-                if(currentSprint.collecting) await msg.reply(`➕ Added ${countInput}. Total: *${userData.count}*`);
-
-                else await msg.react('✍️'); 
-
-            } else {
-
-                userData.count = countInput;
-
-                if(currentSprint.collecting) await msg.react('✅');
-
-                else await msg.react('✍️'); // React with writing hand during sprint
-
-            }
-
-
-
-            currentSprint.participants.set(senderId, userData);
-
-        }
-
-
-
-        // --- COMMAND: !FINISH ---
-
-        if (message === '!finish') {
-
-            if (!currentSprint.collecting && !currentSprint.active) return;
-
-            
-
-            if (currentSprint.participants.size === 0) {
-
-                currentSprint.active = false;
-
-                currentSprint.collecting = false;
-
-                return msg.reply('❌ Sprint ended. No words logged.');
-
-            }
-
-
-
-            const sortedResults = Array.from(currentSprint.participants.values()).sort((a, b) => b.count - a.count);
-
-            let leaderboard = `🏆 **SPRINT RESULTS** 🏆\n\n`;
-
-            const mentions = [];
-
-            const todayDate = new Date().toISOString().split('T')[0];
-
-
-
-            for (let i = 0; i < sortedResults.length; i++) {
-
-                const p = sortedResults[i];
-
-                const medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : '🎖️'));
-
-                const wpm = Math.round(p.count / currentSprint.duration);
-
-
-
-                leaderboard += `${medal} @${p.contactObj.id.user} : *${p.count}* (${wpm} wpm)\n`;
-
-                mentions.push(p.contactObj);
-
-
-
                 try {
+                    const contact = await msg.getContact();
+                    senderId = contact.id._serialized;
+                    senderName = contact.pushname || contact.name || contact.number;
+                    // SAVE THIS! This is the only object safe to tag
+                    realContactObj = contact; 
+                } catch (err) {
+                    // Fallback to raw data
+                    if (msg._data && msg._data.notifyName) {
+                        senderName = msg._data.notifyName;
+                    } else {
+                        senderName = senderId.split('@')[0];
+                    }
+                }
 
-                    await DailyStats.findOneAndUpdate(
+                if (!msg.body.startsWith("!")) return;
 
-                        { userId: p.contactObj.id._serialized, groupId: chatId, date: todayDate },
+                const args = msg.body.trim().split(" ");
+                const command = args[0].toLowerCase();
 
-                        { $inc: { words: p.count }, $setOnInsert: { name: p.name } },
+                // --- HELP COMMAND ---
+                if (command === "!help") {
+                    return msg.reply(
+                        `🤖 **SPRINT BOT COMMANDS**\n\n` +
+                        `🏃 **!sprint 15** → Start 15 min sprint\n` +
+                        `📝 **!wc 500** → Log 500 words\n` +
+                        `➕ **!wc add 200** → Add 200 words\n` +
+                        `🏁 **!finish** → End & show results\n` +
+                        `📅 **!daily** → Today's stats\n` +
+                        `🚫 **!cancel** → Cancel sprint`
+                    );
+                }
 
-                        { upsert: true, new: true }
+                // =======================
+                //   START SPRINT
+                // =======================
+                if (command === "!sprint") {
+                    let minutes = parseInt(args[1]);
+                    if (isNaN(minutes) || minutes <= 0 || minutes > 180) {
+                        return msg.reply("❌ Invalid time. Use: `!sprint 20`");
+                    }
 
+                    if (activeSprints[chatId]) {
+                        return msg.reply("⚠️ A sprint is already running in this chat.");
+                    }
+
+                    activeSprints[chatId] = {
+                        endsAt: Date.now() + minutes * 60000,
+                        participants: {} 
+                    };
+
+                    await chat.sendMessage(
+                        `🏁 *Writing Sprint Started!*\nDuration: *${minutes} minutes*\n\nUse *!wc <number>* to log words.`
                     );
 
-                } catch (err) { console.error("DB Error:", err); }
+                    // Auto-ping when time is up
+                    setTimeout(async () => {
+                        if (activeSprints[chatId]) {
+                            await chat.sendMessage(`🛑 **TIME'S UP!**\n\nReply with *!wc [number]* now.\nType *!finish* to end.`);
+                        }
+                    }, minutes * 60000);
+                    return;
+                }
 
+                // =======================
+                //   SUBMIT WORD COUNT
+                // =======================
+                if (command === "!wc") {
+                    const sprint = activeSprints[chatId];
+                    if (!sprint) {
+                        return msg.reply("❌ No active sprint.\nStart one with: `!sprint 20`");
+                    }
+
+                    let count = 0;
+                    let isAdding = false;
+
+                    if (args[1] === 'add' || args[1] === '+') {
+                        count = parseInt(args[2]);
+                        isAdding = true;
+                    } else {
+                        count = parseInt(args[1]);
+                    }
+
+                    if (isNaN(count) || count < 0) {
+                        return msg.reply("❌ Invalid number.\nUse: `!wc 456`");
+                    }
+
+                    // Initialize or Update User
+                    // We save 'realContactObj' here so we can use it later for tagging
+                    if (!sprint.participants[senderId]) {
+                        sprint.participants[senderId] = { 
+                            name: senderName, 
+                            words: 0,
+                            contact: realContactObj 
+                        };
+                    } else {
+                        // If we didn't have the contact object before but we do now, update it
+                        if (realContactObj) {
+                            sprint.participants[senderId].contact = realContactObj;
+                        }
+                    }
+
+                    if (isAdding) {
+                        sprint.participants[senderId].words += count;
+                        await msg.reply(`➕ Added. Total: *${sprint.participants[senderId].words}*`);
+                    } else {
+                        sprint.participants[senderId].words = count;
+                        await msg.react('✅');
+                    }
+                    return;
+                }
+
+                // =======================
+                //      FINISH SPRINT
+                // =======================
+                if (command === "!finish") {
+                    const sprint = activeSprints[chatId];
+                    if (!sprint) {
+                        return msg.reply("❌ No active sprint running.");
+                    }
+
+                    const date = todayString();
+                    const leaderboardArray = Object.entries(sprint.participants)
+                        .map(([uid, data]) => ({ ...data, uid })) 
+                        .sort((a, b) => b.words - a.words);
+
+                    if (leaderboardArray.length === 0) {
+                        delete activeSprints[chatId];
+                        return msg.reply("🏁 Sprint ended! No entries recorded.");
+                    }
+
+                    // Ensure we have canonical Contact objects for mentions (safe, non-fatal)
+                    let mentions = [];
+                    try {
+                        for (let p of leaderboardArray) {
+                            if (p.contact && p.contact.id && p.contact.id._serialized) {
+                                try {
+                                    // Get the canonical Contact object right before sending
+                                    const canonical = await client.getContactById(p.contact.id._serialized);
+                                    if (canonical && canonical.id) {
+                                        p.contact = canonical;
+                                        mentions.push(canonical);
+                                    }
+                                } catch (err) {
+                                    // don't throw — keep going, we'll use plain text for this entry
+                                    console.warn("Could not refresh contact for mention:", p.contact && p.contact.id && p.contact.id._serialized, err && err.message);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        // Very defensive: if anything unexpected happens, clear mentions so we don't pass bad data
+                        console.warn("Unexpected error while preparing mentions, proceeding without mentions:", err && err.message);
+                        mentions = [];
+                    }
+
+                    // Build leaderboard text using the refreshed contacts
+                    let leaderboardText = `🏁 *Sprint Finished!*\n📅 Date: ${date}\n\n*Leaderboard:*\n`;
+                    for (let i = 0; i < leaderboardArray.length; i++) {
+                        let p = leaderboardArray[i];
+                        if (p.contact && p.contact.id && p.contact.id.user) {
+                            leaderboardText += `${i + 1}. @${p.contact.id.user} — ${p.words} words\n`;
+                        } else {
+                            leaderboardText += `${i + 1}. ${p.name} — ${p.words} words\n`;
+                        }
+
+                        // Save to DB
+                        try {
+                            await DailyStats.findOneAndUpdate(
+                                { userId: p.uid, groupId: chatId, date },
+                                { name: p.name, $inc: { words: p.words } },
+                                { upsert: true, new: true }
+                            );
+                        } catch (err) {
+                            console.error("DB Save Error", err);
+                        }
+                    }
+
+                    delete activeSprints[chatId];
+
+                    // Try sending with mentions, but gracefully fall back to sending without them if anything fails
+                    try {
+                        if (mentions.length > 0) {
+                            await chat.sendMessage(leaderboardText, { mentions });
+                        } else {
+                            await chat.sendMessage(leaderboardText);
+                        }
+                    } catch (err) {
+                        console.warn("Sending leaderboard with mentions failed, retrying without mentions:", err && err.message);
+                        try {
+                            await chat.sendMessage(leaderboardText);
+                        } catch (err2) {
+                            console.error("Failed to send leaderboard message:", err2);
+                        }
+                    }
+                    return;
+                }
+
+                // =======================
+                //      DAILY STATS
+                // =======================
+                if (command === "!daily") {
+                    const date = todayString();
+                    const stats = await DailyStats.find({ groupId: chatId, date }).sort({ words: -1 });
+
+                    if (stats.length === 0) return msg.reply("📅 No stats recorded today.");
+
+                    let text = `📅 **Daily Leaderboard (${date})**\n\n`;
+                    stats.forEach((s, i) => {
+                        text += `${i+1}. ${s.name}: ${s.words}\n`;
+                    });
+                    await chat.sendMessage(text);
+                }
+
+                // =======================
+                //      CANCEL SPRINT
+                // =======================
+                if (command === "!cancel") {
+                    if (activeSprints[chatId]) {
+                        delete activeSprints[chatId];
+                        await msg.reply("🚫 Sprint cancelled.");
+                    }
+                }
+
+            } catch (err) {
+                console.error("Message handler error:", err);
             }
+        });
 
-
-
-            leaderboard += `\nStats saved to Daily Leaderboard! ✅`;
-
-            leaderboard += `\n\nGreat job everyone! Type *!sprint* to go again.`;
-
-            
-
-            await chat.sendMessage(leaderboard, { mentions: mentions });
-
-
-
-            currentSprint.collecting = false;
-
-            currentSprint.active = false;
-
-        }
-
-
-
-        // --- COMMAND: !DAILY ---
-
-        if (message === '!daily') {
-
-            const todayDate = new Date().toISOString().split('T')[0];
-
-            const stats = await DailyStats.find({ groupId: chatId, date: todayDate }).sort({ words: -1 });
-
-
-
-            if (stats.length === 0) return msg.reply('📅 No stats recorded today.');
-
-
-
-            let response = `📅 **DAILY LEADERBOARD (${todayDate})**\n\n`;
-
-            stats.forEach((s, index) => {
-
-                response += `${index + 1}. ${s.name}: *${s.words} words*\n`;
-
-            });
-
-            await chat.sendMessage(response);
-
-        }
-
-
-
-        // --- COMMAND: !CANCEL ---
-
-        if (message === '!cancel') {
-
-            if (currentSprint.active || currentSprint.collecting) {
-
-                currentSprint.active = false;
-
-                currentSprint.collecting = false;
-
-                await msg.reply('🚫 Sprint cancelled.');
-
-            }
-
-        }
-
+        // Start the bot NOW that DB is ready
+        client.initialize();
+    })
+    .catch(err => {
+        console.error("❌ MongoDB connection error:", err);
+        process.exit(1);
     });
-
-
-
-    client.initialize();
-
-}).catch(err => console.error("MongoDB connection error:", err));
