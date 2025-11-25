@@ -6,6 +6,7 @@ const { MongoStore } = require('wwebjs-mongo');
 const mongoose = require("mongoose");
 const QRCode = require('qrcode');
 const express = require('express');
+const http = require('http'); // Required for Keep-Alive
 require("dotenv").config();
 
 // =======================
@@ -36,6 +37,18 @@ app.get('/', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+
+// =======================
+// 🟢 KEEP-ALIVE (FIX FOR SLEEP)
+// =======================
+// This prevents Render from putting the app to sleep after 15 mins
+setInterval(() => {
+    http.get(`http://localhost:${PORT}/`, (res) => {
+        // Just pinging to keep awake
+    }).on('error', (err) => {
+        // Ignore errors during ping
+    });
+}, 5 * 60 * 1000); // Ping every 5 minutes
 
 // =======================
 //   DATABASE SCHEMAS
@@ -180,9 +193,14 @@ mongoose.connect(MONGO_URI)
                         return msg.reply("⚠️ A sprint is already running.");
                     }
 
+                    const endTime = Date.now() + minutes * 60000;
+                    
+                    // DEBUG LOGGING
+                    console.log(`Starting sprint. Duration: ${minutes}m. Ends at: ${new Date(endTime).toLocaleTimeString()}`);
+
                     activeSprints[chatId] = {
-                        duration: minutes, // Saved for WPM Calc
-                        endsAt: Date.now() + minutes * 60000,
+                        duration: minutes, 
+                        endsAt: endTime,
                         participants: {}
                     };
 
@@ -192,11 +210,12 @@ mongoose.connect(MONGO_URI)
 
                     // --- 🛡️ FIX: Try/Catch inside Timeout ---
                     setTimeout(async () => {
+                        // Check if sprint still exists (wasn't cancelled)
                         if (activeSprints[chatId]) {
                             try {
                                 await chat.sendMessage(`🛑 **TIME'S UP!**\n\nReply with *!wc [number]* now.\nType *!finish* to end.`);
                             } catch (e) {
-                                console.log("Failed to send timeout message (connection likely lost temporarily).");
+                                console.log("Failed to send timeout message (connection likely lost temporarily).", e);
                             }
                         }
                     }, minutes * 60000);
@@ -255,7 +274,6 @@ mongoose.connect(MONGO_URI)
                         return msg.reply("🏁 Sprint ended! No entries recorded.");
                     }
 
-                    // --- NEW MEDAL HEADER ---
                     let leaderboardText = `🏆 *SPRINT RESULTS* 🏆\n\n`;
                     let goalUpdateText = "";
 
@@ -308,7 +326,6 @@ mongoose.connect(MONGO_URI)
 
                     delete activeSprints[chatId];
 
-                    // --- FOOTER MESSAGE ---
                     leaderboardText += "\nGreat job everyone! Type !sprint to go again.";
                     
                     // Mention logic for goal completion
