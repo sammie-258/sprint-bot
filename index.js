@@ -258,29 +258,27 @@ mongoose.connect(MONGO_URI)
                     let mentions = [];
                     
                     for (let i = 0; i < leaderboardArray.length; i++) {
-                        let p = leaderboardArray[i];
-                        
-                        // SAFE TAGGING LOGIC
-                        if (p.contact) {
-                            // If we have a REAL contact object, use the @ tag
-                            leaderboardText += `${i + 1}. @${p.contact.id.user} — ${p.words} words\n`;
-                            mentions.push(p.contact);
-                        } else {
-                            // If it's a fallback contact, just print the text name (No Tag)
-                            leaderboardText += `${i + 1}. ${p.name} — ${p.words} words\n`;
-                        }
+    let p = leaderboardArray[i];
 
-                        // Save to DB
-                        try {
-                            await DailyStats.findOneAndUpdate(
-                                { userId: p.uid, groupId: chatId, date },
-                                { name: p.name, $inc: { words: p.words } },
-                                { upsert: true, new: true }
-                            );
-                        } catch (err) {
-                            console.error("DB Save Error", err);
-                        }
-                    }
+    if (p.contact) {
+        // Perfect tagging with ZERO-WIDTH JOINER
+        leaderboardText += `${i + 1}. @${p.contact.id.user}\u200D — ${p.words} words\n`;
+        mentions.push(p.contact);
+    } else {
+        leaderboardText += `${i + 1}. ${p.name} — ${p.words} words\n`;
+    }
+
+    try {
+        await DailyStats.findOneAndUpdate(
+            { userId: p.uid, groupId: chatId, date },
+            { name: p.name, $inc: { words: p.words } },
+            { upsert: true, new: true }
+        );
+    } catch (err) {
+        console.error("DB Save Error", err);
+    }
+}
+
 
                     delete activeSprints[chatId];
                     
