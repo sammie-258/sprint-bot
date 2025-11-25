@@ -181,6 +181,7 @@ mongoose.connect(MONGO_URI)
                     }
 
                     activeSprints[chatId] = {
+                        duration: minutes, // Saved for WPM Calc
                         endsAt: Date.now() + minutes * 60000,
                         participants: {}
                     };
@@ -254,13 +255,25 @@ mongoose.connect(MONGO_URI)
                         return msg.reply("🏁 Sprint ended! No entries recorded.");
                     }
 
-                    let leaderboardText = `🏁 *Sprint Finished!*\n📅 Date: ${date}\n\n*Leaderboard:*\n`;
+                    // --- NEW MEDAL HEADER ---
+                    let leaderboardText = `🏆 *SPRINT RESULTS* 🏆\n\n`;
                     let goalUpdateText = "";
 
                     // Process results
                     for (let i = 0; i < leaderboardArray.length; i++) {
                         let p = leaderboardArray[i];
-                        leaderboardText += `${i + 1}. *${p.name}* — ${p.words} words\n`;
+                        
+                        // Medal Logic
+                        let medal = "🎖️";
+                        if (i === 0) medal = "🥇";
+                        if (i === 1) medal = "🥈";
+                        if (i === 2) medal = "🥉";
+
+                        // WPM Logic
+                        const wpm = Math.round(p.words / sprint.duration);
+
+                        // Format: 🥇 name : 50 words (2 WPM)
+                        leaderboardText += `${medal} ${p.name} : ${p.words} words (${wpm} WPM)\n`;
 
                         // 1. Save to DailyStats
                         try {
@@ -295,8 +308,8 @@ mongoose.connect(MONGO_URI)
 
                     delete activeSprints[chatId];
 
-                    // --- ADDED YOUR MESSAGE HERE ---
-                    leaderboardText += "\n\nGreat job everyone! Type !sprint to go again";
+                    // --- FOOTER MESSAGE ---
+                    leaderboardText += "\nGreat job everyone! Type !sprint to go again.";
                     
                     // Mention logic for goal completion
                     if (goalUpdateText) {
@@ -322,7 +335,11 @@ mongoose.connect(MONGO_URI)
 
                     let text = `📅 **Daily Leaderboard (${date})**\n\n`;
                     stats.forEach((s, i) => {
-                        text += `${i+1}. ${s.name}: ${s.words}\n`;
+                        let medal = "🎖️";
+                        if (i === 0) medal = "🥇";
+                        if (i === 1) medal = "🥈";
+                        if (i === 2) medal = "🥉";
+                        text += `${medal} ${s.name}: ${s.words}\n`;
                     });
                     await chat.sendMessage(text);
                 }
@@ -358,9 +375,13 @@ mongoose.connect(MONGO_URI)
 
                     if (stats.length === 0) return msg.reply(`📉 No stats found for the last ${days} days.`);
 
-                    let text = `🏆 **${title} Leaderboard (Top 15)**\n\n`;
+                    let text = `🏆 **${title} Leaderboard**\n\n`;
                     stats.forEach((s, i) => {
-                        text += `${i+1}. ${s.name}: ${s.totalWords}\n`;
+                        let medal = "🎖️";
+                        if (i === 0) medal = "🥇";
+                        if (i === 1) medal = "🥈";
+                        if (i === 2) medal = "🥉";
+                        text += `${medal} ${s.name}: ${s.totalWords}\n`;
                     });
                     await chat.sendMessage(text);
                 }
