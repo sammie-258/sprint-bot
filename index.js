@@ -41,7 +41,6 @@ app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`))
 // =======================
 // 🟢 KEEP-ALIVE (FIX FOR SLEEP)
 // =======================
-// This prevents Render from putting the app to sleep after 15 mins
 setInterval(() => {
     http.get(`http://localhost:${PORT}/`, (res) => {
         // Just pinging to keep awake
@@ -167,6 +166,7 @@ mongoose.connect(MONGO_URI)
                     return msg.reply(
                         `🤖 **SPRINT BOT COMMANDS**\n\n` +
                         `🏃 **!sprint 15** → Start 15 min sprint\n` +
+                        `⏱️ **!time** → Check time remaining\n` +
                         `📝 **!wc 500** → Log words for sprint\n` +
                         `🏁 **!finish** → End sprint & save stats\n` +
                         `🚫 **!cancel** → Cancel current sprint\n\n` +
@@ -213,6 +213,7 @@ mongoose.connect(MONGO_URI)
                         // Check if sprint still exists (wasn't cancelled)
                         if (activeSprints[chatId]) {
                             try {
+                                console.log(`Sprint finished for chat: ${chatId}`); // Log for debugging
                                 await chat.sendMessage(`🛑 **TIME'S UP!**\n\nReply with *!wc [number]* now.\nType *!finish* to end.`);
                             } catch (e) {
                                 console.log("Failed to send timeout message (connection likely lost temporarily).", e);
@@ -220,6 +221,27 @@ mongoose.connect(MONGO_URI)
                         }
                     }, minutes * 60000);
                     return;
+                }
+
+                // ---------------------------
+                //  COMMAND: TIME (NEW!)
+                // ---------------------------
+                if (command === "!time") {
+                    const sprint = activeSprints[chatId];
+                    if (!sprint) {
+                        return msg.reply("❌ No active sprint.");
+                    }
+
+                    const remainingMs = sprint.endsAt - Date.now();
+                    
+                    if (remainingMs <= 0) {
+                        return msg.reply("🛑 Time is up! Type `!finish` to end.");
+                    }
+
+                    const mins = Math.floor((remainingMs / 1000) / 60);
+                    const secs = Math.floor((remainingMs / 1000) % 60);
+
+                    return msg.reply(`⏳ Time remaining: *${mins}m ${secs}s*`);
                 }
 
                 // ---------------------------
