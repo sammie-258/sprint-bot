@@ -110,7 +110,6 @@ mongoose.connect(MONGO_URI)
         };
 
         const getTodayDateGMT1 = () => {
-            // Returns YYYY-MM-DD in GMT+1
             return new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         };
 
@@ -165,6 +164,7 @@ mongoose.connect(MONGO_URI)
                         await chat.sendMessage(`⚠️ Scheduled sprint skipped because a sprint is already running.`);
                     } else {
                         const chat = await client.getChatById(sprint.groupId);
+                        // Mention the creator
                         await chat.sendMessage(`(This sprint was scheduled by @${sprint.createdBy.split('@')[0]})`, {
                             mentions: [sprint.createdBy]
                         });
@@ -252,7 +252,7 @@ mongoose.connect(MONGO_URI)
                 }
 
                 // ---------------------------
-                //  COMMAND: SCHEDULE (UPDATED)
+                //  COMMAND: SCHEDULE
                 // ---------------------------
                 if (command === "!schedule") {
                     if (args[2]?.toLowerCase() !== 'in') {
@@ -275,7 +275,6 @@ mongoose.connect(MONGO_URI)
                         createdBy: senderId
                     });
 
-                    // Format time for display in GMT+1
                     const timeString = formatTimeGMT1(startTime);
                     
                     return msg.reply(`📅 **Sprint Scheduled!**\n\nDuration: ${durationMins} mins\nStart: In ${delayMins} mins (approx ${timeString} GMT+1)`);
@@ -339,7 +338,7 @@ mongoose.connect(MONGO_URI)
                 }
 
                 // ---------------------------
-                //  COMMAND: FINISH
+                //  COMMAND: FINISH (UPDATED WITH BLUE TAGS)
                 // ---------------------------
                 if (command === "!finish") {
                     const sprint = activeSprints[chatId];
@@ -357,15 +356,22 @@ mongoose.connect(MONGO_URI)
 
                     let leaderboardText = `🏆 *SPRINT RESULTS* 🏆\n\n`;
                     let goalUpdateText = "";
+                    let mentionsList = []; // Store IDs to mention
 
                     for (let i = 0; i < leaderboardArray.length; i++) {
                         let p = leaderboardArray[i];
+                        
+                        // Collect ID for mentioning
+                        mentionsList.push(p.uid);
+
                         let medal = "🎖️";
                         if (i === 0) medal = "🥇";
                         if (i === 1) medal = "🥈";
                         if (i === 2) medal = "🥉";
                         const wpm = Math.round(p.words / sprint.duration);
-                        leaderboardText += `${medal} ${p.name} : ${p.words} words (${wpm} WPM)\n`;
+                        
+                        // Use @number format in text
+                        leaderboardText += `${medal} @${p.uid.split('@')[0]} : ${p.words} words (${wpm} WPM)\n`;
 
                         try {
                             await DailyStats.findOneAndUpdate(
@@ -390,12 +396,14 @@ mongoose.connect(MONGO_URI)
                     leaderboardText += "\nGreat job everyone! Type !sprint to go again.";
                     
                     if (goalUpdateText) {
-                         await chat.sendMessage(leaderboardText + "\n" + goalUpdateText, { 
-                             mentions: leaderboardArray.filter(p => goalUpdateText.includes(p.uid.split('@')[0])).map(p => p.uid) 
-                         });
-                    } else {
-                        await chat.sendMessage(leaderboardText);
+                         leaderboardText += "\n" + goalUpdateText;
                     }
+
+                    // Send Message with all collected mentions
+                    await chat.sendMessage(leaderboardText, { 
+                        mentions: mentionsList
+                    });
+                    
                     return;
                 }
 
@@ -406,7 +414,6 @@ mongoose.connect(MONGO_URI)
                     const isDaily = command === "!daily";
                     const days = isDaily ? 1 : (command === "!weekly" ? 7 : 30);
                     
-                    // Use helper for formatted title
                     const todayGMT1 = todayString();
                     const title = isDaily ? `Daily Leaderboard (${todayGMT1})` : (command === "!weekly" ? "Weekly Leaderboard" : "Monthly Leaderboard");
                     
