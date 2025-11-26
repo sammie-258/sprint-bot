@@ -53,8 +53,9 @@ app.get('/api/stats', async (req, res) => {
             qrImage = await QRCode.toDataURL(qrCodeData);
         }
 
-        // 1. Fetch Top 10 All-Time
+        // 1. Fetch Top 10 All-Time (Sorted by latest date to get correct name)
         const topWritersRaw = await DailyStats.aggregate([
+            { $sort: { timestamp: -1 } }, // Sort newest first to grab latest name
             { $group: { _id: "$userId", name: { $first: "$name" }, total: { $sum: "$words" } } },
             { $sort: { total: -1 } },
             { $limit: 10 }
@@ -308,31 +309,24 @@ mongoose.connect(MONGO_URI)
                 const command = args[0].toLowerCase();
                 const todayString = getTodayDateGMT1; 
 
-                // ---------------------------
-                //  COMMAND: HELP
-                // ---------------------------
+                // COMMANDS
                 if (command === "!help") {
                     return msg.reply(
                         `🤖 **SPRINT BOT COMMANDS**\n\n` +
                         `🏃 **!sprint 15** → Start 15 min sprint\n` +
                         `📅 **!schedule 20 in 60** → Schedule sprint\n` +
                         `🏆 **!top10** → Global Hall of Fame\n` +
-                        `⏱️ **!time** → Check time remaining\n` +
                         `📝 **!wc 500** → Log words\n` +
+                        `📛 **!myname Sam** → Fix your display name\n` +
                         `🏁 **!finish** → End sprint\n` +
-                        `🚫 **!cancel** → Cancel active sprint\n\n` +
-                        `📊 **STATS**\n` +
-                        `📅 **!daily** | 🗓️ **!weekly** | 🏆 **!monthly**\n\n` +
-                        `🎯 **GOALS**\n` +
-                        `🆕 **!goal set 50000** | 👀 **!goal check**`
+                        `📊 **STATS**: !daily | !weekly | !monthly\n` +
+                        `🎯 **GOALS**: !goal set 50000`
                     );
                 }
 
-                // ---------------------------
-                //  COMMAND: TOP10 (Global)
-                // ---------------------------
                 if (command === "!top10" || command === "!top") {
                     const top = await DailyStats.aggregate([
+                        { $sort: { timestamp: -1 } }, // Sort date desc to get latest name
                         { $group: { _id: "$userId", name: { $first: "$name" }, total: { $sum: "$words" } } },
                         { $sort: { total: -1 } },
                         { $limit: 10 }
@@ -345,71 +339,45 @@ mongoose.connect(MONGO_URI)
                         let medal = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : "🎖️"));
                         text += `${medal} ${w.name}: **${w.total.toLocaleString()}**\n`;
                     });
-                    
-                    // Add footer (Optional: put your dashboard link here if you want)
-                    text += `\n👉 Keep writing to climb the ranks!`;
                     await chat.sendMessage(text);
                 }
 
-                // ---------------------------
-                //  COMMAND: SPRINT
-                // ---------------------------
+                // 🟢 NEW: !myname COMMAND (Fixes the "Writer" issue)
+                if (command === "!myname" || command === "!setname") {
+                    const newName = args.slice(1).join(" ");
+                    if (!newName) return msg.reply("❌ Please provide a name. Example: `!myname Sam`");
+
+                    // Update all past entries for this user
+                    await DailyStats.updateMany({ userId: senderId }, { name: newName });
+                    await PersonalGoal.updateMany({ userId: senderId }, { name: newName });
+
+                    return msg.reply(`✅ Name updated to **${newName}** for all stats!`);
+                }
+
                 if (command === "!sprint") {
                     let minutes = parseInt(args[1]);
-                    if (isNaN(minutes) || minutes <= 0 || minutes > 180) {
-                        return msg.reply("❌ Invalid time. Use: `!sprint 20`");
-                    }
-                    if (activeSprints[chatId]) {
-                        return msg.reply("⚠️ A sprint is already running.");
-                    }
-                    
+                    if (isNaN(minutes) || minutes <= 0 || minutes > 180) return msg.reply("❌ Invalid time. Use: `!sprint 20`");
+                    if (activeSprints[chatId]) return msg.reply("⚠️ A sprint is already running.");
                     await startSprintSession(chatId, minutes);
                     return;
                 }
 
-                // ---------------------------
-                //  COMMAND: SCHEDULE
-                // ---------------------------
                 if (command === "!schedule") {
-                    if (args[2]?.toLowerCase() !== 'in') {
-                        return msg.reply("❌ Format: `!schedule <duration> in <minutes>`\nExample: `!schedule 20 in 60`");
-                    }
-
+                    if (args[2]?.toLowerCase() !== 'in') return msg.reply("❌ Format: `!schedule <duration> in <minutes>`");
                     const durationMins = parseInt(args[1]);
                     const delayMins = parseInt(args[3]);
-
-                    if (isNaN(durationMins) || isNaN(delayMins) || durationMins <= 0 || delayMins <= 0) {
-                        return msg.reply("❌ Invalid numbers.");
-                    }
-
+                    if (isNaN(durationMins) || isNaN(delayMins)) return msg.reply("❌ Invalid numbers.");
                     const startTime = new Date(Date.now() + delayMins * 60000);
-
-                    await ScheduledSprint.create({
-                        groupId: chatId,
-                        startTime: startTime,
-                        duration: durationMins,
-                        createdBy: senderId
-                    });
-
-                    const timeString = formatTimeGMT1(startTime);
-                    return msg.reply(`📅 **Sprint Scheduled!**\n\nDuration: ${durationMins} mins\nStart: In ${delayMins} mins (approx ${timeString} GMT+1)`);
+                    await ScheduledSprint.create({ groupId: chatId, startTime, duration: durationMins, createdBy: senderId });
+                    return msg.reply(`📅 **Sprint Scheduled!**\n\nDuration: ${durationMins} mins\nStart: In ${delayMins} mins (approx ${formatTimeGMT1(startTime)} GMT+1)`);
                 }
 
-                // ---------------------------
-                //  COMMAND: UNSCHEDULE
-                // ---------------------------
                 if (command === "!unschedule") {
                     const result = await ScheduledSprint.deleteMany({ groupId: chatId });
-                    if (result.deletedCount > 0) {
-                        return msg.reply(`✅ Cancelled ${result.deletedCount} scheduled sprint(s).`);
-                    } else {
-                        return msg.reply("🤷 No upcoming sprints found.");
-                    }
+                    if (result.deletedCount > 0) return msg.reply(`✅ Cancelled ${result.deletedCount} scheduled sprint(s).`);
+                    return msg.reply("🤷 No upcoming sprints found.");
                 }
 
-                // ---------------------------
-                //  COMMAND: TIME
-                // ---------------------------
                 if (command === "!time") {
                     const sprint = activeSprints[chatId];
                     if (!sprint) return msg.reply("❌ No active sprint.");
@@ -420,28 +388,14 @@ mongoose.connect(MONGO_URI)
                     return msg.reply(`⏳ Time remaining: *${mins}m ${secs}s*`);
                 }
 
-                // ---------------------------
-                //  COMMAND: WC
-                // ---------------------------
                 if (command === "!wc") {
                     const sprint = activeSprints[chatId];
                     if (!sprint) return msg.reply("❌ No active sprint.");
-
                     let count = 0;
                     let isAdding = false;
-                    if (args[1] === 'add' || args[1] === '+') {
-                        count = parseInt(args[2]);
-                        isAdding = true;
-                    } else {
-                        count = parseInt(args[1]);
-                    }
-
+                    if (args[1] === 'add' || args[1] === '+') { count = parseInt(args[2]); isAdding = true; } else { count = parseInt(args[1]); }
                     if (isNaN(count) || count < 0) return msg.reply("❌ Invalid number.");
-
-                    if (!sprint.participants[senderId]) {
-                        sprint.participants[senderId] = { name: senderName, words: 0 };
-                    }
-
+                    if (!sprint.participants[senderId]) sprint.participants[senderId] = { name: senderName, words: 0 };
                     if (isAdding) {
                         sprint.participants[senderId].words += count;
                         await msg.reply(`➕ Added. Total: *${sprint.participants[senderId].words}*`);
@@ -452,16 +406,10 @@ mongoose.connect(MONGO_URI)
                     return;
                 }
 
-                // ---------------------------
-                //  COMMAND: FINISH
-                // ---------------------------
                 if (command === "!finish") {
                     const sprint = activeSprints[chatId];
                     if (!sprint) return msg.reply("❌ No active sprint running.");
-
                     const date = todayString();
-                    
-                    // Sort logic expanded for readability
                     const leaderboardArray = Object.entries(sprint.participants)
                         .map(([uid, data]) => ({ ...data, uid }))
                         .sort((a, b) => b.words - a.words);
@@ -473,7 +421,7 @@ mongoose.connect(MONGO_URI)
 
                     let leaderboardText = `🏆 *SPRINT RESULTS* 🏆\n\n`;
                     let goalUpdateText = "";
-                    let mentionsList = [];
+                    let mentionsList = []; 
 
                     for (let i = 0; i < leaderboardArray.length; i++) {
                         let p = leaderboardArray[i];
@@ -483,19 +431,19 @@ mongoose.connect(MONGO_URI)
                         if (i === 0) medal = "🥇";
                         if (i === 1) medal = "🥈";
                         if (i === 2) medal = "🥉";
-                        
                         const wpm = Math.round(p.words / sprint.duration);
                         leaderboardText += `${medal} @${p.uid.split('@')[0]} : ${p.words} words (${wpm} WPM)\n`;
 
-                        // DB Saving Logic
+                        // DB Logic Expanded for Readability
                         try {
+                            // Save Daily Stats
                             await DailyStats.findOneAndUpdate(
-                                { userId: p.uid, groupId: chatId, date },
-                                { name: p.name, $inc: { words: p.words }, timestamp: new Date() },
+                                { userId: p.uid, groupId: chatId, date }, 
+                                { name: p.name, $inc: { words: p.words }, timestamp: new Date() }, 
                                 { upsert: true, new: true }
                             );
 
-                            // Goal Check
+                            // Check Personal Goal
                             const goal = await PersonalGoal.findOne({ userId: p.uid, isActive: true });
                             if (goal) {
                                 goal.current += p.words;
@@ -506,31 +454,23 @@ mongoose.connect(MONGO_URI)
                                     await goal.save();
                                 }
                             }
-                        } catch (err) {
-                            console.error("DB Save Error", err);
+                        } catch (err) { 
+                            console.error("DB Save Error", err); 
                         }
                     }
 
                     delete activeSprints[chatId];
                     leaderboardText += "\nGreat job everyone! Type !sprint to go again.";
-                    
-                    if (goalUpdateText) {
-                         leaderboardText += "\n" + goalUpdateText;
-                    }
-
+                    if (goalUpdateText) leaderboardText += "\n" + goalUpdateText;
                     await chat.sendMessage(leaderboardText, { mentions: mentionsList });
                     return;
                 }
 
-                // ---------------------------
-                //  COMMAND: LEADERBOARDS
-                // ---------------------------
                 if (["!daily", "!weekly", "!monthly"].includes(command)) {
                     const isDaily = command === "!daily";
                     const days = isDaily ? 1 : (command === "!weekly" ? 7 : 30);
                     const todayGMT1 = todayString();
                     const title = isDaily ? `Daily Leaderboard (${todayGMT1})` : (command === "!weekly" ? "Weekly Leaderboard" : "Monthly Leaderboard");
-                    
                     let stats;
                     if (isDaily) {
                          stats = await DailyStats.find({ groupId: chatId, date: todayGMT1 }).sort({ words: -1 });
@@ -544,9 +484,7 @@ mongoose.connect(MONGO_URI)
                             { $limit: 15 }
                         ]);
                     }
-
                     if (stats.length === 0) return msg.reply(`📉 No stats found.`);
-
                     let text = `🏆 **${title}**\n\n`;
                     stats.forEach((s, i) => {
                         let medal = "🎖️";
@@ -558,9 +496,6 @@ mongoose.connect(MONGO_URI)
                     await chat.sendMessage(text);
                 }
 
-                // ---------------------------
-                //  COMMAND: GOAL
-                // ---------------------------
                 if (command === "!goal") {
                     const subCmd = args[1]?.toLowerCase();
                     if (subCmd === "set") {
@@ -579,9 +514,6 @@ mongoose.connect(MONGO_URI)
                     }
                 }
 
-                // ---------------------------
-                //  COMMAND: CANCEL
-                // ---------------------------
                 if (command === "!cancel") {
                     if (activeSprints[chatId]) {
                         delete activeSprints[chatId];
