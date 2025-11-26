@@ -62,10 +62,18 @@ app.get('/api/stats', async (req, res) => {
         ]);
         const topWriters = topWritersRaw.map(w => ({ name: w.name, words: w.total }));
 
-        // 2. Fetch Today's Top 10
+        // 2. Fetch Today's Top 10 (FIXED: Now Aggregates across groups)
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
-        const todayWritersRaw = await DailyStats.find({ date: todayStr }).sort({ words: -1 }).limit(10);
-        const todayWriters = todayWritersRaw.map(w => ({ name: w.name, words: w.words }));
+        
+        const todayWritersRaw = await DailyStats.aggregate([
+            { $match: { date: todayStr } }, // Filter for today
+            { $sort: { timestamp: -1 } },   // Sort for latest name
+            { $group: { _id: "$userId", name: { $first: "$name" }, total: { $sum: "$words" } } }, // Sum words across all groups
+            { $sort: { total: -1 } },       // Sort by highest words
+            { $limit: 10 }
+        ]);
+        
+        const todayWriters = todayWritersRaw.map(w => ({ name: w.name, words: w.total }));
 
         // 3. Totals
         const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
