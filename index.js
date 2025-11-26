@@ -283,17 +283,30 @@ mongoose.connect(MONGO_URI)
                 // COMMANDS
                 if (command === "!help") {
                     return msg.reply(
-                        `🤖 **SPRINT BOT COMMANDS**\n\n` +
-                        `🏃 **!sprint 15** → Start 15 min sprint\n` +
-                        `📅 **!schedule 20 in 60** → Schedule sprint\n` +
-                        `🏆 **!top10** → Global Hall of Fame\n` +
-                        `📝 **!wc 500** → Log words (during sprint)\n` +
-                        `✍️ **!log 500** → Log words manually (anytime)\n` +
-                        `📛 **!myname Sam** → Fix your display name\n` +
-                        `🏁 **!finish** → End sprint\n` +
-                        `📊 **STATS**: !daily | !weekly | !monthly\n` +
-                        `🎯 **GOALS**: !goal set 50000`
-                    );
+    `🤖 *SPRINT BOT MENU*\n\n` +
+    `🏃 *Sprinting*\n` +
+    `!sprint 20 : Start a 20 min sprint\n` +
+    `!wc 500 : Log 500 words\n` +
+    `!time : Check time remaining\n` +
+    `!finish : End sprint & view results\n` +
+    `!cancel : Stop the current timer\n\n` +
+
+    `📅 *Planning*\n` +
+    `!schedule 20 in 60 : Sprint in 60 mins\n` +
+    `!unschedule : Cancel scheduled sprints\n\n` +
+
+    `📊 *Stats & Goals*\n` +
+    `!daily : Today's leaderboard\n` +
+    `!weekly : Last 7 days leaderboard\n` +
+    `!monthly : Last 30 days leaderboard\n` +
+    `!top10 : All-time Hall of Fame\n` +
+    `!goal set 50000 : Set personal target\n` +
+    `!goal check : View goal progress\n\n` +
+
+    `⚙️ *Utilities*\n` +
+    `!log 500 : Manually add words (no timer)\n` +
+    `!myname YourName : Update your display name`
+);
                 }
 
                 // 🟢 MANUAL LOG
