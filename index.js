@@ -10,18 +10,26 @@ const http = require('http');
 require("dotenv").config();
 
 // =======================
-//   SERVER & WEB QR SETUP
+//   SERVER & API SETUP
 // =======================
 const app = express();
 const PORT = process.env.PORT || 3000;
 const TIMEZONE = "Africa/Lagos"; // GMT+1
 
+// 🟢 CORS: Allow external websites (like your cPanel site) to access this API
+app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*"); 
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+});
+
 let qrCodeData = null;
 let isConnected = false;
 
+// Root Route: Simple Status
 app.get('/', async (req, res) => {
     if (isConnected) {
-        res.send('<h1>✅ Sprint Bot is Connected!</h1>');
+        res.send('<h1>✅ Sprint Bot is Online</h1><p>API is active at /api/stats</p>');
     } else if (qrCodeData) {
         const qrImage = await QRCode.toDataURL(qrCodeData);
         res.send(`
@@ -33,6 +41,56 @@ app.get('/', async (req, res) => {
         `);
     } else {
         res.send('<h1>⏳ Booting up... refresh in 10s.</h1>');
+    }
+});
+
+// 🟢 NEW: API ENDPOINT (Your Dashboard pulls data from here)
+app.get('/api/stats', async (req, res) => {
+    try {
+        let qrImage = null;
+        if (!isConnected && qrCodeData) {
+            qrImage = await QRCode.toDataURL(qrCodeData);
+        }
+
+        // 1. Fetch Top 10 All-Time
+        const topWritersRaw = await DailyStats.aggregate([
+            { $group: { _id: "$userId", name: { $first: "$name" }, total: { $sum: "$words" } } },
+            { $sort: { total: -1 } },
+            { $limit: 10 }
+        ]);
+        const topWriters = topWritersRaw.map(w => ({ name: w.name, words: w.total }));
+
+        // 2. Fetch Today's Top 10
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+        const todayWritersRaw = await DailyStats.find({ date: todayStr }).sort({ words: -1 }).limit(10);
+        const todayWriters = todayWritersRaw.map(w => ({ name: w.name, words: w.words }));
+
+        // 3. Totals
+        const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
+        const totalWords = totalWordsAgg[0]?.total || 0;
+        
+        const totalWritersAgg = await DailyStats.distinct("userId");
+        const totalWriters = totalWritersAgg.length;
+
+        // 4. Last 7 Days Activity (For the Chart)
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const chartDataRaw = await DailyStats.aggregate([
+            { $match: { timestamp: { $gte: sevenDaysAgo } } },
+            { $group: { _id: "$date", total: { $sum: "$words" } } },
+            { $sort: { _id: 1 } } // Sort by date ascending
+        ]);
+        
+        const chartData = {
+            labels: chartDataRaw.map(d => d._id), 
+            data: chartDataRaw.map(d => d.total)
+        };
+
+        res.json({ isConnected, qrCode: qrImage, topWriters, todayWriters, totalWords, totalWriters, chartData });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: "Server Error" });
     }
 });
 
@@ -224,7 +282,7 @@ mongoose.connect(MONGO_URI)
                         `🏃 **!sprint 15** → Start 15 min sprint\n` +
                         `📅 **!schedule 20 in 60** → 20 min sprint in 60 mins\n` +
                         `🚫 **!unschedule** → Cancel pending sprints\n` +
-                        `⏱️ **!time** → Check time remaining\n` +
+                        `⏱ **!time** → Check time remaining\n` +
                         `📝 **!wc 500** → Log words\n` +
                         `🏁 **!finish** → End sprint\n` +
                         `🚫 **!cancel** → Cancel active sprint\n\n` +
@@ -338,7 +396,7 @@ mongoose.connect(MONGO_URI)
                 }
 
                 // ---------------------------
-                //  COMMAND: FINISH (UPDATED WITH BLUE TAGS)
+                //  COMMAND: FINISH (WITH BLUE TAGS)
                 // ---------------------------
                 if (command === "!finish") {
                     const sprint = activeSprints[chatId];
