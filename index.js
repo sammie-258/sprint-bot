@@ -316,12 +316,67 @@ mongoose.connect(MONGO_URI)
                         `🏃 **!sprint 15** → Start 15 min sprint\n` +
                         `📅 **!schedule 20 in 60** → Schedule sprint\n` +
                         `🏆 **!top10** → Global Hall of Fame\n` +
-                        `📝 **!wc 500** → Log words\n` +
+                        `📝 **!wc 500** → Log words (during sprint)\n` +
+                        `✍️ **!log 500** → Log words manually (anytime)\n` +
                         `📛 **!myname Sam** → Fix your display name\n` +
                         `🏁 **!finish** → End sprint\n` +
                         `📊 **STATS**: !daily | !weekly | !monthly\n` +
                         `🎯 **GOALS**: !goal set 50000`
                     );
+                }
+
+                // ---------------------------
+                //  COMMAND: LOG (MANUAL) - NEW!
+                // ---------------------------
+                if (command === "!log") {
+                    let count = parseInt(args[1]);
+                    if (isNaN(count) || count <= 0) {
+                        return msg.reply("❌ Invalid number. Use: `!log 500` to manually add words.");
+                    }
+
+                    const date = todayString();
+                    let goalUpdateText = "";
+
+                    try {
+                        // 1. Save to DailyStats
+                        await DailyStats.findOneAndUpdate(
+                            { userId: senderId, groupId: chatId, date },
+                            {
+                                name: senderName,
+                                $inc: { words: count },
+                                timestamp: new Date()
+                            },
+                            { upsert: true, new: true }
+                        );
+
+                        // 2. Update Personal Goal
+                        const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+                        if (goal) {
+                            goal.current += count;
+                            await goal.save();
+
+                            if (goal.current >= goal.target) {
+                                goalUpdateText = `\n🎉 @${senderId.split('@')[0]} just COMPLETED their goal of ${goal.target} words!`;
+                                goal.isActive = false;
+                                await goal.save();
+                            }
+                        }
+
+                        let replyText = `✅ Manually logged **${count}** words for ${senderName}.`;
+                        if (goalUpdateText) replyText += goalUpdateText;
+
+                        // Send with mentions if needed
+                        if (goalUpdateText) {
+                             await chat.sendMessage(replyText, { mentions: [senderId] });
+                        } else {
+                             await msg.reply(replyText);
+                        }
+
+                    } catch (err) {
+                        console.error("Manual Log Error:", err);
+                        await msg.reply("❌ Error saving data.");
+                    }
+                    return;
                 }
 
                 if (command === "!top10" || command === "!top") {
