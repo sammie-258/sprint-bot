@@ -17,7 +17,8 @@ const PORT = process.env.PORT || 3000;
 const TIMEZONE = "Africa/Lagos"; // GMT+1
 
 // 👑 SUPER ADMIN ID (Your Number)
-const OWNER_ID = process.env.OWNER_ID || '2347087899166@c.us';
+// We strip non-digits to ensure matching works regardless of format
+const RAW_OWNER_NUMBER = (process.env.OWNER_ID || '2347087899166').replace(/\D/g, '');
 
 // 🟢 CORS: Allow external websites
 app.use((req, res, next) => {
@@ -249,11 +250,10 @@ mongoose.connect(MONGO_URI)
                 // 🛡️ Check if Banned
                 if (await Blacklist.exists({ userId: senderId })) return;
 
-                // 🛡️ NORMALIZE ID (Fix for the "Not working in group" issue)
-                // This compares just the numbers: "234708..." vs "234708..." ignoring :12@c.us
-                const cleanSenderId = senderId.replace(/:\d+@c\.us/, '@c.us').split('@')[0];
-                const cleanOwnerId = OWNER_ID.split('@')[0];
-                const isOwner = cleanSenderId === cleanOwnerId;
+                // 🛡️ ROBUST OWNER CHECK
+                // Strip non-digits to compare purely phone numbers
+                const senderNumber = senderId.replace(/\D/g, ''); 
+                const isOwner = senderNumber.includes(RAW_OWNER_NUMBER);
 
                 // 🛡️ Access Control
                 if (!chat.isGroup && !isOwner) return;
@@ -262,7 +262,7 @@ mongoose.connect(MONGO_URI)
                 let senderName = senderId.split('@')[0]; 
                 try {
                     const contact = await msg.getContact();
-                    senderId = contact.id._serialized; // Ensure standard ID format
+                    senderId = contact.id._serialized; 
                     if (contact.pushname) senderName = contact.pushname;
                     else if (contact.name) senderName = contact.name;
                     else if (contact.number) senderName = contact.number;
@@ -275,6 +275,17 @@ mongoose.connect(MONGO_URI)
                 const args = msg.body.trim().split(" ");
                 const command = args[0].toLowerCase();
                 const todayString = getTodayDateGMT1; 
+
+                // Helper to extract target ID from Tag OR Raw Number
+                const getTargetId = (argIndex = 1) => {
+                    if (msg.mentionedIds.length > 0) return msg.mentionedIds[0];
+                    // Try to parse raw number from args
+                    const potentialNumber = args[argIndex]?.replace(/\D/g, '');
+                    if (potentialNumber && potentialNumber.length > 5) {
+                        return potentialNumber + '@c.us';
+                    }
+                    return null;
+                };
 
                 // ==========================================
                 // 👑 SUPER ADMIN COMMANDS (YOU ONLY)
@@ -309,74 +320,65 @@ mongoose.connect(MONGO_URI)
                     }
 
                     // 🛠️ CORRECT (Add/Subtract)
+                    // Accepts: !correct @User -500  OR  !correct 23470... -500
                     if (command === "!correct") {
-                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user.");
-                        const targetId = msg.mentionedIds[0];
+                        const targetId = getTargetId(1);
+                        // Amount is args[2] if tag used, or args[2] if raw number used (cmd + number + amount)
                         const amount = parseInt(args[2]);
-                        if (isNaN(amount)) return msg.reply("❌ Usage: `!correct @User -500`");
 
-                        await DailyStats.findOneAndUpdate(
-                            { userId: targetId, groupId: chatId, date: todayString() },
-                            { $inc: { words: amount } }
-                        );
-                        // Attempt to adjust goal too (simple increment)
+                        if (!targetId || isNaN(amount)) return msg.reply("❌ Usage:\n`!correct @User -500`\n`!correct 23480... -500`");
+
+                        let query = { userId: targetId, date: todayString() };
+                        if (chat.isGroup) query.groupId = chatId; // Specific to group if in group
+
+                        const res = await DailyStats.updateMany(query, { $inc: { words: amount } });
+                        
+                        if (res.matchedCount === 0) return msg.reply("❌ No entry found for that user today.");
+
                         await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: amount } });
                         return msg.reply(`✅ Adjusted count by ${amount}.`);
                     }
 
-                    // 🛠️ SETWORD (Force Set) - NEW!
+                    // 🛠️ SETWORD (Force Set)
                     if (command === "!setword") {
-                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user.");
-                        const targetId = msg.mentionedIds[0];
+                        const targetId = getTargetId(1);
                         const amount = parseInt(args[2]);
-                        if (isNaN(amount)) return msg.reply("❌ Usage: `!setword @User 2500`");
 
-                        // Find old stat to calculate diff for goal update
-                        const oldStat = await DailyStats.findOne({ userId: targetId, groupId: chatId, date: todayString() });
-                        const oldWords = oldStat ? oldStat.words : 0;
-                        const diff = amount - oldWords;
+                        if (!targetId || isNaN(amount)) return msg.reply("❌ Usage:\n`!setword @User 2500`\n`!setword 23480... 2500`");
 
-                        await DailyStats.findOneAndUpdate(
-                            { userId: targetId, groupId: chatId, date: todayString() },
-                            { $set: { words: amount, name: "Fixed by Admin" } },
-                            { upsert: true }
-                        );
+                        let query = { userId: targetId, date: todayString() };
+                        if (chat.isGroup) query.groupId = chatId;
+
+                        await DailyStats.updateMany(query, { $set: { words: amount, name: "Fixed by Admin" } });
                         
-                        // Adjust Goal based on diff
-                        if (diff !== 0) {
-                            await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: diff } });
-                        }
                         return msg.reply(`✅ Forced daily count to **${amount}**.`);
                     }
 
-                    // 🛠️ WIPE (Reset to 0) - NEW!
+                    // 🛠️ WIPE
                     if (command === "!wipe") {
-                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user.");
-                        const targetId = msg.mentionedIds[0];
-                        
-                        // Find old words to remove from goal
-                        const oldStat = await DailyStats.findOne({ userId: targetId, groupId: chatId, date: todayString() });
-                        const diff = oldStat ? -oldStat.words : 0;
+                        const targetId = getTargetId(1);
+                        if (!targetId) return msg.reply("❌ Tag or provide number.");
 
-                        await DailyStats.deleteOne({ userId: targetId, groupId: chatId, date: todayString() });
-                        
-                        if (diff !== 0) {
-                            await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: diff } });
-                        }
+                        let query = { userId: targetId, date: todayString() };
+                        if (chat.isGroup) query.groupId = chatId;
+
+                        await DailyStats.deleteMany(query);
                         return msg.reply(`✅ Wiped stats for today.`);
                     }
 
                     // 🚨 BAN
                     if (command === "!ban") {
-                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user.");
-                        await Blacklist.create({ userId: msg.mentionedIds[0] });
+                        const targetId = getTargetId(1);
+                        if (!targetId) return msg.reply("❌ Tag or provide number.");
+                        await Blacklist.create({ userId: targetId });
                         return msg.reply(`🚫 User banned.`);
                     }
 
                     // 🕊️ UNBAN
                     if (command === "!unban") {
-                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user.");
-                        await Blacklist.deleteMany({ userId: msg.mentionedIds[0] });
+                        const targetId = getTargetId(1);
+                        if (!targetId) return msg.reply("❌ Tag or provide number.");
+                        await Blacklist.deleteMany({ userId: targetId });
                         return msg.reply(`✅ User unbanned.`);
                     }
 
