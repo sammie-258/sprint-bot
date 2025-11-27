@@ -7,6 +7,7 @@ const mongoose = require("mongoose");
 const QRCode = require('qrcode');
 const express = require('express');
 const http = require('http'); 
+const os = require('os'); // NEW: For System Stats
 require("dotenv").config();
 
 // =======================
@@ -27,7 +28,7 @@ app.use(express.json());
 app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*"); 
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, x-admin-password");
-    res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
     if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
 });
@@ -42,6 +43,7 @@ const requireAdmin = (req, res, next) => {
 let qrCodeData = null;
 let isConnected = false;
 let client = null; 
+let maintenanceMode = false; // 🔧 NEW: Maintenance Mode Switch
 
 // =======================
 //   DATABASE SCHEMAS
@@ -97,60 +99,34 @@ app.get('/', async (req, res) => {
     }
 });
 
-// 🟢 PUBLIC DASHBOARD DATA
+// 📊 DASHBOARD DATA (Stats)
 app.get('/api/stats', async (req, res) => {
     try {
         let qrImage = null;
-        if (!isConnected && qrCodeData) {
-            qrImage = await QRCode.toDataURL(qrCodeData);
-        }
+        if (!isConnected && qrCodeData) qrImage = await QRCode.toDataURL(qrCodeData);
 
-        // 1. Top 10 All-Time
+        // Top 10 All-Time
         const topWritersRaw = await DailyStats.aggregate([
-            { $group: { _id: "$name", total: { $sum: "$words" }, userId: { $first: "$userId" } } }, 
+            { $group: { _id: "$name", total: { $sum: "$words" } } }, 
             { $sort: { total: -1 } }, { $limit: 10 }
         ]);
-        const topWriters = topWritersRaw.map(w => ({ name: w._id, words: w.total, id: w.userId }));
+        const topWriters = topWritersRaw.map(w => ({ name: w._id, words: w.total }));
 
-        // 2. Today's Top 10
+        // Today's Top 10
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const todayWritersRaw = await DailyStats.aggregate([
             { $match: { date: todayStr } }, 
-            { $group: { _id: "$name", total: { $sum: "$words" }, userId: { $first: "$userId" } } }, 
+            { $group: { _id: "$name", total: { $sum: "$words" } } }, 
             { $sort: { total: -1 } }, { $limit: 10 }
         ]);
-        const todayWriters = todayWritersRaw.map(w => ({ name: w._id, words: w.total, id: w.userId }));
+        const todayWriters = todayWritersRaw.map(w => ({ name: w._id, words: w.total }));
 
-        // 3. Totals
+        // Totals
         const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
-        const totalWords = totalWordsAgg[0]?.total || 0;
-        
         const totalWritersAgg = await DailyStats.distinct("name");
-        const totalWriters = totalWritersAgg.length;
-
         const allGroupIds = await DailyStats.distinct("groupId");
-        const totalGroupsCount = allGroupIds.filter(id => id !== "Manual_Correction").length;
-
-        // 4. Top Groups
-        const topGroupsRaw = await DailyStats.aggregate([
-            { $group: { _id: "$groupId", total: { $sum: "$words" } } },
-            { $sort: { total: -1 } }, { $limit: 10 }
-        ]);
-
-        const topGroups = await Promise.all(topGroupsRaw.map(async (g) => {
-            let groupName = "Unknown Group";
-            if (g._id === "Manual_Correction") return null; 
-            
-            if (client && isConnected) {
-                try {
-                    const chat = await client.getChatById(g._id);
-                    if (chat && chat.name) groupName = chat.name;
-                } catch (e) {}
-            }
-            return { name: groupName, words: g.total };
-        }));
-
-        // 5. Chart
+        
+        // 7-Day Chart
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const chartDataRaw = await DailyStats.aggregate([
@@ -158,37 +134,112 @@ app.get('/api/stats', async (req, res) => {
             { $group: { _id: "$date", total: { $sum: "$words" } } },
             { $sort: { _id: 1 } } 
         ]);
-        const chartData = {
-            labels: chartDataRaw.map(d => d._id), 
-            data: chartDataRaw.map(d => d.total)
-        };
+        const chartData = { labels: chartDataRaw.map(d => d._id), data: chartDataRaw.map(d => d.total) };
 
         res.json({ 
             isConnected, qrCode: qrImage, topWriters, todayWriters, 
-            totalWords, totalWriters, 
-            totalGroups: totalGroupsCount, 
-            topGroups: topGroups.filter(g => g !== null), 
+            totalWords: totalWordsAgg[0]?.total || 0, 
+            totalWriters: totalWritersAgg.length, 
+            totalGroups: allGroupIds.filter(id => id !== "Manual_Correction").length,
+            maintenanceMode,
             chartData 
         });
-
-    } catch (e) {
-        console.error("API Error:", e);
-        res.status(500).json({ error: "Server Error" });
-    }
+    } catch (e) { console.error("API Error:", e); res.status(500).json({ error: "Server Error" }); }
 });
 
-// 👑 ADMIN API: SEARCH USER
+// 👑 ADMIN: SYSTEM STATS (Detailed)
+app.get('/api/admin/system', requireAdmin, async (req, res) => {
+    const uptime = process.uptime();
+    const memory = process.memoryUsage();
+    res.json({
+        uptime: uptime,
+        memory: Math.round(memory.heapUsed / 1024 / 1024),
+        platform: os.platform() + " " + os.release(),
+        cpu: os.cpus()[0].model,
+        maintenance: maintenanceMode,
+        activeSprintsCount: Object.keys(activeSprints).length
+    });
+});
+
+// 👑 ADMIN: MAINTENANCE TOGGLE
+app.post('/api/admin/maintenance', requireAdmin, (req, res) => {
+    const { status } = req.body; // true or false
+    maintenanceMode = status;
+    res.json({ success: true, status: maintenanceMode });
+});
+
+// 👑 ADMIN: GET ACTIVE SPRINTS
+app.get('/api/admin/sprints', requireAdmin, async (req, res) => {
+    if (!client || !isConnected) return res.json([]);
+    const sprints = [];
+    for (const [chatId, sprint] of Object.entries(activeSprints)) {
+        let name = "Unknown Group";
+        try { const chat = await client.getChatById(chatId); name = chat.name; } catch(e) {}
+        
+        const timeLeft = Math.max(0, sprint.endsAt - Date.now());
+        sprints.push({
+            id: chatId,
+            name: name,
+            timeLeft: Math.ceil(timeLeft / 1000 / 60), // Mins
+            participants: Object.keys(sprint.participants).length
+        });
+    }
+    res.json(sprints);
+});
+
+// 👑 ADMIN: STOP SPRINT
+app.post('/api/admin/sprints/stop', requireAdmin, async (req, res) => {
+    const { chatId } = req.body;
+    if (activeSprints[chatId]) {
+        delete activeSprints[chatId];
+        try {
+            const chat = await client.getChatById(chatId);
+            await chat.sendMessage("🛑 **ADMIN STOP**: Sprint cancelled via Dashboard.");
+        } catch(e) {}
+        return res.json({ success: true });
+    }
+    res.status(404).json({ error: "Sprint not found" });
+});
+
+// 👑 ADMIN: GET ALL GROUPS (For "Leave" tab)
+app.get('/api/admin/groups', requireAdmin, async (req, res) => {
+    if (!client || !isConnected) return res.json([]);
+    const chats = await client.getChats();
+    const groups = chats.filter(c => c.id.server === 'g.us').map(g => ({
+        id: g.id._serialized,
+        name: g.name,
+        participants: g.participants.length
+    }));
+    res.json(groups);
+});
+
+// 👑 ADMIN: LEAVE GROUP
+app.post('/api/admin/groups/leave', requireAdmin, async (req, res) => {
+    const { chatId } = req.body;
+    try {
+        const chat = await client.getChatById(chatId);
+        await chat.sendMessage("👋 This bot is leaving via Admin Console. Goodbye!");
+        await chat.leave();
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// 👑 ADMIN: RENAME USER
+app.post('/api/admin/users/rename', requireAdmin, async (req, res) => {
+    const { userId, newName } = req.body;
+    try {
+        await DailyStats.updateMany({ userId }, { name: newName });
+        await PersonalGoal.updateMany({ userId }, { name: newName });
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// 👑 ADMIN: SEARCH (Updated)
 app.post('/api/admin/search', requireAdmin, async (req, res) => {
     try {
         const { query } = req.body;
-        // Search by Name OR userId
         const users = await DailyStats.aggregate([
-            { $match: { 
-                $or: [
-                    { name: { $regex: query, $options: 'i' } },
-                    { userId: { $regex: query, $options: 'i' } }
-                ]
-            }},
+            { $match: { name: { $regex: query, $options: 'i' } } },
             { $group: { _id: "$userId", name: { $first: "$name" }, totalWords: { $sum: "$words" }, lastActive: { $max: "$date" } } },
             { $limit: 15 }
         ]);
@@ -196,28 +247,21 @@ app.post('/api/admin/search', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 👑 ADMIN API: EDIT STATS (Set/Add)
+// 👑 ADMIN: UPDATE STATS (Correct/Set)
 app.post('/api/admin/update', requireAdmin, async (req, res) => {
     try {
         const { userId, amount, type } = req.body; 
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         
-        // Find today's entry
         let doc = await DailyStats.findOne({ userId, date: todayStr }).sort({ timestamp: -1 });
 
-        // If no entry exists today, find LAST KNOWN GROUP to recreate it
         if (!doc) {
             const history = await DailyStats.findOne({ userId }).sort({ timestamp: -1 });
-            if (!history) return res.status(404).json({ message: "User has no history. Cannot auto-create record." });
+            if (!history) return res.status(404).json({ message: "No history found for this user." });
             
-            // Create new record for today using history
             doc = await DailyStats.create({
-                userId,
-                name: history.name,
-                groupId: history.groupId, // Use last known group
-                date: todayStr,
-                words: 0,
-                timestamp: new Date()
+                userId, name: history.name, groupId: history.groupId,
+                date: todayStr, words: 0, timestamp: new Date()
             });
         }
 
@@ -233,12 +277,11 @@ app.post('/api/admin/update', requireAdmin, async (req, res) => {
             await doc.save();
             await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: parseInt(amount) } });
         }
-
         res.json({ success: true, newTotal: doc.words });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 👑 ADMIN API: BROADCAST
+// 👑 ADMIN: BROADCAST
 app.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
     try {
         const { message } = req.body;
@@ -262,7 +305,7 @@ setInterval(() => {
 // =======================
 mongoose.connect(MONGO_URI)
     .then(() => {
-        console.log("✅ MongoDB connected successfully");
+        console.log("✅ MongoDB connected");
         const store = new MongoStore({ mongoose: mongoose });
 
         client = new Client({
@@ -276,12 +319,9 @@ mongoose.connect(MONGO_URI)
         const startSprintSession = async (chatId, duration) => {
             if (activeSprints[chatId]) return false; 
             const endTime = Date.now() + duration * 60000;
-            console.log(`[${new Date().toLocaleTimeString()}] Starting sprint in ${chatId}`);
-
             activeSprints[chatId] = { duration, endsAt: endTime, participants: {} };
             const chat = await client.getChatById(chatId);
             await chat.sendMessage(`🏁 *Writing Sprint Started!*\nDuration: *${duration} minutes*\n\nUse *!wc <number>* to log words.`);
-
             setTimeout(async () => {
                 if (activeSprints[chatId]) {
                     try { await chat.sendMessage(`🛑 **TIME'S UP!**\n\nReply with *!wc [number]* now.\nType *!finish* to end.`); } 
@@ -322,6 +362,13 @@ mongoose.connect(MONGO_URI)
                 if (await Blacklist.exists({ userId: senderId })) return;
 
                 const isOwner = senderId.includes(OWNER_NUMBER);
+                
+                // 🔧 MAINTENANCE MODE CHECK
+                if (maintenanceMode && !isOwner) {
+                    if (msg.body.startsWith("!")) await msg.reply("⚠️ Bot is currently in Maintenance Mode.");
+                    return;
+                }
+
                 if (!chat.isGroup && !isOwner) return;
 
                 let senderName = senderId.split('@')[0]; 
@@ -360,56 +407,35 @@ mongoose.connect(MONGO_URI)
                         if (!message) return msg.reply("❌ Empty.");
                         const chats = await client.getChats();
                         const groups = chats.filter(c => c.id.server === 'g.us');
-                        msg.reply(`📢 Sending to ${groups.length} groups...`);
+                        msg.reply(`📢 Broadcasting to ${groups.length} groups...`);
                         for (const group of groups) { await group.sendMessage(`📢 *ANNOUNCEMENT*\n\n${message}`); }
                         return;
-                    }
-
-                    if (command === "!groups") {
-                        const chats = await client.getChats();
-                        const groups = chats.filter(c => c.id.server === 'g.us');
-                        let report = `🤖 **Groups:**\n\n`;
-                        groups.forEach((g, i) => { report += `${i+1}. ${g.name}\n`; });
-                        return msg.reply(report);
                     }
 
                     if (command === "!sys") {
                         const uptime = process.uptime();
                         const mem = process.memoryUsage().heapUsed / 1024 / 1024;
-                        return msg.reply(`⚙️ **Status**\n\n⏱️ ${Math.floor(uptime/60)}m\n💾 ${mem.toFixed(2)} MB`);
+                        return msg.reply(`⚙️ **System**\n⏱️ ${Math.floor(uptime/60)}m\n🔧 Maintenance: ${maintenanceMode ? "ON" : "OFF"}`);
                     }
 
-                    // 🛠️ CORRECT / SETWORD (DM Safe)
                     if (command === "!correct" || command === "!setword") {
                         const targetId = getTargetId(1);
                         const amount = parseInt(args[2]);
                         const isSet = command === "!setword";
-
                         if (!targetId || isNaN(amount)) return msg.reply(`❌ Usage: \`${command} @User 500\``);
 
                         let filter = { userId: targetId, date: todayStr };
                         if (chat.isGroup) filter.groupId = chatId;
 
-                        // Find doc. If in DM, we need to find last known group to avoid ghosting
                         let targetDoc = await DailyStats.findOne(filter).sort({ timestamp: -1 });
 
                         if (!targetDoc) {
-                            // Recovery Strategy: Check history
                             const history = await DailyStats.findOne({ userId: targetId }).sort({ timestamp: -1 });
-                            
                             if (history) {
-                                // Create new record using history
-                                targetDoc = await DailyStats.create({
-                                    userId: targetId,
-                                    groupId: chat.isGroup ? chatId : history.groupId,
-                                    date: todayStr,
-                                    name: history.name,
-                                    words: 0, 
-                                    timestamp: new Date()
-                                });
-                                msg.reply(`✅ Created new entry based on ${chat.isGroup ? "current group" : "last active group"}.`);
+                                targetDoc = await DailyStats.create({ userId: targetId, groupId: chat.isGroup ? chatId : history.groupId, date: todayStr, name: history.name, words: 0, timestamp: new Date() });
+                                msg.reply(`✅ Created new entry.`);
                             } else {
-                                return msg.reply("❌ User has no history. Cannot edit via DM.");
+                                return msg.reply("❌ User has no history.");
                             }
                         }
 
@@ -421,7 +447,6 @@ mongoose.connect(MONGO_URI)
                             targetDoc.words += amount;
                             await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: amount } });
                         }
-                        
                         targetDoc.timestamp = new Date();
                         await targetDoc.save();
                         return msg.reply(`✅ Done. New Total: ${targetDoc.words}`);
@@ -434,22 +459,13 @@ mongoose.connect(MONGO_URI)
                         if (!targetId || !newName) return msg.reply("❌ Usage: `!setname @User Name`");
                         await DailyStats.updateMany({ userId: targetId }, { name: newName });
                         await PersonalGoal.updateMany({ userId: targetId }, { name: newName });
-                        return msg.reply(`✅ Updated name to **${newName}**.`);
+                        return msg.reply(`✅ Name: **${newName}**.`);
                     }
 
                     if (command === "!cleanup") {
                         const res1 = await DailyStats.deleteMany({ name: "Fixed by Admin" });
                         const res2 = await DailyStats.deleteMany({ date: { $exists: false } });
-                        return msg.reply(`🧹 Deleted ${res1.deletedCount} 'Fixed' records and ${res2.deletedCount} corrupted dates.`);
-                    }
-
-                    if (command === "!wipe") {
-                        const targetId = getTargetId(1);
-                        if (!targetId) return msg.reply("❌ Tag user.");
-                        let query = { userId: targetId, date: todayStr };
-                        if (chat.isGroup) query.groupId = chatId;
-                        await DailyStats.deleteMany(query);
-                        return msg.reply(`✅ Wiped.`);
+                        return msg.reply(`🧹 Cleaned: ${res1.deletedCount + res2.deletedCount}`);
                     }
 
                     if (command === "!ban") {
@@ -578,7 +594,6 @@ mongoose.connect(MONGO_URI)
                     await chat.sendMessage(txt, { mentions: men });
                 }
 
-                // 🟢 RESTORED FORMATTING FOR LEADERBOARD COMMANDS
                 if (["!daily", "!weekly", "!monthly"].includes(command)) {
                     const d = command === "!daily";
                     const days = d ? 1 : command === "!weekly" ? 7 : 30;
@@ -589,30 +604,14 @@ mongoose.connect(MONGO_URI)
                     else title = "Monthly Leaderboard";
 
                     let stats;
-                    if (d) {
-                         stats = await DailyStats.find({ groupId: chatId, date: todayStr }).sort({ words: -1 });
-                    } else {
-                        const dt = new Date(); 
-                        dt.setDate(dt.getDate() - days);
-                        stats = await DailyStats.aggregate([
-                            { $match: { groupId: chatId, timestamp: { $gte: dt } } }, 
-                            { $group: { _id: "$userId", totalWords: { $sum: "$words" }, name: { $first: "$name" } } }, 
-                            { $sort: { totalWords: -1 } }, 
-                            { $limit: 15 }
-                        ]);
+                    if (d) stats = await DailyStats.find({ groupId: chatId, date: todayStr }).sort({ words: -1 });
+                    else {
+                        const dt = new Date(); dt.setDate(dt.getDate() - days);
+                        stats = await DailyStats.aggregate([{ $match: { groupId: chatId, timestamp: { $gte: dt } } }, { $group: { _id: "$userId", totalWords: { $sum: "$words" }, name: { $first: "$name" } } }, { $sort: { totalWords: -1 } }, { $limit: 15 }]);
                     }
-
-                    if (stats.length === 0) return msg.reply("📉 No stats recorded.");
-
+                    if (stats.length === 0) return msg.reply("📉 No stats.");
                     let txt = `🏆 *${title}*\n\n`;
-                    stats.forEach((s, i) => { 
-                        let medal = "🎖️";
-                        if (i === 0) medal = "🥇";
-                        if (i === 1) medal = "🥈";
-                        if (i === 2) medal = "🥉";
-                        const words = d ? s.words : s.totalWords;
-                        txt += `${medal} ${s.name}: ${words}\n`; 
-                    });
+                    stats.forEach((s, i) => { txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} ${s.name}: ${d ? s.words : s.totalWords}\n`; });
                     await chat.sendMessage(txt);
                 }
 
