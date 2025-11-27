@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 3000;
 const TIMEZONE = "Africa/Lagos"; // GMT+1
 
 // 👑 SUPER ADMIN ID (Your Number)
-const OWNER_NUMBER = '2347087899166'; // Plain number, no symbols
+const OWNER_NUMBER = '2347087899166'; // Plain number
 
 // 🟢 CORS: Allow external websites
 app.use((req, res, next) => {
@@ -246,14 +246,14 @@ mongoose.connect(MONGO_URI)
                 const chatId = chat.id._serialized;
                 let senderId = msg.author || msg.from;
                 
+                // 🛡️ Check if Banned
                 if (await Blacklist.exists({ userId: senderId })) return;
 
-                // 🛡️ ROBUST OWNER CHECK (Fixed for Groups)
-                // We split by ':' to handle device IDs like 23470...@c.us:12
-                // We split by '@' to remove the suffix
-                const senderBaseId = senderId.split(':')[0].split('@')[0];
-                const isOwner = senderBaseId === OWNER_NUMBER;
+                // 🛡️ ROBUST OWNER CHECK (Fixed)
+                // Just check if the sender ID contains your number string anywhere
+                const isOwner = senderId.includes(OWNER_NUMBER);
 
+                // 🛡️ Access Control
                 if (!chat.isGroup && !isOwner) return;
 
                 // 🛡️ Name Recovery
@@ -277,6 +277,7 @@ mongoose.connect(MONGO_URI)
                 // Helper: Get Target ID
                 const getTargetId = (argIndex = 1) => {
                     if (msg.mentionedIds.length > 0) return msg.mentionedIds[0];
+                    // Try to parse raw number
                     const potentialNumber = args[argIndex]?.replace(/\D/g, '');
                     if (potentialNumber && potentialNumber.length > 5) {
                         return potentialNumber + '@c.us';
@@ -321,58 +322,72 @@ mongoose.connect(MONGO_URI)
                         return msg.reply(`⚙️ **System Status**\n\n⏱️ Uptime: ${Math.floor(uptime / 60)} mins\n💾 Memory: ${mem.toFixed(2)} MB`);
                     }
 
-                    // 🛠️ CORRECT (Add/Subtract) - Fixed for DM & Upsert
+                    // 🛠️ CORRECT (Smart Update)
                     if (command === "!correct") {
                         const targetId = getTargetId(1);
                         const amount = parseInt(args[2]);
 
                         if (!targetId || isNaN(amount)) return msg.reply("❌ Usage: `!correct @User -500`");
 
-                        let query = { userId: targetId, date: todayString() };
-                        // If in group, restrict to group. If in DM, allow finding ANY record.
+                        // SMART FIND: If in group, use group ID. If in DM, find MOST RECENT entry today.
+                        let filter = { userId: targetId, date: todayString() };
                         if (chat.isGroup) {
-                            query.groupId = chatId;
+                            filter.groupId = chatId;
                         }
 
-                        const targetName = await getTargetName(targetId);
-                        
-                        // Use findOneAndUpdate to find the doc (or create if missing in group context)
-                        // Note: In DM, if multiple groups exist, this updates the first one found.
-                        const res = await DailyStats.findOneAndUpdate(
-                            query,
-                            { 
-                                $inc: { words: amount },
-                                $setOnInsert: { name: targetName, timestamp: new Date(), groupId: chat.isGroup ? chatId : "Manual_Correction" }
-                            },
-                            { upsert: true, new: true, sort: { timestamp: -1 } } // Sort ensures we pick latest in DM
-                        );
+                        // Try to find the document first (sort by newest)
+                        const targetDoc = await DailyStats.findOne(filter).sort({ timestamp: -1 });
+
+                        if (!targetDoc) {
+                            // If no doc found, we can't 'correct' an entry that doesn't exist unless in group
+                            if (!chat.isGroup) return msg.reply("❌ User has no sprint data for today to correct.");
+                            
+                            // Create new if in group
+                            const targetName = await getTargetName(targetId);
+                            await DailyStats.create({
+                                userId: targetId, groupId: chatId, date: todayString(),
+                                name: targetName, words: amount, timestamp: new Date()
+                            });
+                            return msg.reply(`✅ Created entry with ${amount} words.`);
+                        }
+
+                        // Update the found doc
+                        targetDoc.words += amount;
+                        targetDoc.timestamp = new Date();
+                        await targetDoc.save();
 
                         await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: amount } });
-                        return msg.reply(`✅ Adjusted count by ${amount}. (New Total: ${res.words})`);
+                        return msg.reply(`✅ Adjusted count by ${amount}. New Total: ${targetDoc.words} (Group: ${targetDoc.groupId ? "Active" : "Unknown"})`);
                     }
 
-                    // 🛠️ SETWORD (Force Set) - Fixed for DM & Upsert
+                    // 🛠️ SETWORD (Smart Update)
                     if (command === "!setword") {
                         const targetId = getTargetId(1);
                         const amount = parseInt(args[2]);
 
                         if (!targetId || isNaN(amount)) return msg.reply("❌ Usage: `!setword @User 2500`");
 
-                        let query = { userId: targetId, date: todayString() };
+                        let filter = { userId: targetId, date: todayString() };
                         if (chat.isGroup) {
-                            query.groupId = chatId;
+                            filter.groupId = chatId;
                         }
 
-                        const targetName = await getTargetName(targetId);
+                        // Find most recent doc
+                        const targetDoc = await DailyStats.findOne(filter).sort({ timestamp: -1 });
 
-                        const res = await DailyStats.findOneAndUpdate(
-                            query,
-                            { 
-                                $set: { words: amount, name: targetName, timestamp: new Date() },
-                                $setOnInsert: { groupId: chat.isGroup ? chatId : "Manual_Correction" }
-                            },
-                            { upsert: true, new: true, sort: { timestamp: -1 } }
-                        );
+                        if (!targetDoc) {
+                            if (!chat.isGroup) return msg.reply("❌ No record found to set. Do this in the group.");
+                            const targetName = await getTargetName(targetId);
+                            await DailyStats.create({
+                                userId: targetId, groupId: chatId, date: todayString(),
+                                name: targetName, words: amount, timestamp: new Date()
+                            });
+                            return msg.reply(`✅ Created entry set to ${amount}.`);
+                        }
+
+                        targetDoc.words = amount;
+                        targetDoc.name = "Fixed by Admin"; 
+                        await targetDoc.save();
                         
                         return msg.reply(`✅ Forced daily count to **${amount}**.`);
                     }
