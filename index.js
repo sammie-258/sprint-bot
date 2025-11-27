@@ -105,14 +105,14 @@ app.get('/api/stats', async (req, res) => {
             qrImage = await QRCode.toDataURL(qrCodeData);
         }
 
-        // 1. Top 10 All-Time (Group by Name)
+        // 1. Top 10 All-Time
         const topWritersRaw = await DailyStats.aggregate([
             { $group: { _id: "$name", total: { $sum: "$words" }, userId: { $first: "$userId" } } }, 
             { $sort: { total: -1 } }, { $limit: 10 }
         ]);
         const topWriters = topWritersRaw.map(w => ({ name: w._id, words: w.total, id: w.userId }));
 
-        // 2. Today's Top 10 (Group by Name)
+        // 2. Today's Top 10
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const todayWritersRaw = await DailyStats.aggregate([
             { $match: { date: todayStr } }, 
@@ -404,7 +404,7 @@ mongoose.connect(MONGO_URI)
                                     groupId: chat.isGroup ? chatId : history.groupId,
                                     date: todayStr,
                                     name: history.name,
-                                    words: 0, // Start 0, we add/set below
+                                    words: 0, 
                                     timestamp: new Date()
                                 });
                                 msg.reply(`✅ Created new entry based on ${chat.isGroup ? "current group" : "last active group"}.`);
@@ -475,7 +475,7 @@ mongoose.connect(MONGO_URI)
 
                 // --- REGULAR COMMANDS ---
                 if (command === "!help") {
-                    return msg.reply(`🤖 *SPRINT BOT*
+                    return msg.reply(`🤖 *SPRINT BOT MENU*
 🏃 !sprint 20 | !wc 500
 ⏱️ !time | !finish | !cancel
 📅 !schedule 20 in 60 | !unschedule
@@ -578,18 +578,41 @@ mongoose.connect(MONGO_URI)
                     await chat.sendMessage(txt, { mentions: men });
                 }
 
+                // 🟢 RESTORED FORMATTING FOR LEADERBOARD COMMANDS
                 if (["!daily", "!weekly", "!monthly"].includes(command)) {
                     const d = command === "!daily";
                     const days = d ? 1 : command === "!weekly" ? 7 : 30;
+                    
+                    let title = "";
+                    if (d) title = `Daily Leaderboard (${todayStr})`;
+                    else if (command === "!weekly") title = "Weekly Leaderboard";
+                    else title = "Monthly Leaderboard";
+
                     let stats;
-                    if (d) stats = await DailyStats.find({ groupId: chatId, date: todayStr }).sort({ words: -1 });
-                    else {
-                        const dt = new Date(); dt.setDate(dt.getDate() - days);
-                        stats = await DailyStats.aggregate([{ $match: { groupId: chatId, timestamp: { $gte: dt } } }, { $group: { _id: "$userId", totalWords: { $sum: "$words" }, name: { $first: "$name" } } }, { $sort: { totalWords: -1 } }, { $limit: 15 }]);
+                    if (d) {
+                         stats = await DailyStats.find({ groupId: chatId, date: todayStr }).sort({ words: -1 });
+                    } else {
+                        const dt = new Date(); 
+                        dt.setDate(dt.getDate() - days);
+                        stats = await DailyStats.aggregate([
+                            { $match: { groupId: chatId, timestamp: { $gte: dt } } }, 
+                            { $group: { _id: "$userId", totalWords: { $sum: "$words" }, name: { $first: "$name" } } }, 
+                            { $sort: { totalWords: -1 } }, 
+                            { $limit: 15 }
+                        ]);
                     }
-                    if (stats.length === 0) return msg.reply("📉 No stats.");
-                    let txt = `🏆 **LEADERBOARD**\n\n`;
-                    stats.forEach((s, i) => { txt += `${i+1}. ${s.name}: ${d ? s.words : s.totalWords}\n`; });
+
+                    if (stats.length === 0) return msg.reply("📉 No stats recorded.");
+
+                    let txt = `🏆 *${title}*\n\n`;
+                    stats.forEach((s, i) => { 
+                        let medal = "🎖️";
+                        if (i === 0) medal = "🥇";
+                        if (i === 1) medal = "🥈";
+                        if (i === 2) medal = "🥉";
+                        const words = d ? s.words : s.totalWords;
+                        txt += `${medal} ${s.name}: ${words}\n`; 
+                    });
                     await chat.sendMessage(txt);
                 }
 
