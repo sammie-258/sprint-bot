@@ -50,7 +50,7 @@ app.get('/api/stats', async (req, res) => {
             qrImage = await QRCode.toDataURL(qrCodeData);
         }
 
-        // 1. Fetch Top 10 All-Time (Groups by NAME)
+        // 1. Top 10 All-Time
         const topWritersRaw = await DailyStats.aggregate([
             { $group: { _id: "$name", total: { $sum: "$words" } } }, 
             { $sort: { total: -1 } },
@@ -58,7 +58,7 @@ app.get('/api/stats', async (req, res) => {
         ]);
         const topWriters = topWritersRaw.map(w => ({ name: w._id, words: w.total }));
 
-        // 2. Fetch Today's Top 10 (Groups by NAME)
+        // 2. Today's Top 10
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const todayWritersRaw = await DailyStats.aggregate([
             { $match: { date: todayStr } }, 
@@ -102,7 +102,6 @@ app.get('/api/stats', async (req, res) => {
             { $group: { _id: "$date", total: { $sum: "$words" } } },
             { $sort: { _id: 1 } } 
         ]);
-        
         const chartData = {
             labels: chartDataRaw.map(d => d._id), 
             data: chartDataRaw.map(d => d.total)
@@ -155,7 +154,6 @@ const scheduleSchema = new mongoose.Schema({
 });
 const ScheduledSprint = mongoose.model("ScheduledSprint", scheduleSchema);
 
-// 🆕 Blacklist Schema for Banned Users
 const blacklistSchema = new mongoose.Schema({ userId: String });
 const Blacklist = mongoose.model("Blacklist", blacklistSchema);
 
@@ -192,10 +190,9 @@ mongoose.connect(MONGO_URI)
         const getTodayDateGMT1 = () => new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const formatTimeGMT1 = (dateObj) => dateObj.toLocaleTimeString('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit' });
 
-        // --- SHARED SPRINT START FUNCTION ---
+        // --- SHARED SPRINT START ---
         const startSprintSession = async (chatId, duration) => {
             if (activeSprints[chatId]) return false; 
-
             const endTime = Date.now() + duration * 60000;
             console.log(`[${getCurrentTimeGMT1()}] Starting sprint in ${chatId}. Duration: ${duration}m.`);
 
@@ -212,9 +209,7 @@ mongoose.connect(MONGO_URI)
                 if (activeSprints[chatId]) {
                     try {
                         await chat.sendMessage(`🛑 **TIME'S UP!**\n\nReply with *!wc [number]* now.\nType *!finish* to end.`);
-                    } catch (e) {
-                        console.log("Failed to send timeout message.", e);
-                    }
+                    } catch (e) { console.log("Timeout error", e); }
                 }
             }, duration * 60000);
             return true;
@@ -226,7 +221,6 @@ mongoose.connect(MONGO_URI)
             try {
                 const now = new Date();
                 const dueSprints = await ScheduledSprint.find({ startTime: { $lte: now } });
-
                 for (const sprint of dueSprints) {
                     const started = await startSprintSession(sprint.groupId, sprint.duration);
                     if (!started) {
@@ -238,9 +232,7 @@ mongoose.connect(MONGO_URI)
                     }
                     await ScheduledSprint.deleteOne({ _id: sprint._id });
                 }
-            } catch (e) {
-                console.error("Scheduler Error:", e);
-            }
+            } catch (e) { console.error("Scheduler Error:", e); }
         }, 60000); 
 
         // --- CLIENT EVENTS ---
@@ -254,18 +246,23 @@ mongoose.connect(MONGO_URI)
                 const chatId = chat.id._serialized;
                 let senderId = msg.author || msg.from;
                 
-                // 🛡️ Check if sender is BANNED
-                const isBanned = await Blacklist.exists({ userId: senderId });
-                if (isBanned) return; // Ignore them completely
+                // 🛡️ Check if Banned
+                if (await Blacklist.exists({ userId: senderId })) return;
 
-                // 🛡️ ACCESS CONTROL: Groups OR Owner DM
-                if (!chat.isGroup && senderId !== OWNER_ID) return;
+                // 🛡️ NORMALIZE ID (Fix for the "Not working in group" issue)
+                // This compares just the numbers: "234708..." vs "234708..." ignoring :12@c.us
+                const cleanSenderId = senderId.replace(/:\d+@c\.us/, '@c.us').split('@')[0];
+                const cleanOwnerId = OWNER_ID.split('@')[0];
+                const isOwner = cleanSenderId === cleanOwnerId;
+
+                // 🛡️ Access Control
+                if (!chat.isGroup && !isOwner) return;
 
                 // 🛡️ Name Recovery
                 let senderName = senderId.split('@')[0]; 
                 try {
                     const contact = await msg.getContact();
-                    senderId = contact.id._serialized;
+                    senderId = contact.id._serialized; // Ensure standard ID format
                     if (contact.pushname) senderName = contact.pushname;
                     else if (contact.name) senderName = contact.name;
                     else if (contact.number) senderName = contact.number;
@@ -282,78 +279,108 @@ mongoose.connect(MONGO_URI)
                 // ==========================================
                 // 👑 SUPER ADMIN COMMANDS (YOU ONLY)
                 // ==========================================
-                if (senderId === OWNER_ID) {
+                if (isOwner) {
                     
-                    // 📢 BROADCAST TO ALL GROUPS
+                    // 📢 BROADCAST
                     if (command === "!broadcast") {
                         const message = args.slice(1).join(" ");
                         if (!message) return msg.reply("❌ Message empty.");
-                        
                         const chats = await client.getChats();
                         const groups = chats.filter(c => c.isGroup);
-                        
                         msg.reply(`📢 Broadcasting to ${groups.length} groups...`);
-                        for (const group of groups) {
-                            await group.sendMessage(`📢 *ANNOUNCEMENT*\n\n${message}`);
-                        }
+                        for (const group of groups) { await group.sendMessage(`📢 *ANNOUNCEMENT*\n\n${message}`); }
                         return;
                     }
 
-                    // 🕵️ LIST ALL GROUPS
+                    // 🕵️ GROUPS
                     if (command === "!groups") {
                         const chats = await client.getChats();
                         const groups = chats.filter(c => c.isGroup);
                         let report = `🤖 **I am in ${groups.length} groups:**\n\n`;
-                        groups.forEach((g, i) => {
-                            report += `${i+1}. ${g.name}\n`;
-                        });
+                        groups.forEach((g, i) => { report += `${i+1}. ${g.name}\n`; });
                         return msg.reply(report);
                     }
 
-                    // 🛠️ SYSTEM STATUS
+                    // 🛠️ SYS
                     if (command === "!sys") {
                         const uptime = process.uptime();
                         const mem = process.memoryUsage().heapUsed / 1024 / 1024;
-                        return msg.reply(`⚙️ **System Status**\n\n⏱️ Uptime: ${Math.floor(uptime / 60)} mins\n💾 Memory: ${mem.toFixed(2)} MB\n🌍 Timezone: ${TIMEZONE}`);
+                        return msg.reply(`⚙️ **System Status**\n\n⏱️ Uptime: ${Math.floor(uptime / 60)} mins\n💾 Memory: ${mem.toFixed(2)} MB`);
                     }
 
-                    // 🛠️ CORRECT WORD COUNT (Add/Subtract)
-                    // Usage: !correct @user -500 (in a group)
+                    // 🛠️ CORRECT (Add/Subtract)
                     if (command === "!correct") {
-                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user to correct.");
+                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user.");
                         const targetId = msg.mentionedIds[0];
                         const amount = parseInt(args[2]);
-
                         if (isNaN(amount)) return msg.reply("❌ Usage: `!correct @User -500`");
 
                         await DailyStats.findOneAndUpdate(
                             { userId: targetId, groupId: chatId, date: todayString() },
                             { $inc: { words: amount } }
                         );
-                        await PersonalGoal.findOneAndUpdate(
-                            { userId: targetId, isActive: true },
-                            { $inc: { current: amount } }
-                        );
+                        // Attempt to adjust goal too (simple increment)
+                        await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: amount } });
                         return msg.reply(`✅ Adjusted count by ${amount}.`);
                     }
 
-                    // 🚨 BAN USER
-                    if (command === "!ban") {
-                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user to ban.");
+                    // 🛠️ SETWORD (Force Set) - NEW!
+                    if (command === "!setword") {
+                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user.");
                         const targetId = msg.mentionedIds[0];
-                        await Blacklist.create({ userId: targetId });
-                        return msg.reply(`🚫 User banned from using the bot globally.`);
+                        const amount = parseInt(args[2]);
+                        if (isNaN(amount)) return msg.reply("❌ Usage: `!setword @User 2500`");
+
+                        // Find old stat to calculate diff for goal update
+                        const oldStat = await DailyStats.findOne({ userId: targetId, groupId: chatId, date: todayString() });
+                        const oldWords = oldStat ? oldStat.words : 0;
+                        const diff = amount - oldWords;
+
+                        await DailyStats.findOneAndUpdate(
+                            { userId: targetId, groupId: chatId, date: todayString() },
+                            { $set: { words: amount, name: "Fixed by Admin" } },
+                            { upsert: true }
+                        );
+                        
+                        // Adjust Goal based on diff
+                        if (diff !== 0) {
+                            await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: diff } });
+                        }
+                        return msg.reply(`✅ Forced daily count to **${amount}**.`);
                     }
 
-                    // 🕊️ UNBAN USER
-                    if (command === "!unban") {
-                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user to unban.");
+                    // 🛠️ WIPE (Reset to 0) - NEW!
+                    if (command === "!wipe") {
+                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user.");
                         const targetId = msg.mentionedIds[0];
-                        await Blacklist.deleteMany({ userId: targetId });
+                        
+                        // Find old words to remove from goal
+                        const oldStat = await DailyStats.findOne({ userId: targetId, groupId: chatId, date: todayString() });
+                        const diff = oldStat ? -oldStat.words : 0;
+
+                        await DailyStats.deleteOne({ userId: targetId, groupId: chatId, date: todayString() });
+                        
+                        if (diff !== 0) {
+                            await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: diff } });
+                        }
+                        return msg.reply(`✅ Wiped stats for today.`);
+                    }
+
+                    // 🚨 BAN
+                    if (command === "!ban") {
+                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user.");
+                        await Blacklist.create({ userId: msg.mentionedIds[0] });
+                        return msg.reply(`🚫 User banned.`);
+                    }
+
+                    // 🕊️ UNBAN
+                    if (command === "!unban") {
+                        if (!msg.mentionedIds.length) return msg.reply("❌ Tag a user.");
+                        await Blacklist.deleteMany({ userId: msg.mentionedIds[0] });
                         return msg.reply(`✅ User unbanned.`);
                     }
 
-                    // 👋 FORCE LEAVE GROUP
+                    // 👋 LEAVE
                     if (command === "!leave") {
                         await chat.sendMessage("👋 Admin ordered me to leave. Goodbye!");
                         await chat.leave();
@@ -362,7 +389,7 @@ mongoose.connect(MONGO_URI)
                 }
 
                 // ==========================================
-                // 👤 REGULAR USER COMMANDS
+                // 👤 REGULAR COMMANDS
                 // ==========================================
 
                 if (command === "!help") {
@@ -392,8 +419,7 @@ mongoose.connect(MONGO_URI)
 !myname Sam : Update your display name`);
                 }
 
-                // ... [EXISTING COMMANDS UNCHANGED] ...
-                // !log, !top10, !myname, !sprint, !schedule, !unschedule, !time, !wc, !finish, !daily, !goal, !cancel
+                // ... [EXISTING COMMANDS] ...
 
                 if (command === "!log") {
                     let count = parseInt(args[1]);
@@ -488,6 +514,7 @@ mongoose.connect(MONGO_URI)
                         sprint.participants[senderId].words = count;
                         await msg.react('✅');
                     }
+                    return;
                 }
 
                 if (command === "!finish") {
