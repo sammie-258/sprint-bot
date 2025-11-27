@@ -10,117 +10,38 @@ const http = require('http');
 require("dotenv").config();
 
 // =======================
-//   CONFIG & OWNER SETUP
+//   CONFIG & SERVER SETUP
 // =======================
 const app = express();
 const PORT = process.env.PORT || 3000;
 const TIMEZONE = "Africa/Lagos"; // GMT+1
 
-// 👑 SUPER ADMIN ID (Your Number)
+// 👑 SUPER ADMIN CONFIG
 const OWNER_NUMBER = '2347087899166'; // Plain number
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123"; // ⚠️ Set this in Render ENV
 
-// 🟢 CORS: Allow external websites
+// 🟢 MIDDLEWARE
+app.use(express.json()); // Allow reading JSON from Web Admin
+
+// CORS: Allow external websites (Dashboard/Admin Panel)
 app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*"); 
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, x-admin-password");
+    res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
 });
+
+// Admin Auth Helper
+const requireAdmin = (req, res, next) => {
+    const password = req.headers['x-admin-password'];
+    if (password === ADMIN_PASSWORD) return next();
+    res.status(403).json({ error: "Unauthorized" });
+};
 
 let qrCodeData = null;
 let isConnected = false;
 let client = null; 
-
-// Root Route
-app.get('/', async (req, res) => {
-    if (isConnected) {
-        res.send('<h1>✅ Sprint Bot is Online</h1><p>API is active at /api/stats</p>');
-    } else if (qrCodeData) {
-        const qrImage = await QRCode.toDataURL(qrCodeData);
-        res.send(`<div style="text-align:center;padding-top:50px;"><h1>Scan with WhatsApp</h1><img src="${qrImage}"><p>Refresh page if code expires.</p></div>`);
-    } else {
-        res.send('<h1>⏳ Booting up... refresh in 10s.</h1>');
-    }
-});
-
-// 🟢 API ENDPOINT (Dashboard Data)
-app.get('/api/stats', async (req, res) => {
-    try {
-        let qrImage = null;
-        if (!isConnected && qrCodeData) {
-            qrImage = await QRCode.toDataURL(qrCodeData);
-        }
-
-        // 1. Top 10 All-Time
-        const topWritersRaw = await DailyStats.aggregate([
-            { $group: { _id: "$name", total: { $sum: "$words" } } }, 
-            { $sort: { total: -1 } },
-            { $limit: 10 }
-        ]);
-        const topWriters = topWritersRaw.map(w => ({ name: w._id, words: w.total }));
-
-        // 2. Today's Top 10
-        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
-        const todayWritersRaw = await DailyStats.aggregate([
-            { $match: { date: todayStr } }, 
-            { $group: { _id: "$name", total: { $sum: "$words" } } }, 
-            { $sort: { total: -1 } },       
-            { $limit: 10 }
-        ]);
-        const todayWriters = todayWritersRaw.map(w => ({ name: w._id, words: w.total }));
-
-        // 3. Totals
-        const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
-        const totalWords = totalWordsAgg[0]?.total || 0;
-        const totalWritersAgg = await DailyStats.distinct("name");
-        const totalWriters = totalWritersAgg.length;
-        const totalGroupsAgg = await DailyStats.distinct("groupId");
-        const totalGroups = totalGroupsAgg.length;
-
-        // 4. Top Groups
-        const topGroupsRaw = await DailyStats.aggregate([
-            { $group: { _id: "$groupId", total: { $sum: "$words" } } },
-            { $sort: { total: -1 } },
-            { $limit: 10 }
-        ]);
-
-        const topGroups = await Promise.all(topGroupsRaw.map(async (g) => {
-            let groupName = "Unknown Group";
-            if (client && isConnected) {
-                try {
-                    const chat = await client.getChatById(g._id);
-                    if (chat && chat.name) groupName = chat.name;
-                } catch (e) {}
-            }
-            return { name: groupName, words: g.total };
-        }));
-
-        // 5. Chart Data
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const chartDataRaw = await DailyStats.aggregate([
-            { $match: { timestamp: { $gte: sevenDaysAgo } } },
-            { $group: { _id: "$date", total: { $sum: "$words" } } },
-            { $sort: { _id: 1 } } 
-        ]);
-        const chartData = {
-            labels: chartDataRaw.map(d => d._id), 
-            data: chartDataRaw.map(d => d.total)
-        };
-
-        res.json({ isConnected, qrCode: qrImage, topWriters, todayWriters, totalWords, totalWriters, totalGroups, topGroups, chartData });
-
-    } catch (e) {
-        console.error("API Error:", e);
-        res.status(500).json({ error: "Server Error" });
-    }
-});
-
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
-
-// 🟢 KEEP-ALIVE
-setInterval(() => {
-    http.get(`http://localhost:${PORT}/`, (res) => {}).on('error', (err) => {});
-}, 5 * 60 * 1000); 
 
 // =======================
 //   DATABASE SCHEMAS
@@ -163,7 +84,176 @@ if (!MONGO_URI) {
     process.exit(1);
 }
 
+// In-memory active sprints
 let activeSprints = {}; 
+
+// =======================
+//   WEB API ENDPOINTS
+// =======================
+
+// Root Route
+app.get('/', async (req, res) => {
+    if (isConnected) {
+        res.send('<h1>✅ Sprint Bot is Online</h1><p>API is active.</p>');
+    } else if (qrCodeData) {
+        const qrImage = await QRCode.toDataURL(qrCodeData);
+        res.send(`<div style="text-align:center;padding-top:50px;"><h1>Scan with WhatsApp</h1><img src="${qrImage}"><p>Refresh page if code expires.</p></div>`);
+    } else {
+        res.send('<h1>⏳ Booting up... refresh in 10s.</h1>');
+    }
+});
+
+// 🟢 PUBLIC DASHBOARD DATA
+app.get('/api/stats', async (req, res) => {
+    try {
+        let qrImage = null;
+        if (!isConnected && qrCodeData) {
+            qrImage = await QRCode.toDataURL(qrCodeData);
+        }
+
+        // 1. Top 10 All-Time (Group by Name)
+        const topWritersRaw = await DailyStats.aggregate([
+            { $group: { _id: "$name", total: { $sum: "$words" } } }, 
+            { $sort: { total: -1 } },
+            { $limit: 10 }
+        ]);
+        const topWriters = topWritersRaw.map(w => ({ name: w._id, words: w.total }));
+
+        // 2. Today's Top 10 (Group by Name)
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+        const todayWritersRaw = await DailyStats.aggregate([
+            { $match: { date: todayStr } }, 
+            { $group: { _id: "$name", total: { $sum: "$words" } } }, 
+            { $sort: { total: -1 } },       
+            { $limit: 10 }
+        ]);
+        const todayWriters = todayWritersRaw.map(w => ({ name: w._id, words: w.total }));
+
+        // 3. Totals
+        const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
+        const totalWords = totalWordsAgg[0]?.total || 0;
+        const totalWritersAgg = await DailyStats.distinct("name");
+        const totalWriters = totalWritersAgg.length;
+        const totalGroupsAgg = await DailyStats.distinct("groupId");
+        const totalGroups = totalGroupsAgg.length;
+
+        // 4. Top Groups
+        const topGroupsRaw = await DailyStats.aggregate([
+            { $group: { _id: "$groupId", total: { $sum: "$words" } } },
+            { $sort: { total: -1 } },
+            { $limit: 10 }
+        ]);
+
+        const topGroups = await Promise.all(topGroupsRaw.map(async (g) => {
+            let groupName = "Unknown Group";
+            if (g._id === "Manual_Correction") return null; // Skip ghost group
+            
+            if (client && isConnected) {
+                try {
+                    const chat = await client.getChatById(g._id);
+                    if (chat && chat.name) groupName = chat.name;
+                } catch (e) {}
+            }
+            return { name: groupName, words: g.total };
+        }));
+
+        // 5. Chart Data
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const chartDataRaw = await DailyStats.aggregate([
+            { $match: { timestamp: { $gte: sevenDaysAgo } } },
+            { $group: { _id: "$date", total: { $sum: "$words" } } },
+            { $sort: { _id: 1 } } 
+        ]);
+        const chartData = {
+            labels: chartDataRaw.map(d => d._id), 
+            data: chartDataRaw.map(d => d.total)
+        };
+
+        res.json({ 
+            isConnected, 
+            qrCode: qrImage, 
+            topWriters, 
+            todayWriters, 
+            totalWords, 
+            totalWriters, 
+            totalGroups: totalGroups.filter(g => g !== null).length, 
+            topGroups: topGroups.filter(g => g !== null), 
+            chartData 
+        });
+
+    } catch (e) {
+        console.error("API Error:", e);
+        res.status(500).json({ error: "Server Error" });
+    }
+});
+
+// 👑 ADMIN API: SEARCH USER
+app.post('/api/admin/search', requireAdmin, async (req, res) => {
+    try {
+        const { query } = req.body;
+        // Search by name (case insensitive)
+        const users = await DailyStats.aggregate([
+            { $match: { name: { $regex: query, $options: 'i' } } },
+            { $group: { _id: "$userId", name: { $first: "$name" }, totalWords: { $sum: "$words" }, lastActive: { $max: "$date" } } },
+            { $limit: 10 }
+        ]);
+        res.json(users);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 👑 ADMIN API: EDIT STATS (Set/Add Word Count)
+app.post('/api/admin/update', requireAdmin, async (req, res) => {
+    try {
+        const { userId, amount, type } = req.body; // type: 'set' or 'add'
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+        
+        // Find user's entry for today (most recent active group)
+        const doc = await DailyStats.findOne({ userId, date: todayStr }).sort({ timestamp: -1 });
+
+        if (!doc) return res.status(404).json({ message: "User has no entry for today to edit. User must sprint first." });
+
+        if (type === 'set') {
+            const diff = amount - doc.words;
+            doc.words = parseInt(amount);
+            doc.name = "Fixed by Admin";
+            doc.timestamp = new Date();
+            await doc.save();
+            await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: diff } });
+        } else {
+            // Add (Correct)
+            doc.words += parseInt(amount);
+            doc.timestamp = new Date();
+            await doc.save();
+            await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: parseInt(amount) } });
+        }
+
+        res.json({ success: true, newTotal: doc.words });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 👑 ADMIN API: BROADCAST
+app.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!client || !isConnected) return res.status(500).json({ error: "Bot offline" });
+
+        const chats = await client.getChats();
+        const groups = chats.filter(c => c.id.server === 'g.us');
+        
+        for (const group of groups) {
+            await group.sendMessage(`📢 *ANNOUNCEMENT*\n\n${message}`);
+        }
+        res.json({ success: true, count: groups.length });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+
+// 🟢 KEEP-ALIVE
+setInterval(() => {
+    http.get(`http://localhost:${PORT}/`, (res) => {}).on('error', (err) => {});
+}, 5 * 60 * 1000); 
 
 // =======================
 //   MAIN LOGIC
@@ -246,17 +336,14 @@ mongoose.connect(MONGO_URI)
                 const chatId = chat.id._serialized;
                 let senderId = msg.author || msg.from;
                 
-                // 🛡️ Check if Banned
                 if (await Blacklist.exists({ userId: senderId })) return;
 
-                // 🛡️ ROBUST OWNER CHECK (Fixed)
-                // Just check if the sender ID contains your number string anywhere
+                // 🛡️ OWNER CHECK
                 const isOwner = senderId.includes(OWNER_NUMBER);
 
-                // 🛡️ Access Control
                 if (!chat.isGroup && !isOwner) return;
 
-                // 🛡️ Name Recovery
+                // 🛡️ NAME RECOVERY
                 let senderName = senderId.split('@')[0]; 
                 try {
                     const contact = await msg.getContact();
@@ -277,7 +364,6 @@ mongoose.connect(MONGO_URI)
                 // Helper: Get Target ID
                 const getTargetId = (argIndex = 1) => {
                     if (msg.mentionedIds.length > 0) return msg.mentionedIds[0];
-                    // Try to parse raw number
                     const potentialNumber = args[argIndex]?.replace(/\D/g, '');
                     if (potentialNumber && potentialNumber.length > 5) {
                         return potentialNumber + '@c.us';
@@ -301,8 +387,10 @@ mongoose.connect(MONGO_URI)
                     if (command === "!broadcast") {
                         const message = args.slice(1).join(" ");
                         if (!message) return msg.reply("❌ Message empty.");
+                        
                         const chats = await client.getChats();
-                        const groups = chats.filter(c => c.isGroup);
+                        const groups = chats.filter(c => c.id.server === 'g.us');
+                        
                         msg.reply(`📢 Broadcasting to ${groups.length} groups...`);
                         for (const group of groups) { await group.sendMessage(`📢 *ANNOUNCEMENT*\n\n${message}`); }
                         return;
@@ -310,7 +398,7 @@ mongoose.connect(MONGO_URI)
 
                     if (command === "!groups") {
                         const chats = await client.getChats();
-                        const groups = chats.filter(c => c.isGroup);
+                        const groups = chats.filter(c => c.id.server === 'g.us');
                         let report = `🤖 **I am in ${groups.length} groups:**\n\n`;
                         groups.forEach((g, i) => { report += `${i+1}. ${g.name}\n`; });
                         return msg.reply(report);
@@ -329,35 +417,38 @@ mongoose.connect(MONGO_URI)
 
                         if (!targetId || isNaN(amount)) return msg.reply("❌ Usage: `!correct @User -500`");
 
-                        // SMART FIND: If in group, use group ID. If in DM, find MOST RECENT entry today.
-                        let filter = { userId: targetId, date: todayString() };
+                        const todayStr = todayString();
+                        let filter = { userId: targetId, date: todayStr };
+                        
+                        // Smart Group Detection
                         if (chat.isGroup) {
                             filter.groupId = chatId;
-                        }
+                        } 
 
-                        // Try to find the document first (sort by newest)
+                        // Find document logic: Try to find existing doc
+                        // If in DM, sorting by timestamp -1 ensures we get the LATEST activity from any group
                         const targetDoc = await DailyStats.findOne(filter).sort({ timestamp: -1 });
 
                         if (!targetDoc) {
-                            // If no doc found, we can't 'correct' an entry that doesn't exist unless in group
-                            if (!chat.isGroup) return msg.reply("❌ User has no sprint data for today to correct.");
-                            
-                            // Create new if in group
-                            const targetName = await getTargetName(targetId);
-                            await DailyStats.create({
-                                userId: targetId, groupId: chatId, date: todayString(),
-                                name: targetName, words: amount, timestamp: new Date()
-                            });
-                            return msg.reply(`✅ Created entry with ${amount} words.`);
+                            if (chat.isGroup) {
+                                // Create new only if in group context
+                                const targetName = await getTargetName(targetId);
+                                await DailyStats.create({
+                                    userId: targetId, groupId: chatId, date: todayStr,
+                                    name: targetName, words: amount, timestamp: new Date()
+                                });
+                                return msg.reply(`✅ Created new entry for ${targetName} with ${amount} words.`);
+                            } else {
+                                return msg.reply("❌ User has no active sprint record today. I cannot create a new one from DM (unknown group). Please use this command inside their group.");
+                            }
                         }
 
-                        // Update the found doc
                         targetDoc.words += amount;
                         targetDoc.timestamp = new Date();
                         await targetDoc.save();
 
                         await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: amount } });
-                        return msg.reply(`✅ Adjusted count by ${amount}. New Total: ${targetDoc.words} (Group: ${targetDoc.groupId ? "Active" : "Unknown"})`);
+                        return msg.reply(`✅ Adjusted count by ${amount}. New Total: ${targetDoc.words}`);
                     }
 
                     // 🛠️ SETWORD (Smart Update)
@@ -367,22 +458,23 @@ mongoose.connect(MONGO_URI)
 
                         if (!targetId || isNaN(amount)) return msg.reply("❌ Usage: `!setword @User 2500`");
 
-                        let filter = { userId: targetId, date: todayString() };
-                        if (chat.isGroup) {
-                            filter.groupId = chatId;
-                        }
+                        const todayStr = todayString();
+                        let filter = { userId: targetId, date: todayStr };
+                        if (chat.isGroup) filter.groupId = chatId;
 
-                        // Find most recent doc
                         const targetDoc = await DailyStats.findOne(filter).sort({ timestamp: -1 });
 
                         if (!targetDoc) {
-                            if (!chat.isGroup) return msg.reply("❌ No record found to set. Do this in the group.");
-                            const targetName = await getTargetName(targetId);
-                            await DailyStats.create({
-                                userId: targetId, groupId: chatId, date: todayString(),
-                                name: targetName, words: amount, timestamp: new Date()
-                            });
-                            return msg.reply(`✅ Created entry set to ${amount}.`);
+                            if (chat.isGroup) {
+                                const targetName = await getTargetName(targetId);
+                                await DailyStats.create({
+                                    userId: targetId, groupId: chatId, date: todayStr,
+                                    name: targetName, words: amount, timestamp: new Date()
+                                });
+                                return msg.reply(`✅ Created new entry set to ${amount}.`);
+                            } else {
+                                return msg.reply("❌ No record found today to update. Please run inside the group.");
+                            }
                         }
 
                         targetDoc.words = amount;
@@ -390,6 +482,25 @@ mongoose.connect(MONGO_URI)
                         await targetDoc.save();
                         
                         return msg.reply(`✅ Forced daily count to **${amount}**.`);
+                    }
+
+                    // 🛠️ SETNAME (Admin fix for "Writer")
+                    if (command === "!setname") {
+                        const targetId = getTargetId(1);
+                        const nameStartIndex = msg.mentionedIds.length > 0 ? 2 : 2; 
+                        const newName = args.slice(nameStartIndex).join(" ");
+
+                        if (!targetId || !newName) return msg.reply("❌ Usage: `!setname @User New Name`");
+
+                        await DailyStats.updateMany({ userId: targetId }, { name: newName });
+                        await PersonalGoal.updateMany({ userId: targetId }, { name: newName });
+                        return msg.reply(`✅ Updated name to **${newName}** for all records.`);
+                    }
+
+                    // 🛠️ CLEAN GHOSTS
+                    if (command === "!cleanghosts") {
+                        const res = await DailyStats.deleteMany({ groupId: "Manual_Correction" });
+                        return msg.reply(`🧹 Cleaned up ${res.deletedCount} ghost records.`);
                     }
 
                     if (command === "!wipe") {
@@ -433,7 +544,7 @@ mongoose.connect(MONGO_URI)
 
 🏃 *Sprinting*
 !sprint 20 : Start a 20 min sprint
-!wc 500 : Log 500 words
+!wc 500 : Log words
 !time : Check time remaining
 !finish : End sprint & view results
 !cancel : Stop the current timer
