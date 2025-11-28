@@ -1,5 +1,5 @@
 // =======================
-//       IMPORTS
+//       IMPORTS
 // =======================
 const { Client, RemoteAuth } = require("whatsapp-web.js");
 const { MongoStore } = require('wwebjs-mongo');
@@ -7,11 +7,11 @@ const mongoose = require("mongoose");
 const QRCode = require('qrcode');
 const express = require('express');
 const http = require('http'); 
-const os = require('os'); // NEW: For System Stats
+const os = require('os'); 
 require("dotenv").config();
 
 // =======================
-//   CONFIG & SERVER SETUP
+//   CONFIG & SERVER SETUP
 // =======================
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,10 +43,10 @@ const requireAdmin = (req, res, next) => {
 let qrCodeData = null;
 let isConnected = false;
 let client = null; 
-let maintenanceMode = false; // 🔧 NEW: Maintenance Mode Switch
+let maintenanceMode = false; 
 
 // =======================
-//   DATABASE SCHEMAS
+//   DATABASE SCHEMAS
 // =======================
 const dailyStatsSchema = new mongoose.Schema({
     userId: String,
@@ -85,7 +85,7 @@ if (!MONGO_URI) { console.error("❌ ERROR: MONGO_URI is missing!"); process.exi
 let activeSprints = {}; 
 
 // =======================
-//   WEB API ENDPOINTS
+//   WEB API ENDPOINTS
 // =======================
 
 app.get('/', async (req, res) => {
@@ -105,14 +105,14 @@ app.get('/api/stats', async (req, res) => {
         let qrImage = null;
         if (!isConnected && qrCodeData) qrImage = await QRCode.toDataURL(qrCodeData);
 
-        // Top 10 All-Time
+        // 1. Top 10 All-Time Writers
         const topWritersRaw = await DailyStats.aggregate([
             { $group: { _id: "$name", total: { $sum: "$words" } } }, 
             { $sort: { total: -1 } }, { $limit: 10 }
         ]);
         const topWriters = topWritersRaw.map(w => ({ name: w._id, words: w.total }));
 
-        // Today's Top 10
+        // 2. Today's Top 10 Writers
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const todayWritersRaw = await DailyStats.aggregate([
             { $match: { date: todayStr } }, 
@@ -121,12 +121,35 @@ app.get('/api/stats', async (req, res) => {
         ]);
         const todayWriters = todayWritersRaw.map(w => ({ name: w._id, words: w.total }));
 
-        // Totals
+        // 3. Top Groups (FIXED)
+        const topGroupsRaw = await DailyStats.aggregate([
+            { $match: { groupId: { $exists: true, $ne: "Manual_Correction" } } }, // Filter bad IDs
+            { $group: { _id: "$groupId", total: { $sum: "$words" } } },
+            { $sort: { total: -1 } },
+            { $limit: 10 }
+        ]);
+
+        // Resolve Group Names asynchronously
+        const topGroups = await Promise.all(topGroupsRaw.map(async (g) => {
+            let groupName = "Unknown Group";
+            if (client && isConnected) {
+                try {
+                    const chat = await client.getChatById(g._id);
+                    if (chat.name) groupName = chat.name;
+                } catch (e) {
+                    // Chat might be deleted or bot kicked out, fallback to ID
+                    groupName = `Group ${g._id.substring(0, 5)}...`;
+                }
+            }
+            return { name: groupName, words: g.total };
+        }));
+
+        // 4. General Totals
         const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
         const totalWritersAgg = await DailyStats.distinct("name");
         const allGroupIds = await DailyStats.distinct("groupId");
         
-        // 7-Day Chart
+        // 5. 7-Day Chart Data
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const chartDataRaw = await DailyStats.aggregate([
@@ -137,7 +160,11 @@ app.get('/api/stats', async (req, res) => {
         const chartData = { labels: chartDataRaw.map(d => d._id), data: chartDataRaw.map(d => d.total) };
 
         res.json({ 
-            isConnected, qrCode: qrImage, topWriters, todayWriters, 
+            isConnected, 
+            qrCode: qrImage, 
+            topWriters, 
+            todayWriters, 
+            topGroups, // <--- NOW INCLUDED
             totalWords: totalWordsAgg[0]?.total || 0, 
             totalWriters: totalWritersAgg.length, 
             totalGroups: allGroupIds.filter(id => id !== "Manual_Correction").length,
@@ -147,7 +174,7 @@ app.get('/api/stats', async (req, res) => {
     } catch (e) { console.error("API Error:", e); res.status(500).json({ error: "Server Error" }); }
 });
 
-// 👑 ADMIN: SYSTEM STATS (Detailed)
+// 👑 ADMIN: SYSTEM STATS
 app.get('/api/admin/system', requireAdmin, async (req, res) => {
     const uptime = process.uptime();
     const memory = process.memoryUsage();
@@ -163,7 +190,7 @@ app.get('/api/admin/system', requireAdmin, async (req, res) => {
 
 // 👑 ADMIN: MAINTENANCE TOGGLE
 app.post('/api/admin/maintenance', requireAdmin, (req, res) => {
-    const { status } = req.body; // true or false
+    const { status } = req.body; 
     maintenanceMode = status;
     res.json({ success: true, status: maintenanceMode });
 });
@@ -180,7 +207,7 @@ app.get('/api/admin/sprints', requireAdmin, async (req, res) => {
         sprints.push({
             id: chatId,
             name: name,
-            timeLeft: Math.ceil(timeLeft / 1000 / 60), // Mins
+            timeLeft: Math.ceil(timeLeft / 1000 / 60), 
             participants: Object.keys(sprint.participants).length
         });
     }
@@ -201,7 +228,7 @@ app.post('/api/admin/sprints/stop', requireAdmin, async (req, res) => {
     res.status(404).json({ error: "Sprint not found" });
 });
 
-// 👑 ADMIN: GET ALL GROUPS (For "Leave" tab)
+// 👑 ADMIN: GET ALL GROUPS
 app.get('/api/admin/groups', requireAdmin, async (req, res) => {
     if (!client || !isConnected) return res.json([]);
     const chats = await client.getChats();
@@ -234,7 +261,7 @@ app.post('/api/admin/users/rename', requireAdmin, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// 👑 ADMIN: SEARCH (Updated)
+// 👑 ADMIN: SEARCH
 app.post('/api/admin/search', requireAdmin, async (req, res) => {
     try {
         const { query } = req.body;
@@ -247,7 +274,7 @@ app.post('/api/admin/search', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 👑 ADMIN: UPDATE STATS (Correct/Set)
+// 👑 ADMIN: UPDATE STATS
 app.post('/api/admin/update', requireAdmin, async (req, res) => {
     try {
         const { userId, amount, type } = req.body; 
@@ -301,20 +328,74 @@ setInterval(() => {
 }, 5 * 60 * 1000); 
 
 // =======================
-//   MAIN LOGIC
+//   MAIN LOGIC
 // =======================
+
 mongoose.connect(MONGO_URI)
+
     .then(() => {
+
         console.log("✅ MongoDB connected");
+
         const store = new MongoStore({ mongoose: mongoose });
 
+
+
         client = new Client({
-            authStrategy: new RemoteAuth({ store: store, backupSyncIntervalMs: 300000 }),
-            puppeteer: { headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-accelerated-2d-canvas", "--no-first-run", "--no-zygote", "--single-process", "--disable-gpu"] }
+
+            authStrategy: new RemoteAuth({
+
+                store: store,
+
+                backupSyncIntervalMs: 300000,
+
+                // Explicit path helps Render find the temp folder
+
+                dataPath: './.wwebjs_auth' 
+
+            }),
+
+            // 🛑 CRITICAL FIX: Locks the version to stop crashes
+
+            webVersionCache: {
+
+                type: "remote",
+
+                remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html",
+
+            },
+
+            puppeteer: {
+
+                headless: true,
+
+                args: [
+
+                    "--no-sandbox",
+
+                    "--disable-setuid-sandbox",
+
+                    "--disable-dev-shm-usage", // Essential for Render memory
+
+                    "--disable-accelerated-2d-canvas",
+
+                    "--no-first-run",
+
+                    "--no-zygote",
+
+                    "--single-process",
+
+                    "--disable-gpu"
+
+                ],
+
+                timeout: 60000
+
+            }
+
         });
 
         const getTodayDateGMT1 = () => new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
-        const formatTimeGMT1 = (dateObj) => dateObj.toLocaleTimeString('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit' });
 
         const startSprintSession = async (chatId, duration) => {
             if (activeSprints[chatId]) return false; 
@@ -393,13 +474,6 @@ mongoose.connect(MONGO_URI)
                     return null;
                 };
 
-                const getTargetName = async (targetId) => {
-                    try {
-                        const contact = await client.getContactById(targetId);
-                        return contact.pushname || contact.name || contact.number || "Writer";
-                    } catch (e) { return "Writer"; }
-                };
-
                 // --- ADMIN COMMANDS ---
                 if (isOwner) {
                     if (command === "!broadcast") {
@@ -414,7 +488,6 @@ mongoose.connect(MONGO_URI)
 
                     if (command === "!sys") {
                         const uptime = process.uptime();
-                        const mem = process.memoryUsage().heapUsed / 1024 / 1024;
                         return msg.reply(`⚙️ **System**\n⏱️ ${Math.floor(uptime/60)}m\n🔧 Maintenance: ${maintenanceMode ? "ON" : "OFF"}`);
                     }
 
