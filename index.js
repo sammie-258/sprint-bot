@@ -565,12 +565,29 @@ mongoose.connect(MONGO_URI)
                 // --- REGULAR COMMANDS ---
                 if (command === "!help") {
                     return msg.reply(`🤖 *SPRINT BOT MENU*
-🏃 !sprint 20 | !wc 500
-⏱️ !time | !finish | !cancel
-📅 !schedule 20 in 60 | !unschedule
-📊 !daily | !weekly | !monthly | !top10
-🎯 !goal set 5000 | !goal check
-⚙️ !log 500 | !myname Sam`);
+
+🏃 *Sprinting*
+!sprint 20 : Start a 20 min sprint
+!wc 500 : Log 500 words
+!time : Check time remaining
+!finish : End sprint & view results
+!cancel : Stop the current timer
+
+📅 *Planning*
+!schedule 20 in 60 : Sprint in 60 mins
+!unschedule : Cancel scheduled sprints
+
+📊 *Stats & Goals*
+!daily : Today's leaderboard
+!weekly : Last 7 days leaderboard
+!monthly : Last 30 days leaderboard
+!top10 : All-time Hall of Fame
+!goal set 50000 : Set personal target
+!goal check : View goal progress
+
+⚙ *Utils*
+!log 500 : Manually add words (no timer)
+!myname Sam : Update your display name`);
                 }
 
                 if (command === "!log") {
@@ -616,10 +633,15 @@ mongoose.connect(MONGO_URI)
                 if (command === "!schedule") {
                     if (args[2] !== 'in') return msg.reply("❌ Use: `!schedule 20 in 60`");
                     const d = parseInt(args[1]), w = parseInt(args[3]);
-                    if (isNaN(d) || isNaN(w)) return msg.reply("❌ Invalid.");
+                    if (isNaN(d) || isNaN(w)) return msg.reply("❌ Invalid numbers.");
+                    
                     const s = new Date(Date.now() + w * 60000);
                     await ScheduledSprint.create({ groupId: chatId, startTime: s, duration: d, createdBy: senderId });
-                    return msg.reply(`📅 Scheduled: ${d}m in ${w}m.`);
+                    
+                    // Format time for GMT+1 (Africa/Lagos)
+                    const timeStr = s.toLocaleTimeString('en-GB', { timeZone: "Africa/Lagos", hour: '2-digit', minute: '2-digit' });
+
+                    return msg.reply(`📅 *Sprint Scheduled!*\n\nDuration: ${d} mins\nStart: In ${w} mins (approx ${timeStr} GMT+1)`);
                 }
 
                 if (command === "!unschedule") {
@@ -690,6 +712,7 @@ mongoose.connect(MONGO_URI)
 
                 if (command === "!goal") {
                     const sub = args[1]?.toLowerCase();
+                    
                     if (sub === "set") {
                         const t = parseInt(args[2]);
                         if (isNaN(t)) return msg.reply("❌ Use: `!goal set 5000`");
@@ -697,11 +720,27 @@ mongoose.connect(MONGO_URI)
                         await PersonalGoal.create({ userId: senderId, name: senderName, target: t, current: 0 });
                         return msg.reply(`🎯 Goal set: ${t}`);
                     }
+                    
                     if (sub === "check") {
                         const g = await PersonalGoal.findOne({ userId: senderId, isActive: true });
-                        if (!g) return msg.reply("❌ No active goal.");
-                        const p = ((g.current/g.target)*100).toFixed(1);
-                        return msg.reply(`🎯 ${g.current}/${g.target} (${p}%)`);
+                        if (!g) return msg.reply("❌ No active goal. Start one with \`!goal set [number]\`");
+                        
+                        // Calculate Percentage
+                        const rawPct = (g.current / g.target) * 100;
+                        const pct = Math.min(100, Math.max(0, rawPct)); // Clamp between 0-100
+                        
+                        // Calculate Green Blocks (0 to 10)
+                        const filledCount = Math.round(pct / 10); 
+                        const emptyCount = 10 - filledCount;
+                        const bar = "🟩".repeat(filledCount) + "⬜".repeat(emptyCount);
+                        
+                        const txt = `🎯 *Goal Progress*\n` +
+                                    `👤 ${g.name}\n` +
+                                    `📊 ${g.current} / ${g.target} words\n` +
+                                    `${bar} (${rawPct.toFixed(1)}%)\n` +
+                                    `📅 Started: ${g.startDate}`;
+                                    
+                        return msg.reply(txt);
                     }
                 }
 
