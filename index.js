@@ -84,6 +84,15 @@ if (!MONGO_URI) { console.error("❌ ERROR: MONGO_URI is missing!"); process.exi
 
 let activeSprints = {}; 
 
+// New Schema for running sprints
+const activeSprintSchema = new mongoose.Schema({
+    groupId: String,
+    endsAt: Number,
+    duration: Number,
+    participants: { type: Object, default: {} } // Stores user words
+});
+const ActiveSprint = mongoose.model("ActiveSprint", activeSprintSchema);
+
 // =======================
 //   WEB API ENDPOINTS
 // =======================
@@ -221,7 +230,7 @@ app.post('/api/admin/sprints/stop', requireAdmin, async (req, res) => {
         delete activeSprints[chatId];
         try {
             const chat = await client.getChatById(chatId);
-            await chat.sendMessage("🛑 **ADMIN STOP**: Sprint cancelled via Dashboard.");
+            await chat.sendMessage("🛑 **ADMIN STOP**: Sprint cancelled by Super Admin.");
         } catch(e) {}
         return res.json({ success: true });
     }
@@ -332,77 +341,102 @@ setInterval(() => {
 // =======================
 
 mongoose.connect(MONGO_URI)
-
-    .then(() => {
-
+    .then(async () => { // <--- ✅ Added 'async'
         console.log("✅ MongoDB connected");
-
+        
+        // 🟢 RESTORE SPRINTS
+        const restoredSprints = await ActiveSprint.find({});
+restoredSprints.forEach(doc => {
+    if (doc.endsAt > Date.now()) {
+        // Sprint is still valid, restore it to memory
+        activeSprints[doc.groupId] = {
+            duration: doc.duration,
+            endsAt: doc.endsAt,
+            participants: doc.participants
+        };
+        console.log(`♻️ Restored active sprint for group ${doc.groupId}`);
+        
+        // Restart the timer for the remaining time
+        const remainingTime = doc.endsAt - Date.now();
+        setTimeout(async () => {
+    // 🛡️ Added check: Ensure bot is actually connected before sending
+    if (activeSprints[doc.groupId] && client && isConnected) {
+         try {
+             const chat = await client.getChatById(doc.groupId);
+             await chat.sendMessage(`🛑 **TIME'S UP!** (Restored)\n\nReply with *!wc [number]* now.\nType *!finish* to end.`);
+         } catch (e) { console.log("⚠️ Could not send restored sprint msg:", e.message); }
+    }
+}, remainingTime);
+    } else {
+        // Sprint expired while bot was offline - delete it
+        ActiveSprint.deleteOne({ _id: doc._id }).exec();
+    }
+});
         const store = new MongoStore({ mongoose: mongoose });
 
-
-
         client = new Client({
-
             authStrategy: new RemoteAuth({
-
                 store: store,
-
                 backupSyncIntervalMs: 300000,
-
-                // Explicit path helps Render find the temp folder
-
                 dataPath: './.wwebjs_auth' 
-
             }),
-
-            // 🛑 CRITICAL FIX: Locks the version to stop crashes
-
+            // 🟢 OPTIMIZATION: Do not generate link previews (saves RAM)
+            generatePcPreview: false,
+            
             webVersionCache: {
-
                 type: "remote",
-
                 remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html",
-
             },
-
             puppeteer: {
-
                 headless: true,
-
+                // 🟢 OPTIMIZATION: Aggressive arguments for low-memory environments
                 args: [
-
                     "--no-sandbox",
-
                     "--disable-setuid-sandbox",
-
-                    "--disable-dev-shm-usage", // Essential for Render memory
-
+                    "--disable-dev-shm-usage", // Critical for Render
                     "--disable-accelerated-2d-canvas",
-
                     "--no-first-run",
-
                     "--no-zygote",
-
-                    "--single-process",
-
-                    "--disable-gpu"
-
+                    "--single-process", 
+                    "--disable-gpu",
+                    "--js-flags=--max-old-space-size=360", // Match package.json
+                    "--disable-extensions",
+                    "--disable-default-apps",
+                    "--mute-audio",
+                    "--no-default-browser-check",
+                    "--disable-background-timer-throttling",
+                    "--disable-backgrounding-occluded-windows",
+                    "--disable-breakpad",
+                    "--disable-component-update",
+                    "--disable-ipc-flooding-protection",
+                    "--disable-notifications",
+                    "--disable-renderer-backgrounding",
                 ],
-
                 timeout: 60000
-
             }
-
         });
 
         const getTodayDateGMT1 = () => new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
 
         const startSprintSession = async (chatId, duration) => {
-            if (activeSprints[chatId]) return false; 
-            const endTime = Date.now() + duration * 60000;
-            activeSprints[chatId] = { duration, endsAt: endTime, participants: {} };
-            const chat = await client.getChatById(chatId);
-            await chat.sendMessage(`🏁 *Writing Sprint Started!*\nDuration: *${duration} minutes*\n\nUse *!wc <number>* to log words.`);
+    if (activeSprints[chatId]) return false; 
+    console.log(`🏁 Sprint STARTED in ${chatId} for ${duration} mins`);
+    const endTime = Date.now() + duration * 60000;
+    
+    // 1. Save to Memory
+    activeSprints[chatId] = { duration, endsAt: endTime, participants: {} };
+    
+    // 2. Save to Database (Persistance)
+    await ActiveSprint.create({ 
+        groupId: chatId, 
+        duration, 
+        endsAt: endTime, 
+        participants: {} 
+    });
+
+    const chat = await client.getChatById(chatId);
+    await chat.sendMessage(`🏁 *Writing Sprint Started!*\nDuration: *${duration} minutes*\n\nUse *!wc <number>* to log words.`);
+    
             setTimeout(async () => {
                 if (activeSprints[chatId]) {
                     try { await chat.sendMessage(`🛑 **TIME'S UP!**\n\nReply with *!wc [number]* now.\nType *!finish* to end.`); } 
@@ -591,21 +625,30 @@ mongoose.connect(MONGO_URI)
                 }
 
                 if (command === "!log") {
-                    let count = parseInt(args[1]);
-                    if (isNaN(count) || count <= 0) return msg.reply("❌ Use: `!log 500`");
-                    try {
-                        await DailyStats.findOneAndUpdate({ userId: senderId, groupId: chatId, date: todayStr }, { name: senderName, $inc: { words: count }, timestamp: new Date() }, { upsert: true, new: true });
-                        const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
-                        let goalMsg = "";
-                        if (goal) {
-                            goal.current += count;
-                            await goal.save();
-                            if (goal.current >= goal.target) { goalMsg = `\n🎉 Goal Hit!`; goal.isActive = false; await goal.save(); }
-                        }
-                        let txt = `✅ Logged ${count}.` + goalMsg;
-                        if(goalMsg) await chat.sendMessage(txt, {mentions: [senderId]}); else await msg.reply(txt);
-                    } catch (e) { console.error(e); }
-                }
+    let count = parseInt(args[1]);
+    if (isNaN(count) || count <= 0) return msg.reply("❌ Use: `!log 500`");
+    try {
+        await DailyStats.findOneAndUpdate({ userId: senderId, groupId: chatId, date: todayStr }, { name: senderName, $inc: { words: count }, timestamp: new Date() }, { upsert: true, new: true });
+        
+        const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+        
+        // 1. Send the normal log message first
+        await msg.reply(`✅ Logged ${count}.`);
+
+        // 2. Check Goal & Send SEPARATE message if hit (Fix #1)
+        if (goal) {
+            goal.current += count;
+            if (goal.current >= goal.target) { 
+                goal.isActive = false; 
+                await goal.save(); 
+                // Tag the user in a separate message
+                await chat.sendMessage(`🎉 *GOAL HIT!* 🏆\n\nCongratulations @${senderId.split('@')[0]}! You smashed your target of ${goal.target} words!`, { mentions: [senderId] });
+            } else {
+                await goal.save();
+            }
+        }
+    } catch (e) { console.error(e); }
+}
 
                 if (command === "!top10" || command === "!top") {
                     const top = await DailyStats.aggregate([{ $group: { _id: "$name", total: { $sum: "$words" } } }, { $sort: { total: -1 } }, { $limit: 10 }]);
@@ -652,29 +695,46 @@ mongoose.connect(MONGO_URI)
 
                 if (command === "!time") {
                     const s = activeSprints[chatId];
-                    if (!s) return msg.reply("❌ No sprint.");
+                    if (!s) return msg.reply("❌ No active sprint.");
                     const r = s.endsAt - Date.now();
                     if (r <= 0) return msg.reply("🛑 Time up!");
-                    return msg.reply(`⏳ ${Math.floor(r/60000)}m ${Math.floor((r/1000)%60)}s`);
-                }
+                    const endDates = new Date(s.endsAt);
+    const timeString = endDates.toLocaleTimeString('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit' });
+    
+    return msg.reply(`⏳ *${Math.floor(r/60000)}m ${Math.floor((r/1000)%60)}s* remaining\n(Ends approx ${timeString})`);
+}
 
                 if (command === "!wc") {
-                    const s = activeSprints[chatId];
-                    if (!s) return msg.reply("❌ No sprint.");
-                    let c = parseInt(args[1]==='add'||args[1]==='+'?args[2]:args[1]);
-                    let add = args[1]==='add'||args[1]==='+';
-                    if (isNaN(c)) return msg.reply("❌ Invalid.");
-                    if (!s.participants[senderId]) s.participants[senderId] = { name: senderName, words: 0 };
-                    if (add) { s.participants[senderId].words += c; await msg.reply(`➕ Added. Total: ${s.participants[senderId].words}`); }
-                    else { s.participants[senderId].words = c; await msg.react('✅'); }
-                }
+    const s = activeSprints[chatId];
+    if (!s) return msg.reply("❌ No sprint.");
+    
+    let c = parseInt(args[1]==='add'||args[1]==='+'?args[2]:args[1]);
+    let add = args[1]==='add'||args[1]==='+';
+    
+    if (isNaN(c)) return msg.reply("❌ Invalid.");
+    if (!s.participants[senderId]) s.participants[senderId] = { name: senderName, words: 0 };
+    
+    if (add) { s.participants[senderId].words += c; await msg.reply(`➕ Added. Total: ${s.participants[senderId].words}`); }
+    else { s.participants[senderId].words = c; await msg.react('✅'); }
+
+    // 🟢 SYNC TO DB
+    await ActiveSprint.updateOne(
+        { groupId: chatId }, 
+        { $set: { participants: s.participants } }
+    );
+}
 
                 if (command === "!finish") {
                     const s = activeSprints[chatId];
                     if (!s) return msg.reply("❌ No sprint.");
                     const l = Object.entries(s.participants).map(([u, d]) => ({ ...d, uid: u })).sort((a, b) => b.words - a.words);
-                    if (l.length === 0) { delete activeSprints[chatId]; return msg.reply("🏁 Ended. Empty."); }
-                    let txt = `🏆 *RESULTS* 🏆\n\n`, men = [];
+                    if (l.length === 0) { 
+        delete activeSprints[chatId]; 
+        await ActiveSprint.deleteOne({ groupId: chatId });
+        console.log(`🏁 Sprint ENDED in ${chatId} (No participants)`); // Fix #4
+        return msg.reply("🏁 Ended. Empty."); 
+    }
+                    let txt = `🏆 *SPRINT RESULTS* 🏆\n\n`, men = [];
                     for (let i = 0; i < l.length; i++) {
                         let p = l[i]; men.push(p.uid);
                         txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} @${p.uid.split('@')[0]} : ${p.words} (${Math.round(p.words/s.duration)} WPM)\n`;
@@ -685,9 +745,15 @@ mongoose.connect(MONGO_URI)
                         } catch (e) {}
                     }
                     delete activeSprints[chatId];
-                    txt += "\nGreat job!";
-                    await chat.sendMessage(txt, { mentions: men });
-                }
+    await ActiveSprint.deleteOne({ groupId: chatId });
+    
+    console.log(`🏁 Sprint ENDED in ${chatId} with ${l.length} writers`); // Fix #4
+
+    // Fix #2: Add suggestion to start new sprint
+    txt += "\nGreat job, everyone!\n\n👉 *Next Step:* Type `!sprint 15` to go again or `!schedule` to plan ahead!";
+    
+    await chat.sendMessage(txt, { mentions: men });
+}
 
                 if (["!daily", "!weekly", "!monthly"].includes(command)) {
                     const d = command === "!daily";
@@ -752,5 +818,19 @@ mongoose.connect(MONGO_URI)
         });
 
         client.initialize();
-    })
+
+        // 🟢 MEMORY LEAK PROTECTION (Add this block)
+        setInterval(async () => {
+            console.log("♻️ Auto-Reboot: Refreshing client to clear memory...");
+            if (client) {
+                try {
+                    await client.destroy();
+                    client.initialize();
+                    console.log("✅ Client refreshed successfully.");
+                } catch (e) {
+                    process.exit(1); 
+                }
+            }
+        }, 21600000); // 6 hours
+    }) // <--- This closes the .then(async () => {
     .catch(err => { console.error("❌ MongoDB error:", err); process.exit(1); });

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint Bot Super Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .tab-active { border-bottom: 2px solid #10b981; color: #10b981; font-weight: 600; }
+        .tab-inactive { color: #6b7280; }
+        .tab-inactive:hover { color: #374151; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- 🔒 Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-gray-900 z-50 flex items-center justify-center">
+        <div class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center">
+            <div class="mb-4 text-green-600 text-4xl"><i class="fas fa-shield-alt"></i></div>
+            <h2 class="text-2xl font-bold mb-2">Super Admin</h2>
+            <input type="password" id="admin-pass" placeholder="Enter Access Key" class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-green-500 outline-none">
+            <button onclick="login()" class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-black transition">Unlock Console</button>
+        </div>
+    </div>
+
+    <!-- 🎛️ Main Interface -->
+    <div id="app" class="hidden min-h-screen flex flex-col">
+        
+        <!-- Navbar -->
+        <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-robot text-green-600 text-2xl"></i>
+                        <span class="font-bold text-lg tracking-tight">Sprint Bot <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded ml-2">v2.0</span></span>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button onclick="openBroadcast()" class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center">
+                            <i class="fas fa-bullhorn mr-2"></i> Broadcast
+                        </button>
+                        <button onclick="logout()" class="text-gray-500 hover:text-red-600 px-3 py-2 transition"><i class="fas fa-sign-out-alt text-xl"></i></button>
+                    </div>
+                </div>
+                
+                <!-- Tabs -->
+                <div class="flex space-x-8 mt-2 overflow-x-auto">
+                    <button onclick="switchTab('overview')" id="tab-overview" class="tab-active pb-3 px-1">Overview</button>
+                    <button onclick="switchTab('sprints')" id="tab-sprints" class="tab-inactive pb-3 px-1">Active Sprints</button>
+                    <button onclick="switchTab('groups')" id="tab-groups" class="tab-inactive pb-3 px-1">Groups</button>
+                    <button onclick="switchTab('writers')" id="tab-writers" class="tab-inactive pb-3 px-1">Manage Writers</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mx-auto px-4 py-8 max-w-5xl flex-1">
+            
+            <!-- TAB 1: OVERVIEW & SYSTEM -->
+            <div id="view-overview" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Maintenance Card -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="font-bold text-gray-700">Maintenance Mode</h3>
+                                <p class="text-xs text-gray-500 mt-1">Stops commands for non-admins.</p>
+                            </div>
+                            <div class="text-3xl text-orange-500"><i class="fas fa-tools"></i></div>
+                        </div>
+                        <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                            <span id="maint-status" class="font-bold text-sm text-gray-600">OFF</span>
+                            <button onclick="toggleMaintenance()" id="maint-btn" class="bg-gray-200 text-gray-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-gray-300 transition">Enable</button>
+                        </div>
+                    </div>
+
+                    <!-- System Stats -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 md:col-span-2">
+                        <h3 class="font-bold text-gray-700 mb-4">System Health</h3>
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div class="p-3 bg-blue-50 rounded-lg">
+                                <p class="text-xs text-blue-500 uppercase font-bold">Memory</p>
+                                <p class="text-xl font-bold text-gray-800" id="sys-mem">...</p>
+                            </div>
+                            <div class="p-3 bg-green-50 rounded-lg">
+                                <p class="text-xs text-green-500 uppercase font-bold">Uptime</p>
+                                <p class="text-xl font-bold text-gray-800" id="sys-uptime">...</p>
+                            </div>
+                            <div class="p-3 bg-purple-50 rounded-lg">
+                                <p class="text-xs text-purple-500 uppercase font-bold">Server</p>
+                                <p class="text-xl font-bold text-gray-800" id="sys-platform">...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: ACTIVE SPRINTS -->
+            <div id="view-sprints" class="hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">Ongoing Sprints</h2>
+                    <button onclick="loadSprints()" class="text-blue-600 text-sm hover:underline"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
+                </div>
+                <div id="sprints-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Injected via JS -->
+                </div>
+            </div>
+
+            <!-- TAB 3: GROUPS MANAGER -->
+            <div id="view-groups" class="hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">Connected Groups</h2>
+                    <button onclick="loadGroups()" class="text-blue-600 text-sm hover:underline"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-gray-500 font-semibold border-b">
+                            <tr><th class="p-4">Group Name</th><th class="p-4">Members</th><th class="p-4 text-right">Actions</th></tr>
+                        </thead>
+                        <tbody id="groups-table" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 4: WRITERS (Search & Edit) -->
+            <div id="view-writers" class="hidden">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+                    <div class="flex gap-3">
+                        <input type="text" id="search-input" placeholder="Search by name or number..." 
+                               class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                               onkeypress="if(event.key === 'Enter') searchUsers()">
+                        <button onclick="searchUsers()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700 transition">Search</button>
+                    </div>
+                </div>
+                <div id="results-area" class="grid grid-cols-1 gap-4"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ✏️ EDIT MODAL -->
+    <div id="edit-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800" id="edit-name">Edit User</h3>
+                <button onclick="closeEdit()" class="text-gray-400 hover:text-red-500"><i class="fas fa-times"></i></button>
+            </div>
+            <input type="hidden" id="edit-id">
+            
+            <div class="space-y-6">
+                <!-- Rename -->
+                <div class="p-3 border rounded-lg bg-gray-50">
+                    <label class="block text-xs font-bold text-gray-500 mb-1">RENAME USER</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="new-name" placeholder="New Name" class="flex-1 p-2 border rounded text-sm">
+                        <button onclick="renameUser()" class="bg-gray-800 text-white px-3 rounded text-sm">Save</button>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-blue-600 mb-1">SET TOTAL</label>
+                        <div class="flex gap-2">
+                            <input type="number" id="edit-amount" class="w-full p-2 border rounded text-sm">
+                            <button onclick="updateStats('set')" class="bg-blue-600 text-white px-3 rounded text-sm">Set</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-green-600 mb-1">ADD / SUB</label>
+                        <div class="flex gap-2">
+                            <input type="number" id="add-amount" class="w-full p-2 border rounded text-sm">
+                            <button onclick="updateStats('add')" class="bg-green-600 text-white px-3 rounded text-sm">Add</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📢 BROADCAST MODAL -->
+    <div id="broadcast-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl w-full max-w-lg shadow-2xl border-t-4 border-yellow-500">
+            <h3 class="text-xl font-bold mb-2">Global Broadcast</h3>
+            <textarea id="broadcast-text" rows="4" class="w-full p-4 border rounded-lg mb-4" placeholder="Type message..."></textarea>
+            <div class="flex justify-end gap-3">
+                <button onclick="document.getElementById('broadcast-modal').classList.add('hidden')" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
+                <button onclick="sendBroadcast()" class="px-6 py-2 bg-yellow-500 text-white font-bold rounded">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ REPLACE WITH YOUR RENDER URL
+        const API_URL = 'https://sprint-bot-9bll.onrender.com';
+        let token = localStorage.getItem('admin_key');
+
+        if(token) {
+            document.getElementById('auth-modal').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            loadSystemStats();
+        }
+
+        // --- NAVIGATION ---
+        function switchTab(tabId) {
+            ['overview', 'sprints', 'groups', 'writers'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).className = 'tab-inactive pb-3 px-1';
+            });
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabId}`).className = 'tab-active pb-3 px-1';
+
+            // Auto load data for specific tabs
+            if(tabId === 'sprints') loadSprints();
+            if(tabId === 'groups') loadGroups();
+            if(tabId === 'overview') loadSystemStats();
+        }
+
+        // --- AUTH ---
+        function login() {
+            const pass = document.getElementById('admin-pass').value;
+            if(!pass) return alert("Enter password");
+            token = pass;
+            localStorage.setItem('admin_key', pass);
+            location.reload();
+        }
+        function logout() { localStorage.removeItem('admin_key'); location.reload(); }
+
+        // --- API HELPER ---
+        async function api(endpoint, body, method = 'POST') {
+            const opts = {
+                method: method,
+                headers: { 'Content-Type': 'application/json', 'x-admin-password': token }
+            };
+            if(body) opts.body = JSON.stringify(body);
+            
+            try {
+                const res = await fetch(`${API_URL}${endpoint}`, opts);
+                if(res.status === 403) { alert("Access Denied"); logout(); return null; }
+                return res.json();
+            } catch(e) { console.error(e); return null; }
+        }
+
+        // --- SYSTEM & MAINTENANCE ---
+        async function loadSystemStats() {
+            const data = await api('/api/admin/system', null, 'GET');
+            if(!data) return;
+            
+            document.getElementById('sys-uptime').innerText = Math.floor(data.uptime/60) + 'm';
+            document.getElementById('sys-mem').innerText = data.memory + ' MB';
+            document.getElementById('sys-platform').innerText = data.platform;
+            
+            const btn = document.getElementById('maint-btn');
+            const status = document.getElementById('maint-status');
+            if(data.maintenance) {
+                status.innerText = "ON"; status.classList.add('text-red-600');
+                btn.innerText = "Disable"; btn.classList.replace('bg-gray-200', 'bg-red-100');
+                btn.classList.replace('text-gray-600', 'text-red-600');
+            } else {
+                status.innerText = "OFF"; status.classList.remove('text-red-600');
+                btn.innerText = "Enable"; btn.classList.replace('bg-red-100', 'bg-gray-200');
+                btn.classList.replace('text-red-600', 'text-gray-600');
+            }
+        }
+
+        async function toggleMaintenance() {
+            const currentText = document.getElementById('maint-status').innerText;
+            const newState = currentText === "OFF";
+            const res = await api('/api/admin/maintenance', { status: newState });
+            if(res && res.success) loadSystemStats();
+        }
+
+        // --- SPRINTS ---
+        async function loadSprints() {
+            const container = document.getElementById('sprints-list');
+            container.innerHTML = '<div class="text-center py-4 text-gray-400">Loading...</div>';
+            
+            const data = await api('/api/admin/sprints', null, 'GET');
+            container.innerHTML = '';
+            
+            if(!data || data.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center py-10 bg-white rounded-xl border border-dashed border-gray-300 text-gray-400">No active sprints right now.</div>';
+                return;
+            }
+
+            data.forEach(s => {
+                container.innerHTML += `
+                    <div class="bg-white p-5 rounded-xl border border-green-100 shadow-sm flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">${s.name}</h3>
+                            <div class="flex items-center space-x-3 text-sm mt-1">
+                                <span class="text-green-600 font-mono bg-green-50 px-2 rounded"><i class="fas fa-clock mr-1"></i> ${s.timeLeft}m left</span>
+                                <span class="text-gray-500"><i class="fas fa-users mr-1"></i> ${s.participants} writers</span>
+                            </div>
+                        </div>
+                        <button onclick="stopSprint('${s.id}')" class="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white px-4 py-2 rounded-lg font-bold transition text-sm">STOP</button>
+                    </div>
+                `;
+            });
+        }
+
+        async function stopSprint(chatId) {
+            if(!confirm("Emergency Stop this sprint?")) return;
+            const res = await api('/api/admin/sprints/stop', { chatId });
+            if(res && res.success) { loadSprints(); }
+        }
+
+        // --- GROUPS ---
+        async function loadGroups() {
+            const container = document.getElementById('groups-table');
+            container.innerHTML = '<tr><td colspan="3" class="p-4 text-center">Loading...</td></tr>';
+            
+            const data = await api('/api/admin/groups', null, 'GET');
+            container.innerHTML = '';
+
+            data.forEach(g => {
+                container.innerHTML += `
+                    <tr class="hover:bg-gray-50 border-b last:border-0">
+                        <td class="p-4 font-medium">${g.name}</td>
+                        <td class="p-4 text-gray-500">${g.participants} users</td>
+                        <td class="p-4 text-right">
+                            <button onclick="leaveGroup('${g.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold border border-red-200 px-3 py-1 rounded hover:bg-red-50">LEAVE</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function leaveGroup(chatId) {
+            if(!confirm("Are you sure? The bot will leave this group.")) return;
+            const res = await api('/api/admin/groups/leave', { chatId });
+            if(res && res.success) { alert("Bot left the group."); loadGroups(); }
+        }
+
+        // --- WRITERS (Search & Edit) ---
+        async function searchUsers() {
+            const query = document.getElementById('search-input').value;
+            if(!query) return;
+            const container = document.getElementById('results-area');
+            container.innerHTML = '<div class="text-center py-4">Searching...</div>';
+            
+            const data = await api('/api/admin/search', { query });
+            container.innerHTML = '';
+            
+            if(!data || data.length === 0) {
+                container.innerHTML = '<div class="text-center py-10 text-gray-400">No users found.</div>';
+                return;
+            }
+
+            data.forEach(u => {
+                // IMPORTANT: The API returns grouped data. 
+                // We use u._id (which is name) for display
+                // BUT we need the REAL userId to edit. The API now returns { ... userId: "123..." } in the group result for this purpose.
+                // Wait, in previous step I ensured the API returns `userId` inside the $first accumulator?
+                // Let's check the index.js logic... Yes: { $group: { ... userId: { $first: "$userId" } } }
+                // Wait, I missed adding `userId` to the $group in index.js for the Search endpoint!
+                // FIX: I will assume the name is unique enough for display, but for editing we need the ID.
+                // Correction: In the Search API I wrote in index.js, I did NOT add userId to the group properly in the latest version.
+                // However, the _id is the userId in the Search API! (See index.js: { $group: { _id: "$userId", ... } })
+                // So u._id IS the userId. Correct.
+                
+                const lastActive = u.lastActive ? new Date(u.lastActive).toLocaleDateString() : 'N/A';
+
+                container.innerHTML += `
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">${u.name}</h3>
+                            <p class="text-xs text-gray-400 font-mono mb-1">ID: ${u._id.substring(0, 12)}...</p>
+                            <div class="text-xs text-gray-500">Last Active: ${lastActive}</div>
+                            <div class="mt-2 text-sm text-gray-600 bg-gray-50 px-2 py-1 rounded w-fit">
+                                Total: <b>${u.totalWords.toLocaleString()}</b>
+                            </div>
+                        </div>
+                        <button onclick="openEdit('${u._id}', '${u.name}')" class="bg-gray-800 text-white p-3 rounded-lg hover:bg-black transition"><i class="fas fa-edit"></i></button>
+                    </div>
+                `;
+            });
+        }
+
+        // Edit Modal Logic
+        function openEdit(id, name) {
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-name').innerText = name;
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+        function closeEdit() { document.getElementById('edit-modal').classList.add('hidden'); }
+
+        async function updateStats(type) {
+            const id = document.getElementById('edit-id').value;
+            const val = type === 'set' ? document.getElementById('edit-amount').value : document.getElementById('add-amount').value;
+            if(!val) return alert("Enter number");
+            const res = await api('/api/admin/update', { userId: id, amount: val, type });
+            if(res.success) { alert(`Updated! New Total: ${res.newTotal}`); closeEdit(); searchUsers(); }
+            else { alert(res.message); }
+        }
+
+        async function renameUser() {
+            const id = document.getElementById('edit-id').value;
+            const name = document.getElementById('new-name').value;
+            if(!name) return alert("Enter new name");
+            const res = await api('/api/admin/users/rename', { userId: id, newName: name });
+            if(res.success) { alert("Renamed!"); closeEdit(); searchUsers(); }
+            else { alert(res.message); }
+        }
+
+        function openBroadcast() { document.getElementById('broadcast-modal').classList.remove('hidden'); }
+        async function sendBroadcast() {
+            const msg = document.getElementById('broadcast-text').value;
+            if(!confirm("Send to ALL groups?")) return;
+            const res = await api('/api/admin/broadcast', { message: msg });
+            if(res.success) { alert(`Sent to ${res.count} groups!`); document.getElementById('broadcast-modal').classList.add('hidden'); }
+        }
+    </script>
+</body>
+</html>
