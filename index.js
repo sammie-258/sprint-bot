@@ -257,11 +257,28 @@ app.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 👑 ADMIN: CANCEL SCHEDULED SPRINT
+// 👑 ADMIN: CANCEL SCHEDULED SPRINT (With Notification)
 app.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
     const { id } = req.body;
     try {
-        await ScheduledSprint.findByIdAndDelete(id);
+        // 1. Find the sprint first to get the Group ID
+        const sprint = await ScheduledSprint.findById(id);
+        
+        if (sprint) {
+            // 2. Notify the group
+            if (client && isConnected) {
+                try {
+                    const chat = await client.getChatById(sprint.groupId);
+                    await chat.sendMessage(`⚠️ **NOTICE**: A scheduled sprint has been cancelled by the Admin.`);
+                } catch(e) {
+                    console.log("Could not notify group of cancellation", e.message);
+                }
+            }
+            
+            // 3. Delete the sprint
+            await ScheduledSprint.deleteOne({ _id: id });
+        }
+        
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -405,7 +422,7 @@ restoredSprints.forEach(doc => {
 
         client = new Client({
             authStrategy: new RemoteAuth({
-    clientId: 'sprint-session-v2', // New ID = Fresh Start
+    clientId: 'sprint-session-v3', // New ID = Fresh Start
     store: store,
     backupSyncIntervalMs: 600000, // 10 mins (Safety buffer)
     dataPath: path.join(__dirname, '.wwebjs_auth') // 🟢 ABSOLUTE PATH FIX
@@ -802,7 +819,7 @@ restoredSprints.forEach(doc => {
                     }
                     if (stats.length === 0) return msg.reply("📉 No stats.");
                     let txt = `🏆 *${title}*\n\n`;
-                    stats.forEach((s, i) => { txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} ${s.name}: ${d ? s.words : s.totalWords}\n`; });
+                    stats.forEach((s, i) => { txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} ${s.name}: ${d ? s.words : s.totalWords} words\n`; });
                     await chat.sendMessage(txt);
                 }
 
@@ -814,7 +831,7 @@ restoredSprints.forEach(doc => {
                         if (isNaN(t)) return msg.reply("❌ Use: `!goal set 5000`");
                         await PersonalGoal.updateMany({ userId: senderId }, { isActive: false });
                         await PersonalGoal.create({ userId: senderId, name: senderName, target: t, current: 0 });
-                        return msg.reply(`🎯 Goal set: ${t}`);
+                        return msg.reply(`🎯 Goal set: ${t} words`);
                     }
                     
                     if (sub === "check") {
@@ -848,19 +865,5 @@ restoredSprints.forEach(doc => {
         });
 
         client.initialize();
-
-        // 🟢 MEMORY LEAK PROTECTION (Add this block)
-        setInterval(async () => {
-            console.log("♻️ Auto-Reboot: Refreshing client to clear memory...");
-            if (client) {
-                try {
-                    await client.destroy();
-                    client.initialize();
-                    console.log("✅ Client refreshed successfully.");
-                } catch (e) {
-                    process.exit(1); 
-                }
-            }
-        }, 21600000); // 6 hours
-    }) // <--- This closes the .then(async () => {
+    })
     .catch(err => { console.error("❌ MongoDB error:", err); process.exit(1); });
