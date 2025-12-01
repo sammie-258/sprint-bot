@@ -97,15 +97,8 @@ const ActiveSprint = mongoose.model("ActiveSprint", activeSprintSchema);
 //   WEB API ENDPOINTS
 // =======================
 
-app.get('/', async (req, res) => {
-    if (isConnected) {
-        res.send('<h1>✅ Sprint Bot is Online</h1><p>API is active.</p>');
-    } else if (qrCodeData) {
-        const qrImage = await QRCode.toDataURL(qrCodeData);
-        res.send(`<div style="text-align:center;padding-top:50px;"><h1>Scan with WhatsApp</h1><img src="${qrImage}"><p>Refresh page if code expires.</p></div>`);
-    } else {
-        res.send('<h1>⏳ Booting up... refresh in 10s.</h1>');
-    }
+app.get('/', (req, res) => {
+    res.redirect('https://quillreads.com/sprint-bot-dashboard');
 });
 
 // 📊 DASHBOARD DATA (Stats)
@@ -235,6 +228,41 @@ app.post('/api/admin/sprints/stop', requireAdmin, async (req, res) => {
         return res.json({ success: true });
     }
     res.status(404).json({ error: "Sprint not found" });
+});
+
+// 👑 ADMIN: GET SCHEDULED SPRINTS
+app.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
+    try {
+        // Find future sprints, sorted by soonest first
+        const sprints = await ScheduledSprint.find({ startTime: { $gt: new Date() } }).sort({ startTime: 1 });
+        
+        const result = await Promise.all(sprints.map(async (s) => {
+            let groupName = s.groupId;
+            // Try to resolve group name
+            if (client && isConnected) {
+                try { const chat = await client.getChatById(s.groupId); groupName = chat.name; } catch(e) {}
+            }
+            
+            return {
+                id: s._id, // MongoDB ID used for deletion
+                groupName: groupName,
+                startTime: s.startTime,
+                duration: s.duration,
+                createdBy: s.createdBy.split('@')[0] // Clean up phone number
+            };
+        }));
+        
+        res.json(result);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 👑 ADMIN: CANCEL SCHEDULED SPRINT
+app.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
+    const { id } = req.body;
+    try {
+        await ScheduledSprint.findByIdAndDelete(id);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // 👑 ADMIN: GET ALL GROUPS
