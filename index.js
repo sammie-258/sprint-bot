@@ -8,6 +8,7 @@ const QRCode = require('qrcode');
 const express = require('express');
 const http = require('http'); 
 const os = require('os'); 
+const path = require('path');
 require("dotenv").config();
 
 // =======================
@@ -404,10 +405,11 @@ restoredSprints.forEach(doc => {
 
         client = new Client({
             authStrategy: new RemoteAuth({
-                store: store,
-                backupSyncIntervalMs: 300000,
-                dataPath: './.wwebjs_auth' 
-            }),
+    clientId: 'sprint-session-v2', // New ID = Fresh Start
+    store: store,
+    backupSyncIntervalMs: 600000, // 10 mins (Safety buffer)
+    dataPath: path.join(__dirname, '.wwebjs_auth') // 🟢 ABSOLUTE PATH FIX
+}),
             // 🟢 OPTIMIZATION: Do not generate link previews (saves RAM)
             generatePcPreview: false,
             
