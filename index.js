@@ -661,7 +661,7 @@ restoredSprints.forEach(doc => {
         const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
         
         // 1. Send the normal log message first
-        await msg.reply(`✅ Logged ${count}.`);
+        await msg.reply(`✅ Logged ${count} words.`);
 
         // 2. Check Goal & Send SEPARATE message if hit (Fix #1)
         if (goal) {
@@ -765,7 +765,7 @@ restoredSprints.forEach(doc => {
                     let txt = `🏆 *SPRINT RESULTS* 🏆\n\n`, men = [];
                     for (let i = 0; i < l.length; i++) {
                         let p = l[i]; men.push(p.uid);
-                        txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} @${p.uid.split('@')[0]} : ${p.words} (${Math.round(p.words/s.duration)} WPM)\n`;
+                        txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} @${p.uid.split('@')[0]} : ${p.words} words (${Math.round(p.words/s.duration)} WPM)\n`;
                         try {
                             await DailyStats.findOneAndUpdate({ userId: p.uid, groupId: chatId, date: todayStr }, { name: p.name, $inc: { words: p.words }, timestamp: new Date() }, { upsert: true });
                             const g = await PersonalGoal.findOne({ userId: p.uid, isActive: true });
