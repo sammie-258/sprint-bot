@@ -41,7 +41,7 @@
                         <button onclick="openBroadcast()" class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center">
                             <i class="fas fa-bullhorn mr-2"></i> Broadcast
                         </button>
-                        <button onclick="logout()" class="text-gray-500 hover:text-red-600 px-3 py-2 transition"><i class="fas fa-sign-out-alt text-xl"></i></button>
+                        <button onclick="logout()" class="text-gray-500 hover:text-sky-700 px-3 py-2 transition"><i class="fas fa-sign-out-alt text-xl"></i></button>
                     </div>
                 </div>
                 
@@ -144,7 +144,7 @@
         <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-xl font-bold text-gray-800" id="edit-name">Edit User</h3>
-                <button onclick="closeEdit()" class="text-gray-400 hover:text-red-500"><i class="fas fa-times"></i></button>
+                <button onclick="closeEdit()" class="text-gray-400 hover:text-sky-600"><i class="fas fa-times"></i></button>
             </div>
             <input type="hidden" id="edit-id">
             
@@ -254,13 +254,13 @@
             const btn = document.getElementById('maint-btn');
             const status = document.getElementById('maint-status');
             if(data.maintenance) {
-                status.innerText = "ON"; status.classList.add('text-red-600');
+                status.innerText = "ON"; status.classList.add('text-sky-700');
                 btn.innerText = "Disable"; btn.classList.replace('bg-gray-200', 'bg-red-100');
-                btn.classList.replace('text-gray-600', 'text-red-600');
+                btn.classList.replace('text-gray-600', 'text-sky-700');
             } else {
-                status.innerText = "OFF"; status.classList.remove('text-red-600');
+                status.innerText = "OFF"; status.classList.remove('text-sky-700');
                 btn.innerText = "Enable"; btn.classList.replace('bg-red-100', 'bg-gray-200');
-                btn.classList.replace('text-red-600', 'text-gray-600');
+                btn.classList.replace('text-sky-700', 'text-gray-600');
             }
         }
 
@@ -294,7 +294,7 @@
                                 <span class="text-gray-500"><i class="fas fa-users mr-1"></i> ${s.participants} writers</span>
                             </div>
                         </div>
-                        <button onclick="stopSprint('${s.id}')" class="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white px-4 py-2 rounded-lg font-bold transition text-sm">STOP</button>
+                        <button onclick="stopSprint('${s.id}')" class="bg-red-50 text-sky-700 hover:bg-sky-700 hover:text-white px-4 py-2 rounded-lg font-bold transition text-sm">STOP</button>
                     </div>
                 `;
             });
@@ -320,7 +320,7 @@
                         <td class="p-4 font-medium">${g.name}</td>
                         <td class="p-4 text-gray-500">${g.participants} users</td>
                         <td class="p-4 text-right">
-                            <button onclick="leaveGroup('${g.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold border border-red-200 px-3 py-1 rounded hover:bg-red-50">LEAVE</button>
+                            <button onclick="leaveGroup('${g.id}')" class="text-sky-600 hover:text-red-700 text-xs font-bold border border-red-200 px-3 py-1 rounded hover:bg-red-50">LEAVE</button>
                         </td>
                     </tr>
                 `;
