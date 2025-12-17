@@ -422,31 +422,28 @@ restoredSprints.forEach(doc => {
 
         client = new Client({
             authStrategy: new RemoteAuth({
-    clientId: 'sprint-session-v3', // New ID = Fresh Start
-    store: store,
-    backupSyncIntervalMs: 600000, // 10 mins (Safety buffer)
-    dataPath: path.join(__dirname, '.wwebjs_auth') // 🟢 ABSOLUTE PATH FIX
-}),
-            // 🟢 OPTIMIZATION: Do not generate link previews (saves RAM)
+                clientId: 'sprint-session-v5', // 🟢 New ID (v5) to ensure fresh start
+                store: store,
+                backupSyncIntervalMs: 600000, 
+                dataPath: path.join(__dirname, '.wwebjs_auth') 
+            }),
             generatePcPreview: false,
-            
             webVersionCache: {
                 type: "remote",
                 remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html",
             },
             puppeteer: {
                 headless: true,
-                // 🟢 OPTIMIZATION: Aggressive arguments for low-memory environments
                 args: [
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage", // Critical for Render
+                    "--disable-dev-shm-usage",
                     "--disable-accelerated-2d-canvas",
                     "--no-first-run",
                     "--no-zygote",
-                    "--single-process", 
+                    // "--single-process",  <-- ❌ REMOVED THIS LINE (The cause of the crash)
                     "--disable-gpu",
-                    "--js-flags=--max-old-space-size=360", // Match package.json
+                    "--js-flags=--max-old-space-size=256", // 🟢 Updated to match package.json
                     "--disable-extensions",
                     "--disable-default-apps",
                     "--mute-audio",
