@@ -422,12 +422,13 @@ restoredSprints.forEach(doc => {
 
         client = new Client({
             authStrategy: new RemoteAuth({
-                clientId: 'sprint-session-v5', // 🟢 New ID (v5) to ensure fresh start
+                clientId: 'sprint-session-v6', // 🟢 Increment to v6 for a clean start
                 store: store,
                 backupSyncIntervalMs: 600000, 
                 dataPath: path.join(__dirname, '.wwebjs_auth') 
             }),
             generatePcPreview: false,
+            
             webVersionCache: {
                 type: "remote",
                 remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html",
@@ -437,13 +438,11 @@ restoredSprints.forEach(doc => {
                 args: [
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",
+                    "--disable-dev-shm-usage", // Writes memory to disk (Critical)
                     "--disable-accelerated-2d-canvas",
                     "--no-first-run",
                     "--no-zygote",
-                    // "--single-process",  <-- ❌ REMOVED THIS LINE (The cause of the crash)
                     "--disable-gpu",
-                    "--js-flags=--max-old-space-size=256", // 🟢 Updated to match package.json
                     "--disable-extensions",
                     "--disable-default-apps",
                     "--mute-audio",
@@ -455,6 +454,8 @@ restoredSprints.forEach(doc => {
                     "--disable-ipc-flooding-protection",
                     "--disable-notifications",
                     "--disable-renderer-backgrounding",
+                    // 🟢 NEW: Critical for low-memory VPS
+                    "--disable-features=site-per-process", 
                 ],
                 timeout: 60000
             }
@@ -864,3 +865,13 @@ restoredSprints.forEach(doc => {
         client.initialize();
     })
     .catch(err => { console.error("❌ MongoDB error:", err); process.exit(1); });
+    // 🛡️ Prevent crash on unhandled errors
+process.on('unhandledRejection', (reason, promise) => {
+    console.log('⚠️ Unhandled Rejection:', reason);
+    // Don't exit here, just log it.
+});
+
+process.on('uncaughtException', (err) => {
+    console.log('⚠️ Uncaught Exception:', err);
+    // Don't exit here either.
+});
