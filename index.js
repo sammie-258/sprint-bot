@@ -107,43 +107,51 @@ app.get('/', (req, res) => {
     res.redirect('https://quillreads.com/sprint-bot-dashboard');
 });
 
-// 🟢 FIX: DATABASE MIGRATION ENDPOINT (Run once via browser)
+// 🟢 FIX: DATABASE MIGRATION ENDPOINT (Iterative approach to fix Mongoose Error)
 app.get('/api/admin/migrate-legacy', requireAdmin, async (req, res) => {
     try {
-        console.log("⚠️ Starting Database Migration...");
+        console.log("⚠️ Starting Database Migration (Iterative Mode)...");
         
-        // 1. Migrate DailyStats: Convert @c.us to @s.whatsapp.net
-        const statsResult = await DailyStats.updateMany(
-            { userId: { $regex: '@c.us' } },
-            [
-                { $set: { userId: { $replaceOne: { input: "$userId", find: "@c.us", replacement: "@s.whatsapp.net" } } } }
-            ]
-        );
+        const migrateCollection = async (Model, fieldName) => {
+            // Find all documents containing the old ID format
+            const query = {};
+            query[fieldName] = { $regex: '@c.us' };
+            
+            const docs = await Model.find(query);
+            let count = 0;
+            
+            for (const doc of docs) {
+                // Manually replace and save
+                if (doc[fieldName] && doc[fieldName].includes('@c.us')) {
+                    doc[fieldName] = doc[fieldName].replace('@c.us', '@s.whatsapp.net');
+                    try {
+                        await doc.save();
+                        count++;
+                    } catch (err) {
+                        console.error(`Failed to update doc ${doc._id}:`, err.message);
+                    }
+                }
+            }
+            return count;
+        };
 
-        // 2. Migrate PersonalGoals
-        const goalsResult = await PersonalGoal.updateMany(
-            { userId: { $regex: '@c.us' } },
-            [
-                { $set: { userId: { $replaceOne: { input: "$userId", find: "@c.us", replacement: "@s.whatsapp.net" } } } }
-            ]
-        );
+        // 1. Migrate DailyStats
+        const statsCount = await migrateCollection(DailyStats, 'userId');
 
-        // 3. Migrate ScheduledSprints (Creator ID)
-        const schedResult = await ScheduledSprint.updateMany(
-            { createdBy: { $regex: '@c.us' } },
-            [
-                { $set: { createdBy: { $replaceOne: { input: "$createdBy", find: "@c.us", replacement: "@s.whatsapp.net" } } } }
-            ]
-        );
+        // 2. Migrate PersonalGoal
+        const goalsCount = await migrateCollection(PersonalGoal, 'userId');
+
+        // 3. Migrate ScheduledSprint
+        const schedCount = await migrateCollection(ScheduledSprint, 'createdBy');
 
         console.log("✅ Migration Complete");
         res.json({
             success: true,
-            message: "Legacy IDs migrated successfully to Baileys format.",
+            message: "Legacy IDs migrated successfully.",
             details: {
-                statsUpdated: statsResult.modifiedCount,
-                goalsUpdated: goalsResult.modifiedCount,
-                schedulesUpdated: schedResult.modifiedCount
+                statsUpdated: statsCount,
+                goalsUpdated: goalsCount,
+                schedulesUpdated: schedCount
             }
         });
     } catch (e) {
