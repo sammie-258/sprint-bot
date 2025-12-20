@@ -106,11 +106,11 @@ app.get('/', (req, res) => {
     res.redirect('https://quillreads.com/sprint-bot-dashboard');
 });
 
-// 🟢 NEW: SMART MERGE TOOL (Run this to fix duplicates/old IDs)
-app.get('/api/admin/fix-db-merge', requireAdmin, async (req, res) => {
+// 🟢 MIGRATION LOGIC (Refactored to be accessible via multiple routes)
+const runSmartMigration = async (req, res) => {
     try {
         console.log("⚠️ Starting Smart Database Merge...");
-        const log = { merged: 0, renamed: 0, errors: [] };
+        const log = { merged_stats: 0, renamed_stats: 0, merged_goals: 0, renamed_goals: 0, schedules: 0, errors: [] };
 
         // 1. Fix DailyStats
         // Find all legacy records (@c.us)
@@ -135,31 +135,48 @@ app.get('/api/admin/fix-db-merge', requireAdmin, async (req, res) => {
                     
                     await existingNewDoc.save();
                     await DailyStats.deleteOne({ _id: oldDoc._id }); // Remove the old duplicate
-                    log.merged++;
+                    log.merged_stats++;
                 } else {
                     // NO CONFLICT: Just rename
                     oldDoc.userId = newId;
                     await oldDoc.save();
-                    log.renamed++;
+                    log.renamed_stats++;
                 }
             } catch (err) {
                 log.errors.push(`Stats ID ${oldDoc._id}: ${err.message}`);
             }
         }
 
-        // 2. Fix PersonalGoals (Simple rename usually, merge if duplicate active)
+        // 2. Fix PersonalGoals (Now with merging logic)
         const legacyGoals = await PersonalGoal.find({ userId: { $regex: '@c.us' } });
         for (const g of legacyGoals) {
-            const newId = g.userId.replace('@c.us', '@s.whatsapp.net');
-            g.userId = newId;
-            await g.save();
+            try {
+                const newId = g.userId.replace('@c.us', '@s.whatsapp.net');
+                
+                // Check if user already created a goal on the new ID
+                const existingNewGoal = await PersonalGoal.findOne({ userId: newId, isActive: true });
+                
+                if (existingNewGoal && g.isActive) {
+                    // Merge progress
+                    existingNewGoal.current += g.current;
+                    await existingNewGoal.save();
+                    await PersonalGoal.deleteOne({ _id: g._id });
+                    log.merged_goals++;
+                } else {
+                    // Just rename
+                    g.userId = newId;
+                    await g.save();
+                    log.renamed_goals++;
+                }
+            } catch(e) { log.errors.push(`Goal ID ${g._id}: ${e.message}`); }
         }
 
         // 3. Fix Schedules
-        await ScheduledSprint.updateMany(
+        const schedRes = await ScheduledSprint.updateMany(
             { createdBy: { $regex: '@c.us' } },
             [ { $set: { createdBy: { $replaceOne: { input: "$createdBy", find: "@c.us", replacement: "@s.whatsapp.net" } } } } ]
         );
+        log.schedules = schedRes.modifiedCount;
 
         console.log("✅ Smart Fix Complete:", log);
         res.json({ success: true, log });
@@ -168,7 +185,11 @@ app.get('/api/admin/fix-db-merge', requireAdmin, async (req, res) => {
         console.error("Smart Fix Error:", e);
         res.status(500).json({ error: e.message });
     }
-});
+};
+
+// 🟢 ROUTES FOR MIGRATION (Both Old and New URLs work)
+app.get('/api/admin/fix-db-merge', requireAdmin, runSmartMigration);
+app.get('/api/admin/migrate-legacy', requireAdmin, runSmartMigration);
 
 app.get('/api/stats', async (req, res) => {
     try {
