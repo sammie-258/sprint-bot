@@ -2,7 +2,6 @@
 //       IMPORTS
 // =======================
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
-const { MongoStore } = require('wwebjs-mongo');
 const mongoose = require("mongoose");
 const express = require('express');
 const http = require('http'); 
