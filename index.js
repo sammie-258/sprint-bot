@@ -39,6 +39,75 @@ app.use((req, res, next) => {
     next();
 });
 
+// Add this endpoint to your index.js (in the Express app section)
+
+app.get('/api/admin/cleanup-duplicates', requireAdmin, async (req, res) => {
+    try {
+        console.log("🧹 Starting duplicate cleanup...");
+        
+        // Find all records
+        const allRecords = await DailyStats.find({}).lean();
+        
+        // Group by userId+groupId+date
+        const groups = {};
+        for (const record of allRecords) {
+            const key = `${record.userId}|${record.groupId}|${record.date}`;
+            if (!groups[key]) {
+                groups[key] = [];
+            }
+            groups[key].push(record);
+        }
+
+        let duplicatesFixed = 0;
+        let totalDeleted = 0;
+
+        // Process each group
+        for (const [key, records] of Object.entries(groups)) {
+            if (records.length > 1) {
+                // Sum all words
+                const totalWords = records.reduce((sum, r) => sum + (r.words || 0), 0);
+                
+                // Find record with latest timestamp
+                const keeper = records.reduce((latest, current) => 
+                    new Date(current.timestamp) > new Date(latest.timestamp) ? current : latest
+                );
+
+                // Update keeper with total words
+                await DailyStats.updateOne(
+                    { _id: keeper._id },
+                    { $set: { words: totalWords, timestamp: new Date() } }
+                );
+
+                // Delete all others
+                const othersToDelete = records
+                    .filter(r => r._id.toString() !== keeper._id.toString())
+                    .map(r => r._id);
+
+                if (othersToDelete.length > 0) {
+                    const deleteResult = await DailyStats.deleteMany({
+                        _id: { $in: othersToDelete }
+                    });
+                    totalDeleted += deleteResult.deletedCount;
+                }
+
+                duplicatesFixed++;
+                console.log(`✅ Fixed: ${key} (${records.length} → 1, total words: ${totalWords})`);
+            }
+        }
+
+        res.json({ 
+            success: true, 
+            duplicateGroupsFixed: duplicatesFixed,
+            recordsDeleted: totalDeleted,
+            message: `Fixed ${duplicatesFixed} duplicate groups, deleted ${totalDeleted} records`
+        });
+
+    } catch (e) {
+        console.error("❌ Cleanup error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Admin Auth Helper
 const requireAdmin = (req, res, next) => {
     const password = req.headers['x-admin-password'] || req.query.password;
@@ -932,38 +1001,4 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (err) => {
     console.log('⚠️ Uncaught Exception:', err);
-});
-app.get('/api/admin/cleanup-duplicates', requireAdmin, async (req, res) => {
-    try {
-        const duplicates = await DailyStats.collection.aggregate([
-            {
-                $group: {
-                    _id: { userId: "$userId", groupId: "$groupId", date: "$date" },
-                    totalWords: { $sum: "$words" },
-                    ids: { $push: "$_id" },
-                    latestTime: { $max: "$timestamp" }
-                }
-            },
-            { $match: { ids: { $size: { $gt: 1 } } } }
-        ]).toArray();
-
-        let cleaned = 0;
-        for (const dup of duplicates) {
-            // Keep the first, delete others
-            const keepId = dup.ids[0];
-            await DailyStats.updateOne(
-                { _id: keepId },
-                { $set: { words: dup.totalWords } }
-            );
-            // Delete the rest
-            await DailyStats.deleteMany({
-                _id: { $in: dup.ids.slice(1) }
-            });
-            cleaned++;
-        }
-
-        res.json({ success: true, duplicatesFixed: cleaned });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
 });
