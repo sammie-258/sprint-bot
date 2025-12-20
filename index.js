@@ -41,7 +41,8 @@ app.use((req, res, next) => {
 
 // Admin Auth Helper
 const requireAdmin = (req, res, next) => {
-    const password = req.headers['x-admin-password'];
+    // Check header or query param (for easy browser access to migration)
+    const password = req.headers['x-admin-password'] || req.query.password;
     if (password === ADMIN_PASSWORD) return next();
     res.status(403).json({ error: "Unauthorized" });
 };
@@ -106,6 +107,51 @@ app.get('/', (req, res) => {
     res.redirect('https://quillreads.com/sprint-bot-dashboard');
 });
 
+// 🟢 FIX: DATABASE MIGRATION ENDPOINT (Run once via browser)
+app.get('/api/admin/migrate-legacy', requireAdmin, async (req, res) => {
+    try {
+        console.log("⚠️ Starting Database Migration...");
+        
+        // 1. Migrate DailyStats: Convert @c.us to @s.whatsapp.net
+        const statsResult = await DailyStats.updateMany(
+            { userId: { $regex: '@c.us' } },
+            [
+                { $set: { userId: { $replaceOne: { input: "$userId", find: "@c.us", replacement: "@s.whatsapp.net" } } } }
+            ]
+        );
+
+        // 2. Migrate PersonalGoals
+        const goalsResult = await PersonalGoal.updateMany(
+            { userId: { $regex: '@c.us' } },
+            [
+                { $set: { userId: { $replaceOne: { input: "$userId", find: "@c.us", replacement: "@s.whatsapp.net" } } } }
+            ]
+        );
+
+        // 3. Migrate ScheduledSprints (Creator ID)
+        const schedResult = await ScheduledSprint.updateMany(
+            { createdBy: { $regex: '@c.us' } },
+            [
+                { $set: { createdBy: { $replaceOne: { input: "$createdBy", find: "@c.us", replacement: "@s.whatsapp.net" } } } }
+            ]
+        );
+
+        console.log("✅ Migration Complete");
+        res.json({
+            success: true,
+            message: "Legacy IDs migrated successfully to Baileys format.",
+            details: {
+                statsUpdated: statsResult.modifiedCount,
+                goalsUpdated: goalsResult.modifiedCount,
+                schedulesUpdated: schedResult.modifiedCount
+            }
+        });
+    } catch (e) {
+        console.error("Migration Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/stats', async (req, res) => {
     try {
         let qrImage = null;
@@ -132,15 +178,25 @@ app.get('/api/stats', async (req, res) => {
             { $limit: 10 }
         ]);
 
+        // 🟢 FIX: Correct Metadata Fetching for Baileys
         const topGroups = await Promise.all(topGroupsRaw.map(async (g) => {
-            let groupName = g._id || "Unknown";
-            if (sock && isConnected) {
-                try {
-                    const chat = await sock.chatModificationListen.groupMetadata?.(g._id) || { subject: g._id };
-                    if (chat.subject) groupName = chat.subject;
-                } catch (e) {
-                    // Use group ID if we can't fetch name
+            let groupName = "Unknown Group";
+            // Check if ID is actually a group ID
+            if (g._id && (g._id.endsWith('@g.us') || g._id.length > 15)) {
+                if (sock && isConnected) {
+                    try {
+                        // Use Baileys native metadata fetch
+                        const meta = await sock.groupMetadata(g._id);
+                        if (meta && meta.subject) groupName = meta.subject;
+                        else groupName = g._id;
+                    } catch (e) {
+                        groupName = g._id.split('@')[0]; // Fallback to ID
+                    }
+                } else {
+                    groupName = g._id.split('@')[0];
                 }
+            } else {
+                groupName = g._id || "Unknown";
             }
             return { name: groupName, words: g.total };
         }));
@@ -173,6 +229,8 @@ app.get('/api/stats', async (req, res) => {
     } catch (e) { console.error("API Error:", e); res.status(500).json({ error: "Server Error" }); }
 });
 
+// --- ADMIN API ENDPOINTS ---
+
 app.get('/api/admin/system', requireAdmin, async (req, res) => {
     const uptime = process.uptime();
     const memory = process.memoryUsage();
@@ -192,13 +250,55 @@ app.post('/api/admin/maintenance', requireAdmin, (req, res) => {
     res.json({ success: true, status: maintenanceMode });
 });
 
+// 🟢 NEW: Groups Endpoint for Admin Dashboard
+app.get('/api/admin/groups', requireAdmin, async (req, res) => {
+    try {
+        if (!sock || !isConnected) return res.status(500).json({ error: "Bot offline" });
+        
+        const groups = await sock.groupFetchAllParticipating();
+        const result = Object.values(groups).map(g => ({
+            id: g.id,
+            name: g.subject,
+            participants: g.participants.length
+        }));
+        
+        res.json(result);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 🟢 NEW: Leave Group Endpoint
+app.post('/api/admin/groups/leave', requireAdmin, async (req, res) => {
+    try {
+        const { chatId } = req.body;
+        if (sock && isConnected) {
+            await sock.groupLeave(chatId);
+            res.json({ success: true });
+        } else {
+            res.status(500).json({ error: "Bot offline" });
+        }
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 🟢 NEW: Rename User Endpoint
+app.post('/api/admin/users/rename', requireAdmin, async (req, res) => {
+    try {
+        const { userId, newName } = req.body;
+        if (!userId || !newName) return res.status(400).json({ message: "Missing fields" });
+
+        await DailyStats.updateMany({ userId }, { name: newName });
+        await PersonalGoal.updateMany({ userId }, { name: newName });
+        
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/admin/sprints', requireAdmin, async (req, res) => {
     const sprints = [];
     for (const [chatId, sprint] of Object.entries(activeSprints)) {
         const timeLeft = Math.max(0, sprint.endsAt - Date.now());
         sprints.push({
             id: chatId,
-            name: chatId,
+            name: chatId, // Note: Fetching real names here might be slow, usually handle in frontend or cache
             timeLeft: Math.ceil(timeLeft / 1000 / 60), 
             participants: Object.keys(sprint.participants).length
         });
@@ -229,7 +329,7 @@ app.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
             groupName: s.groupId,
             startTime: s.startTime,
             duration: s.duration,
-            createdBy: s.createdBy.split('@')[0]
+            createdBy: s.createdBy ? s.createdBy.split('@')[0] : 'Unknown'
         }));
         res.json(result);
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -387,7 +487,10 @@ mongoose.connect(MONGO_URI)
                     if (!started) {
                         await sock.sendMessage(sprint.groupId, { text: `⚠️ Scheduled sprint skipped.` });
                     } else {
-                        await sock.sendMessage(sprint.groupId, { text: `(Sprint scheduled by @${sprint.createdBy.split('@')[0]})` });
+                        // 🟢 FIX: Handle user ID split safely
+                        let creatorName = 'Someone';
+                        if(sprint.createdBy) creatorName = sprint.createdBy.split('@')[0].split(':')[0];
+                        await sock.sendMessage(sprint.groupId, { text: `(Sprint scheduled by @${creatorName})` });
                     }
                     await ScheduledSprint.deleteOne({ _id: sprint._id });
                 }
@@ -449,7 +552,11 @@ mongoose.connect(MONGO_URI)
 
                     const chatId = msg.key.remoteJid;
                     const isGroup = chatId.endsWith('@g.us');
-                    const senderId = msg.key.participant || msg.key.remoteJid;
+                    
+                    // 🟢 FIX: Normalize Sender ID (Remove Device :15 etc)
+                    // This converts 1234:2@s.whatsapp.net -> 1234@s.whatsapp.net
+                    let rawSender = msg.key.participant || msg.key.remoteJid;
+                    const senderId = rawSender.split(':')[0] + '@s.whatsapp.net';
                     
                     if (await Blacklist.exists({ userId: senderId })) return;
                     
@@ -478,11 +585,12 @@ mongoose.connect(MONGO_URI)
                     const command = args[0].toLowerCase();
                     const todayStr = getTodayDateGMT1();
 
+                    // 🟢 FIX: Helper to handle @c.us vs @s.whatsapp.net for admin inputs
                     const getTargetId = (argIndex = 1) => {
-                        // In Baileys, mentions are stored differently
-                        // For now, try to parse number from args
+                        // In Baileys, mentions are stored in msg.message.extendedTextMessage.contextInfo.mentionedJid
+                        // But if user typed a number manually:
                         const potentialNumber = args[argIndex]?.replace(/\D/g, '');
-                        if (potentialNumber && potentialNumber.length > 5) return potentialNumber + '@c.us';
+                        if (potentialNumber && potentialNumber.length > 5) return potentialNumber + '@s.whatsapp.net';
                         return null;
                     };
 
@@ -681,6 +789,7 @@ mongoose.connect(MONGO_URI)
                     if (command === "!finish") {
                         const s = activeSprints[chatId];
                         if (!s) return sock.sendMessage(chatId, { text: "❌ No sprint." }, { quoted: msg });
+                        // 🟢 FIX: Ensure ID is passed to array for updates
                         const l = Object.entries(s.participants).map(([u, d]) => ({ ...d, uid: u })).sort((a, b) => b.words - a.words);
                         if (l.length === 0) { 
                             delete activeSprints[chatId]; 
