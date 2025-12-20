@@ -1,20 +1,18 @@
 // =======================
 //       IMPORTS
 // =======================
-const { Client, RemoteAuth } = require("whatsapp-web.js");
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
 const { MongoStore } = require('wwebjs-mongo');
 const mongoose = require("mongoose");
-const QRCode = require('qrcode');
 const express = require('express');
 const http = require('http'); 
 const os = require('os'); 
-const path = require('path');
+const QR = require('qrcode');
 require("dotenv").config();
 
 // =======================
 //   MANUAL GARBAGE COLLECTION
 // =======================
-// 🗑️ FORCE CLEANUP EVERY 30 SECONDS TO SAVE RAM
 if (global.gc) {
     setInterval(() => {
         global.gc();
@@ -31,7 +29,6 @@ const TIMEZONE = "Africa/Lagos";
 const OWNER_NUMBER = '2347087899166'; 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123"; 
 
-// 🟢 MIDDLEWARE
 app.use(express.json()); 
 
 // CORS
@@ -52,7 +49,7 @@ const requireAdmin = (req, res, next) => {
 
 let qrCodeData = null;
 let isConnected = false;
-let client = null; 
+let sock = null; 
 let maintenanceMode = false; 
 
 // =======================
@@ -93,7 +90,7 @@ const activeSprintSchema = new mongoose.Schema({
     groupId: String,
     endsAt: Number,
     duration: Number,
-    participants: { type: Object, default: {} } // Stores user words
+    participants: { type: Object, default: {} }
 });
 const ActiveSprint = mongoose.model("ActiveSprint", activeSprintSchema);
 
@@ -110,20 +107,17 @@ app.get('/', (req, res) => {
     res.redirect('https://quillreads.com/sprint-bot-dashboard');
 });
 
-// 📊 DASHBOARD DATA (Stats)
 app.get('/api/stats', async (req, res) => {
     try {
         let qrImage = null;
-        if (!isConnected && qrCodeData) qrImage = await QRCode.toDataURL(qrCodeData);
+        if (!isConnected && qrCodeData) qrImage = await QR.toDataURL(qrCodeData);
 
-        // 1. Top 10 All-Time Writers
         const topWritersRaw = await DailyStats.aggregate([
             { $group: { _id: "$name", total: { $sum: "$words" } } }, 
             { $sort: { total: -1 } }, { $limit: 10 }
         ]);
         const topWriters = topWritersRaw.map(w => ({ name: w._id, words: w.total }));
 
-        // 2. Today's Top 10 Writers
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const todayWritersRaw = await DailyStats.aggregate([
             { $match: { date: todayStr } }, 
@@ -132,7 +126,6 @@ app.get('/api/stats', async (req, res) => {
         ]);
         const todayWriters = todayWritersRaw.map(w => ({ name: w._id, words: w.total }));
 
-        // 3. Top Groups
         const topGroupsRaw = await DailyStats.aggregate([
             { $match: { groupId: { $exists: true, $ne: "Manual_Correction" } } }, 
             { $group: { _id: "$groupId", total: { $sum: "$words" } } },
@@ -140,25 +133,12 @@ app.get('/api/stats', async (req, res) => {
             { $limit: 10 }
         ]);
 
-        const topGroups = await Promise.all(topGroupsRaw.map(async (g) => {
-            let groupName = "Unknown Group";
-            if (client && isConnected) {
-                try {
-                    const chat = await client.getChatById(g._id);
-                    if (chat.name) groupName = chat.name;
-                } catch (e) {
-                    groupName = `Group ${g._id.substring(0, 5)}...`;
-                }
-            }
-            return { name: groupName, words: g.total };
-        }));
+        const topGroups = topGroupsRaw.map(g => ({ name: g._id || "Unknown", words: g.total }));
 
-        // 4. General Totals
         const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
         const totalWritersAgg = await DailyStats.distinct("name");
         const allGroupIds = await DailyStats.distinct("groupId");
         
-        // 5. 7-Day Chart Data
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const chartDataRaw = await DailyStats.aggregate([
@@ -183,7 +163,6 @@ app.get('/api/stats', async (req, res) => {
     } catch (e) { console.error("API Error:", e); res.status(500).json({ error: "Server Error" }); }
 });
 
-// 👑 ADMIN: SYSTEM STATS
 app.get('/api/admin/system', requireAdmin, async (req, res) => {
     const uptime = process.uptime();
     const memory = process.memoryUsage();
@@ -197,25 +176,19 @@ app.get('/api/admin/system', requireAdmin, async (req, res) => {
     });
 });
 
-// 👑 ADMIN: MAINTENANCE TOGGLE
 app.post('/api/admin/maintenance', requireAdmin, (req, res) => {
     const { status } = req.body; 
     maintenanceMode = status;
     res.json({ success: true, status: maintenanceMode });
 });
 
-// 👑 ADMIN: GET ACTIVE SPRINTS
 app.get('/api/admin/sprints', requireAdmin, async (req, res) => {
-    if (!client || !isConnected) return res.json([]);
     const sprints = [];
     for (const [chatId, sprint] of Object.entries(activeSprints)) {
-        let name = "Unknown Group";
-        try { const chat = await client.getChatById(chatId); name = chat.name; } catch(e) {}
-        
         const timeLeft = Math.max(0, sprint.endsAt - Date.now());
         sprints.push({
             id: chatId,
-            name: name,
+            name: chatId,
             timeLeft: Math.ceil(timeLeft / 1000 / 60), 
             participants: Object.keys(sprint.participants).length
         });
@@ -223,94 +196,46 @@ app.get('/api/admin/sprints', requireAdmin, async (req, res) => {
     res.json(sprints);
 });
 
-// 👑 ADMIN: STOP SPRINT
 app.post('/api/admin/sprints/stop', requireAdmin, async (req, res) => {
     const { chatId } = req.body;
     if (activeSprints[chatId]) {
         delete activeSprints[chatId];
         await ActiveSprint.deleteOne({ groupId: chatId }); 
         try {
-            const chat = await client.getChatById(chatId);
-            await chat.sendMessage("🛑 **ADMIN STOP**: Sprint cancelled by Super Admin.");
+            if (sock && isConnected) {
+                await sock.sendMessage(chatId, { text: "🛑 **ADMIN STOP**: Sprint cancelled by Super Admin." });
+            }
         } catch(e) {}
         return res.json({ success: true });
     }
     res.status(404).json({ error: "Sprint not found" });
 });
 
-// 👑 ADMIN: GET SCHEDULED SPRINTS
 app.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
     try {
         const sprints = await ScheduledSprint.find({ startTime: { $gt: new Date() } }).sort({ startTime: 1 });
-        const result = await Promise.all(sprints.map(async (s) => {
-            let groupName = s.groupId;
-            if (client && isConnected) {
-                try { const chat = await client.getChatById(s.groupId); groupName = chat.name; } catch(e) {}
-            }
-            return {
-                id: s._id,
-                groupName: groupName,
-                startTime: s.startTime,
-                duration: s.duration,
-                createdBy: s.createdBy.split('@')[0]
-            };
+        const result = sprints.map((s) => ({
+            id: s._id,
+            groupName: s.groupId,
+            startTime: s.startTime,
+            duration: s.duration,
+            createdBy: s.createdBy.split('@')[0]
         }));
         res.json(result);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 👑 ADMIN: CANCEL SCHEDULED SPRINT
 app.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
     const { id } = req.body;
     try {
         const sprint = await ScheduledSprint.findById(id);
         if (sprint) {
-            if (client && isConnected) {
-                try {
-                    const chat = await client.getChatById(sprint.groupId);
-                    await chat.sendMessage(`⚠️ **NOTICE**: A scheduled sprint has been cancelled by the Admin.`);
-                } catch(e) { console.log("Could not notify group of cancellation", e.message); }
-            }
             await ScheduledSprint.deleteOne({ _id: id });
         }
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 👑 ADMIN: GET ALL GROUPS
-app.get('/api/admin/groups', requireAdmin, async (req, res) => {
-    if (!client || !isConnected) return res.json([]);
-    const chats = await client.getChats();
-    const groups = chats.filter(c => c.id.server === 'g.us').map(g => ({
-        id: g.id._serialized,
-        name: g.name,
-        participants: g.participants.length
-    }));
-    res.json(groups);
-});
-
-// 👑 ADMIN: LEAVE GROUP
-app.post('/api/admin/groups/leave', requireAdmin, async (req, res) => {
-    const { chatId } = req.body;
-    try {
-        const chat = await client.getChatById(chatId);
-        await chat.sendMessage("👋 This bot is leaving via Admin Console. Goodbye!");
-        await chat.leave();
-        res.json({ success: true });
-    } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-// 👑 ADMIN: RENAME USER
-app.post('/api/admin/users/rename', requireAdmin, async (req, res) => {
-    const { userId, newName } = req.body;
-    try {
-        await DailyStats.updateMany({ userId }, { name: newName });
-        await PersonalGoal.updateMany({ userId }, { name: newName });
-        res.json({ success: true });
-    } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-// 👑 ADMIN: SEARCH
 app.post('/api/admin/search', requireAdmin, async (req, res) => {
     try {
         const { query } = req.body;
@@ -323,7 +248,6 @@ app.post('/api/admin/search', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 👑 ADMIN: UPDATE STATS
 app.post('/api/admin/update', requireAdmin, async (req, res) => {
     try {
         const { userId, amount, type } = req.body; 
@@ -357,37 +281,28 @@ app.post('/api/admin/update', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 👑 ADMIN: BROADCAST
 app.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
     try {
-        const { message, targetGroups, imageUrl } = req.body;
-        if (!client || !isConnected) return res.status(500).json({ error: "Bot offline" });
+        const { message } = req.body;
+        if (!sock || !isConnected) return res.status(500).json({ error: "Bot offline" });
 
-        // 1. Prepare Media (if image provided)
-        let media = null;
-        if (imageUrl) {
-            try { media = await MessageMedia.fromUrl(imageUrl); } 
-            catch (e) { return res.status(400).json({ error: "Invalid Image URL" }); }
+        const chats = await sock.groupFetchAllParticipating();
+        let count = 0;
+        
+        for (const [jid, group] of Object.entries(chats)) {
+            try {
+                await sock.sendMessage(jid, { text: `📢 *ANNOUNCEMENT*\n\n${message}` });
+                count++;
+                await new Promise(r => setTimeout(r, 500));
+            } catch(e) { console.log("Broadcast error", e); }
         }
-
-        const allChats = await client.getChats();
-        let groups = allChats.filter(c => c.id.server === 'g.us');
-        if (targetGroups && targetGroups.length > 0) {
-            groups = groups.filter(g => targetGroups.includes(g.id._serialized));
-        }
-
-        for (const group of groups) { 
-            if (media) await group.sendMessage(media, { caption: message || "" });
-            else if (message) await group.sendMessage(`📢 *ANNOUNCEMENT*\n\n${message}`);
-            await new Promise(r => setTimeout(r, 500)); 
-        }
-        res.json({ success: true, count: groups.length });
+        
+        res.json({ success: true, count });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
 
-// 🟢 KEEP-ALIVE
 setInterval(() => {
     http.get(`http://localhost:${PORT}/`, (res) => {}).on('error', (err) => {});
 }, 5 * 60 * 1000); 
@@ -400,7 +315,6 @@ mongoose.connect(MONGO_URI)
     .then(async () => { 
         console.log("✅ MongoDB connected");
         
-        // 🟢 RESTORE SPRINTS
         const restoredSprints = await ActiveSprint.find({});
         restoredSprints.forEach(doc => {
             if (doc.endsAt > Date.now()) {
@@ -413,10 +327,9 @@ mongoose.connect(MONGO_URI)
                 
                 const remainingTime = doc.endsAt - Date.now();
                 setTimeout(async () => {
-                    if (activeSprints[doc.groupId] && client && isConnected) {
+                    if (activeSprints[doc.groupId] && sock && isConnected) {
                          try {
-                             const chat = await client.getChatById(doc.groupId);
-                             await chat.sendMessage(`🛑 **TIME'S UP!** (Restored)\n\nReply with *!wc [number]* now.\nType *!finish* to end.`);
+                             await sock.sendMessage(doc.groupId, { text: `🛑 **TIME'S UP!** (Restored)\n\nReply with *!wc [number]* now.\nType *!finish* to end.` });
                          } catch (e) {}
                     }
                 }, remainingTime);
@@ -425,57 +338,11 @@ mongoose.connect(MONGO_URI)
             }
         });
 
-        const store = new MongoStore({ mongoose: mongoose });
-
-        client = new Client({
-            authStrategy: new RemoteAuth({
-                clientId: 'sprint-session-v8', // 🟢 v8 Clean Start
-                store: store,
-                backupSyncIntervalMs: 600000, 
-                dataPath: path.join(__dirname, '.wwebjs_auth') 
-            }),
-            generatePcPreview: false,
-            webVersionCache: {
-                type: "remote",
-                remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html",
-            },
-            puppeteer: {
-                headless: true,
-                args: [
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage", // CRITICAL FOR RENDER
-                    "--disable-accelerated-2d-canvas",
-                    "--no-first-run",
-                    "--no-zygote",
-                    "--disable-gpu",
-                    "--disable-extensions",
-                    "--disable-default-apps",
-                    "--mute-audio",
-                    "--no-default-browser-check",
-                    "--disable-background-timer-throttling",
-                    "--disable-backgrounding-occluded-windows",
-                    "--disable-breakpad",
-                    "--disable-component-update",
-                    "--disable-ipc-flooding-protection",
-                    "--disable-notifications",
-                    "--disable-renderer-backgrounding",
-                    "--disable-features=site-per-process",
-                    // 🟢 ULTRA-LIGHT MODE ARGS
-                    "--disable-software-rasterizer",
-                    "--disable-speech-api",
-                    "--disable-sync",
-                    "--disable-webgl"
-                ],
-                timeout: 60000
-            }
-        });
-
         const getTodayDateGMT1 = () => new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
 
         const startSprintSession = async (chatId, duration) => {
             if (activeSprints[chatId]) return false; 
-            console.log(`🏁 Sprint STARTED in ${chatId} for ${duration} mins`);
+            console.log(`🏃 Sprint STARTED in ${chatId} for ${duration} mins`);
             const endTime = Date.now() + duration * 60000;
             
             activeSprints[chatId] = { duration, endsAt: endTime, participants: {} };
@@ -487,12 +354,13 @@ mongoose.connect(MONGO_URI)
                 participants: {} 
             });
 
-            const chat = await client.getChatById(chatId);
-            await chat.sendMessage(`🏁 *Writing Sprint Started!*\nDuration: *${duration} minutes*\n\nUse *!wc <number>* to log words.`);
+            await sock.sendMessage(chatId, { text: `🏃 *Writing Sprint Started!*\nDuration: *${duration} minutes*\n\nUse *!wc <number>* to log words.` });
             
             setTimeout(async () => {
                 if (activeSprints[chatId]) {
-                    try { await chat.sendMessage(`🛑 **TIME'S UP!**\n\nReply with *!wc [number]* now.\nType *!finish* to end.`); } 
+                    try { 
+                        await sock.sendMessage(chatId, { text: `🛑 **TIME'S UP!**\n\nReply with *!wc [number]* now.\nType *!finish* to end.` }); 
+                    } 
                     catch (e) { console.log("Timeout error", e); }
                 }
             }, duration * 60000);
@@ -507,150 +375,174 @@ mongoose.connect(MONGO_URI)
                 for (const sprint of dueSprints) {
                     const started = await startSprintSession(sprint.groupId, sprint.duration);
                     if (!started) {
-                        const chat = await client.getChatById(sprint.groupId);
-                        await chat.sendMessage(`⚠️ Scheduled sprint skipped.`);
+                        await sock.sendMessage(sprint.groupId, { text: `⚠️ Scheduled sprint skipped.` });
                     } else {
-                        const chat = await client.getChatById(sprint.groupId);
-                        await chat.sendMessage(`(Sprint scheduled by @${sprint.createdBy.split('@')[0]})`, { mentions: [sprint.createdBy] });
+                        await sock.sendMessage(sprint.groupId, { text: `(Sprint scheduled by @${sprint.createdBy.split('@')[0]})` });
                     }
                     await ScheduledSprint.deleteOne({ _id: sprint._id });
                 }
             } catch (e) { console.error("Scheduler Error:", e); }
-        }, 60000); 
+        }, 60000);
 
-        client.on("qr", qr => { qrCodeData = qr; console.log("New QR"); });
-        client.on("ready", () => { isConnected = true; console.log("Client ready"); });
+        // =======================
+        //   BAILEYS INITIALIZATION
+        // =======================
+        
+        const { state, saveCreds } = await useMultiFileAuthState('.auth_info_baileys');
+        
+        const initializeBot = async () => {
+            const { version } = await fetchLatestBaileysVersion();
+            
+            sock = makeWASocket({
+                version,
+                auth: state,
+                printQRInTerminal: false,
+                browser: ['Sprint Bot', 'Chrome', '120.0'],
+                msgRetryCounterMax: 15,
+                defaultQueryTimeoutMs: 60000,
+            });
 
-        client.on("message", async msg => {
-            try {
-                const chat = await msg.getChat();
-                const chatId = chat.id._serialized;
-                let senderId = msg.author || msg.from;
-                
-                if (await Blacklist.exists({ userId: senderId })) return;
+            // QR Code Event
+            sock.ev.on('connection.update', (update) => {
+                const { connection, lastDisconnect, qr } = update;
 
-                const isOwner = senderId.includes(OWNER_NUMBER);
-                
-                if (maintenanceMode && !isOwner) {
-                    if (msg.body.startsWith("!")) await msg.reply("⚠️ Bot is currently in Maintenance Mode.");
-                    return;
+                if (qr) {
+                    qrCodeData = qr;
+                    console.log('New QR Code Generated');
                 }
 
-                if (!chat.isGroup && !isOwner) return;
+                if (connection === 'connecting') {
+                    console.log('⏳ Connecting...');
+                } else if (connection === 'open') {
+                    isConnected = true;
+                    console.log('✅ Bot Connected!');
+                    qrCodeData = null;
+                } else if (connection === 'close') {
+                    isConnected = false;
+                    const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                    console.log('❌ Connection closed:', lastDisconnect?.error, 'Reconnecting:', shouldReconnect);
+                    
+                    if (shouldReconnect) {
+                        setTimeout(() => initializeBot(), 3000);
+                    }
+                }
+            });
 
-                let senderName = senderId.split('@')[0]; 
+            // Credentials Update
+            sock.ev.on('creds.update', saveCreds);
+
+            // Message Handler
+            sock.ev.on('messages.upsert', async (m) => {
                 try {
-                    const contact = await msg.getContact();
-                    senderId = contact.id._serialized; 
-                    if (contact.pushname) senderName = contact.pushname;
-                    else if (contact.name) senderName = contact.name;
-                    else if (contact.number) senderName = contact.number;
-                } catch (err) { senderName = msg._data?.notifyName || senderId.split('@')[0]; }
+                    const msg = m.messages[0];
+                    if (!msg.message || msg.key.fromMe) return;
 
-                if (!msg.body.startsWith("!")) return;
+                    const chatId = msg.key.remoteJid;
+                    const isGroup = chatId.endsWith('@g.us');
+                    const senderId = msg.key.participant || msg.key.remoteJid;
+                    
+                    if (await Blacklist.exists({ userId: senderId })) return;
+                    
+                    const isOwner = senderId.includes(OWNER_NUMBER);
 
-                const args = msg.body.trim().split(" ");
-                const command = args[0].toLowerCase();
-                const todayStr = getTodayDateGMT1(); 
-
-                const getTargetId = (argIndex = 1) => {
-                    if (msg.mentionedIds.length > 0) return msg.mentionedIds[0];
-                    const potentialNumber = args[argIndex]?.replace(/\D/g, '');
-                    if (potentialNumber && potentialNumber.length > 5) return potentialNumber + '@c.us';
-                    return null;
-                };
-
-                // --- ADMIN COMMANDS ---
-                if (isOwner) {
-                    if (command === "!broadcast") {
-                        const message = args.slice(1).join(" ");
-                        if (!message) return msg.reply("❌ Empty.");
-                        const chats = await client.getChats();
-                        const groups = chats.filter(c => c.id.server === 'g.us');
-                        msg.reply(`📢 Broadcasting to ${groups.length} groups...`);
-                        for (const group of groups) { await group.sendMessage(`📢 *ANNOUNCEMENT*\n\n${message}`); }
+                    if (maintenanceMode && !isOwner) {
+                        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+                        if (body.startsWith("!")) await sock.sendMessage(chatId, { text: "⚠️ Bot is currently in Maintenance Mode." }, { quoted: msg });
                         return;
                     }
 
-                    if (command === "!sys") {
-                        const uptime = process.uptime();
-                        return msg.reply(`⚙️ **System**\n⏱️ ${Math.floor(uptime/60)}m\n🔧 Maintenance: ${maintenanceMode ? "ON" : "OFF"}`);
-                    }
+                    if (!isGroup && !isOwner) return;
 
-                    if (command === "!correct" || command === "!setword") {
-                        const targetId = getTargetId(1);
-                        const amount = parseInt(args[2]);
-                        const isSet = command === "!setword";
-                        if (!targetId || isNaN(amount)) return msg.reply(`❌ Usage: \`${command} @User 500\``);
+                    // Extract text from message
+                    let body = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+                    if (!body.startsWith("!")) return;
 
-                        let filter = { userId: targetId, date: todayStr };
-                        if (chat.isGroup) filter.groupId = chatId;
+                    // Get sender name
+                    let senderName = senderId.split('@')[0];
+                    try {
+                        const contact = await sock.getContactBasicInfo(senderId);
+                        if (contact.pushName) senderName = contact.pushName;
+                    } catch (err) { senderName = senderId.split('@')[0]; }
 
-                        let targetDoc = await DailyStats.findOne(filter).sort({ timestamp: -1 });
+                    const args = body.trim().split(" ");
+                    const command = args[0].toLowerCase();
+                    const todayStr = getTodayDateGMT1();
 
-                        if (!targetDoc) {
-                            const history = await DailyStats.findOne({ userId: targetId }).sort({ timestamp: -1 });
-                            if (history) {
-                                targetDoc = await DailyStats.create({ userId: targetId, groupId: chat.isGroup ? chatId : history.groupId, date: todayStr, name: history.name, words: 0, timestamp: new Date() });
-                                msg.reply(`✅ Created new entry.`);
-                            } else {
-                                return msg.reply("❌ User has no history.");
+                    const getTargetId = (argIndex = 1) => {
+                        // In Baileys, mentions are stored differently
+                        // For now, try to parse number from args
+                        const potentialNumber = args[argIndex]?.replace(/\D/g, '');
+                        if (potentialNumber && potentialNumber.length > 5) return potentialNumber + '@c.us';
+                        return null;
+                    };
+
+                    // --- ADMIN COMMANDS ---
+                    if (isOwner) {
+                        if (command === "!broadcast") {
+                            const message = args.slice(1).join(" ");
+                            if (!message) return sock.sendMessage(chatId, { text: "❌ Empty." }, { quoted: msg });
+                            
+                            const chats = await sock.groupFetchAllParticipating();
+                            let count = 0;
+                            
+                            for (const [jid] of Object.entries(chats)) {
+                                try {
+                                    await sock.sendMessage(jid, { text: `📢 *ANNOUNCEMENT*\n\n${message}` });
+                                    count++;
+                                } catch(e) {}
                             }
+                            return sock.sendMessage(chatId, { text: `✅ Broadcasted to ${count} groups.` }, { quoted: msg });
                         }
 
-                        if (isSet) {
-                            const diff = amount - targetDoc.words;
-                            targetDoc.words = amount;
-                            await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: diff } });
-                        } else {
-                            targetDoc.words += amount;
-                            await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: amount } });
+                        if (command === "!sys") {
+                            const uptime = process.uptime();
+                            return sock.sendMessage(chatId, { text: `⚙️ **System**\n⏱️ ${Math.floor(uptime/60)}m\n🔧 Maintenance: ${maintenanceMode ? "ON" : "OFF"}` }, { quoted: msg });
                         }
-                        targetDoc.timestamp = new Date();
-                        await targetDoc.save();
-                        return msg.reply(`✅ Done. New Total: ${targetDoc.words}`);
+
+                        if (command === "!correct" || command === "!setword") {
+                            const targetId = getTargetId(1);
+                            const amount = parseInt(args[2]);
+                            const isSet = command === "!setword";
+                            if (!targetId || isNaN(amount)) return sock.sendMessage(chatId, { text: `❌ Usage: \`${command} number 500\`` }, { quoted: msg });
+
+                            let filter = { userId: targetId, date: todayStr };
+                            if (isGroup) filter.groupId = chatId;
+
+                            let targetDoc = await DailyStats.findOne(filter).sort({ timestamp: -1 });
+
+                            if (!targetDoc) {
+                                const history = await DailyStats.findOne({ userId: targetId }).sort({ timestamp: -1 });
+                                if (history) {
+                                    targetDoc = await DailyStats.create({ userId: targetId, groupId: isGroup ? chatId : history.groupId, date: todayStr, name: history.name, words: 0, timestamp: new Date() });
+                                    sock.sendMessage(chatId, { text: `✅ Created new entry.` }, { quoted: msg });
+                                } else {
+                                    return sock.sendMessage(chatId, { text: "❌ User has no history." }, { quoted: msg });
+                                }
+                            }
+
+                            if (isSet) {
+                                const diff = amount - targetDoc.words;
+                                targetDoc.words = amount;
+                                await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: diff } });
+                            } else {
+                                targetDoc.words += amount;
+                                await PersonalGoal.findOneAndUpdate({ userId: targetId, isActive: true }, { $inc: { current: amount } });
+                            }
+                            targetDoc.timestamp = new Date();
+                            await targetDoc.save();
+                            return sock.sendMessage(chatId, { text: `✅ Done. New Total: ${targetDoc.words}` }, { quoted: msg });
+                        }
+
+                        if (command === "!leave") {
+                            await sock.sendMessage(chatId, { text: "👋 Bye!" });
+                            await sock.groupLeave(chatId);
+                            return;
+                        }
                     }
 
-                    if (command === "!setname") {
-                        const targetId = getTargetId(1);
-                        const nameStartIndex = msg.mentionedIds.length > 0 ? 2 : 2; 
-                        const newName = args.slice(nameStartIndex).join(" ");
-                        if (!targetId || !newName) return msg.reply("❌ Usage: `!setname @User Name`");
-                        await DailyStats.updateMany({ userId: targetId }, { name: newName });
-                        await PersonalGoal.updateMany({ userId: targetId }, { name: newName });
-                        return msg.reply(`✅ Name: **${newName}**.`);
-                    }
-
-                    if (command === "!cleanup") {
-                        const res1 = await DailyStats.deleteMany({ name: "Fixed by Admin" });
-                        const res2 = await DailyStats.deleteMany({ date: { $exists: false } });
-                        return msg.reply(`🧹 Cleaned: ${res1.deletedCount + res2.deletedCount}`);
-                    }
-
-                    if (command === "!ban") {
-                        const targetId = getTargetId(1);
-                        if (!targetId) return msg.reply("❌ Tag user.");
-                        await Blacklist.create({ userId: targetId });
-                        return msg.reply(`🚫 Banned.`);
-                    }
-
-                    if (command === "!unban") {
-                        const targetId = getTargetId(1);
-                        if (!targetId) return msg.reply("❌ Tag user.");
-                        await Blacklist.deleteMany({ userId: targetId });
-                        return msg.reply(`✅ Unbanned.`);
-                    }
-
-                    if (command === "!leave") {
-                        await chat.sendMessage("👋 Bye!");
-                        await chat.leave();
-                        return;
-                    }
-                }
-
-                // --- REGULAR COMMANDS ---
-                if (command === "!help") {
-                    return msg.reply(`🤖 *SPRINT BOT MENU*
+                    // --- REGULAR COMMANDS ---
+                    if (command === "!help") {
+                        return sock.sendMessage(chatId, { text: `🤖 *SPRINT BOT MENU*
 
 🏃 *Sprinting*
 !sprint 20 : Start a 20 min sprint
@@ -673,201 +565,216 @@ mongoose.connect(MONGO_URI)
 
 ⚙ *Utils*
 !log 500 : Manually add words (no timer)
-!myname Sam : Update your display name`);
-                }
-
-                if (command === "!log") {
-                    let count = parseInt(args[1]);
-                    if (isNaN(count) || count <= 0) return msg.reply("❌ Use: `!log 500`");
-                    try {
-                        await DailyStats.findOneAndUpdate({ userId: senderId, groupId: chatId, date: todayStr }, { name: senderName, $inc: { words: count }, timestamp: new Date() }, { upsert: true, new: true });
-                        const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
-                        
-                        await msg.reply(`✅ Logged ${count} words.`);
-
-                        if (goal) {
-                            goal.current += count;
-                            if (goal.current >= goal.target) { 
-                                goal.isActive = false; 
-                                await goal.save(); 
-                                await chat.sendMessage(`🎉 *GOAL HIT!* 🏆\n\nCongratulations @${senderId.split('@')[0]}! You smashed your target of ${goal.target} words!`, { mentions: [senderId] });
-                            } else {
-                                await goal.save();
-                            }
-                        }
-                    } catch (e) { console.error(e); }
-                }
-
-                if (command === "!top10" || command === "!top") {
-                    const top = await DailyStats.aggregate([{ $group: { _id: "$name", total: { $sum: "$words" } } }, { $sort: { total: -1 } }, { $limit: 10 }]);
-                    if (top.length === 0) return msg.reply("📉 No data.");
-                    let txt = `🌍 **ALL-TIME HALL OF FAME**\n\n`;
-                    top.forEach((w, i) => { txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} ${w._id}: ${w.total.toLocaleString()}\n`; });
-                    await chat.sendMessage(txt);
-                }
-
-                if (command === "!myname") {
-                    const n = args.slice(1).join(" ");
-                    if (!n) return msg.reply("❌ Use: `!myname Sam`");
-                    await DailyStats.updateMany({ userId: senderId }, { name: n });
-                    await PersonalGoal.updateMany({ userId: senderId }, { name: n });
-                    return msg.reply(`✅ Name: ${n}`);
-                }
-
-                if (command === "!sprint") {
-                    let m = parseInt(args[1]);
-                    if (isNaN(m) || m <= 0 || m > 180) return msg.reply("❌ Use: `!sprint 20`");
-                    if (activeSprints[chatId]) return msg.reply("⚠️ Running.");
-                    await startSprintSession(chatId, m);
-                }
-
-                if (command === "!schedule") {
-                    if (args[2] !== 'in') return msg.reply("❌ Use: `!schedule 20 in 60`");
-                    const d = parseInt(args[1]), w = parseInt(args[3]);
-                    if (isNaN(d) || isNaN(w)) return msg.reply("❌ Invalid numbers.");
-                    
-                    const s = new Date(Date.now() + w * 60000);
-                    await ScheduledSprint.create({ groupId: chatId, startTime: s, duration: d, createdBy: senderId });
-                    
-                    const timeStr = s.toLocaleTimeString('en-GB', { timeZone: "Africa/Lagos", hour: '2-digit', minute: '2-digit' });
-
-                    return msg.reply(`📅 *Sprint Scheduled!*\n\nDuration: ${d} mins\nStart: In ${w} mins (approx ${timeStr} GMT+1)`);
-                }
-
-                if (command === "!unschedule") {
-                    const r = await ScheduledSprint.deleteMany({ groupId: chatId });
-                    if (r.deletedCount > 0) return msg.reply(`✅ Cancelled.`);
-                    return msg.reply("🤷 None found.");
-                }
-
-                if (command === "!time") {
-                    const s = activeSprints[chatId];
-                    if (!s) return msg.reply("❌ No active sprint.");
-                    const r = s.endsAt - Date.now();
-                    if (r <= 0) return msg.reply("🛑 Time up!");
-                    const endDates = new Date(s.endsAt);
-                    const timeString = endDates.toLocaleTimeString('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit' });
-                    
-                    return msg.reply(`⏳ *${Math.floor(r/60000)}m ${Math.floor((r/1000)%60)}s* remaining\n(Ends approx ${timeString})`);
-                }
-
-                if (command === "!wc") {
-                    const s = activeSprints[chatId];
-                    if (!s) return msg.reply("❌ No sprint.");
-                    
-                    let c = parseInt(args[1]==='add'||args[1]==='+'?args[2]:args[1]);
-                    let add = args[1]==='add'||args[1]==='+';
-                    
-                    if (isNaN(c)) return msg.reply("❌ Invalid.");
-                    if (!s.participants[senderId]) s.participants[senderId] = { name: senderName, words: 0 };
-                    
-                    if (add) { s.participants[senderId].words += c; await msg.reply(`➕ Added. Total: ${s.participants[senderId].words}`); }
-                    else { s.participants[senderId].words = c; await msg.react('✅'); }
-
-                    // 🟢 SYNC TO DB
-                    await ActiveSprint.updateOne(
-                        { groupId: chatId }, 
-                        { $set: { participants: s.participants } }
-                    );
-                }
-
-                if (command === "!finish") {
-                    const s = activeSprints[chatId];
-                    if (!s) return msg.reply("❌ No sprint.");
-                    const l = Object.entries(s.participants).map(([u, d]) => ({ ...d, uid: u })).sort((a, b) => b.words - a.words);
-                    if (l.length === 0) { 
-                        delete activeSprints[chatId]; 
-                        await ActiveSprint.deleteOne({ groupId: chatId });
-                        console.log(`🏁 Sprint ENDED in ${chatId} (No participants)`);
-                        return msg.reply("🏁 Ended. Empty."); 
+!myname Sam : Update your display name` }, { quoted: msg });
                     }
-                    let txt = `🏆 *SPRINT RESULTS* 🏆\n\n`, men = [];
-                    for (let i = 0; i < l.length; i++) {
-                        let p = l[i]; men.push(p.uid);
-                        txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} @${p.uid.split('@')[0]} : ${p.words} words (${Math.round(p.words/s.duration)} WPM)\n`;
+
+                    if (command === "!log") {
+                        let count = parseInt(args[1]);
+                        if (isNaN(count) || count <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!log 500`" }, { quoted: msg });
                         try {
-                            await DailyStats.findOneAndUpdate({ userId: p.uid, groupId: chatId, date: todayStr }, { name: p.name, $inc: { words: p.words }, timestamp: new Date() }, { upsert: true });
-                            const g = await PersonalGoal.findOne({ userId: p.uid, isActive: true });
-                            if (g) { g.current += p.words; await g.save(); if (g.current >= g.target) { g.isActive = false; await g.save(); txt += `\n🎉 Goal Hit!`; } }
-                        } catch (e) {}
+                            await DailyStats.findOneAndUpdate({ userId: senderId, groupId: chatId, date: todayStr }, { name: senderName, $inc: { words: count }, timestamp: new Date() }, { upsert: true, new: true });
+                            const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+                            
+                            await sock.sendMessage(chatId, { text: `✅ Logged ${count} words.` }, { quoted: msg });
+
+                            if (goal) {
+                                goal.current += count;
+                                if (goal.current >= goal.target) { 
+                                    goal.isActive = false; 
+                                    await goal.save(); 
+                                    await sock.sendMessage(chatId, { text: `🎉 *GOAL HIT!* 🏆\n\nCongratulations! You smashed your target of ${goal.target} words!` });
+                                } else {
+                                    await goal.save();
+                                }
+                            }
+                        } catch (e) { console.error(e); }
                     }
-                    delete activeSprints[chatId];
-                    await ActiveSprint.deleteOne({ groupId: chatId });
-                    
-                    console.log(`🏁 Sprint ENDED in ${chatId} with ${l.length} writers`); 
 
-                    txt += "\nGreat job, everyone!\n\n👉 *Next Step:* Type `!sprint 15` to go again or `!schedule` to plan ahead!";
-                    
-                    await chat.sendMessage(txt, { mentions: men });
-                }
-
-                if (["!daily", "!weekly", "!monthly"].includes(command)) {
-                    const d = command === "!daily";
-                    const days = d ? 1 : command === "!weekly" ? 7 : 30;
-                    
-                    let title = "";
-                    if (d) title = `Daily Leaderboard (${todayStr})`;
-                    else if (command === "!weekly") title = "Weekly Leaderboard";
-                    else title = "Monthly Leaderboard";
-
-                    let stats;
-                    if (d) stats = await DailyStats.find({ groupId: chatId, date: todayStr }).sort({ words: -1 });
-                    else {
-                        const dt = new Date(); dt.setDate(dt.getDate() - days);
-                        stats = await DailyStats.aggregate([{ $match: { groupId: chatId, timestamp: { $gte: dt } } }, { $group: { _id: "$userId", totalWords: { $sum: "$words" }, name: { $first: "$name" } } }, { $sort: { totalWords: -1 } }, { $limit: 15 }]);
+                    if (command === "!top10" || command === "!top") {
+                        const top = await DailyStats.aggregate([{ $group: { _id: "$name", total: { $sum: "$words" } } }, { $sort: { total: -1 } }, { $limit: 10 }]);
+                        if (top.length === 0) return sock.sendMessage(chatId, { text: "📉 No data." }, { quoted: msg });
+                        let txt = `🌎 **ALL-TIME HALL OF FAME**\n\n`;
+                        top.forEach((w, i) => { txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} ${w._id}: ${w.total.toLocaleString()}\n`; });
+                        await sock.sendMessage(chatId, { text: txt });
                     }
-                    if (stats.length === 0) return msg.reply("📉 No stats.");
-                    let txt = `🏆 *${title}*\n\n`;
-                    stats.forEach((s, i) => { txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} ${s.name}: ${d ? s.words : s.totalWords} words\n`; });
-                    await chat.sendMessage(txt);
-                }
 
-                if (command === "!goal") {
-                    const sub = args[1]?.toLowerCase();
-                    
-                    if (sub === "set") {
-                        const t = parseInt(args[2]);
-                        if (isNaN(t)) return msg.reply("❌ Use: `!goal set 5000`");
-                        await PersonalGoal.updateMany({ userId: senderId }, { isActive: false });
-                        await PersonalGoal.create({ userId: senderId, name: senderName, target: t, current: 0 });
-                        return msg.reply(`🎯 Goal set: ${t} words`);
+                    if (command === "!myname") {
+                        const n = args.slice(1).join(" ");
+                        if (!n) return sock.sendMessage(chatId, { text: "❌ Use: `!myname Sam`" }, { quoted: msg });
+                        await DailyStats.updateMany({ userId: senderId }, { name: n });
+                        await PersonalGoal.updateMany({ userId: senderId }, { name: n });
+                        return sock.sendMessage(chatId, { text: `✅ Name: ${n}` }, { quoted: msg });
                     }
-                    
-                    if (sub === "check") {
-                        const g = await PersonalGoal.findOne({ userId: senderId, isActive: true });
-                        if (!g) return msg.reply("❌ No active goal. Start one with \`!goal set [number]\`");
+
+                    if (command === "!sprint") {
+                        let m = parseInt(args[1]);
+                        if (isNaN(m) || m <= 0 || m > 180) return sock.sendMessage(chatId, { text: "❌ Use: `!sprint 20`" }, { quoted: msg });
+                        if (activeSprints[chatId]) return sock.sendMessage(chatId, { text: "⚠️ Running." }, { quoted: msg });
+                        await startSprintSession(chatId, m);
+                    }
+
+                    if (command === "!schedule") {
+                        if (args[2] !== 'in') return sock.sendMessage(chatId, { text: "❌ Use: `!schedule 20 in 60`" }, { quoted: msg });
+                        const d = parseInt(args[1]), w = parseInt(args[3]);
+                        if (isNaN(d) || isNaN(w)) return sock.sendMessage(chatId, { text: "❌ Invalid numbers." }, { quoted: msg });
                         
-                        // Calculate Percentage
-                        const rawPct = (g.current / g.target) * 100;
-                        const pct = Math.min(100, Math.max(0, rawPct)); // Clamp between 0-100
+                        const s = new Date(Date.now() + w * 60000);
+                        await ScheduledSprint.create({ groupId: chatId, startTime: s, duration: d, createdBy: senderId });
                         
-                        // Calculate Green Blocks (0 to 10)
-                        const filledCount = Math.round(pct / 10); 
-                        const emptyCount = 10 - filledCount;
-                        const bar = "🟩".repeat(filledCount) + "⬜".repeat(emptyCount);
-                        
-                        const txt = `🎯 *Goal Progress*\n` +
-                                    `👤 ${g.name}\n` +
-                                    `📊 ${g.current} / ${g.target} words\n` +
-                                    `${bar} (${rawPct.toFixed(1)}%)\n` +
-                                    `📅 Started: ${g.startDate}`;
-                                    
-                        return msg.reply(txt);
+                        const timeStr = s.toLocaleTimeString('en-GB', { timeZone: "Africa/Lagos", hour: '2-digit', minute: '2-digit' });
+
+                        return sock.sendMessage(chatId, { text: `📅 *Sprint Scheduled!*\n\nDuration: ${d} mins\nStart: In ${w} mins (approx ${timeStr} GMT+1)` }, { quoted: msg });
                     }
-                }
 
-                if (command === "!cancel") {
-                    if (activeSprints[chatId]) { delete activeSprints[chatId]; await ActiveSprint.deleteOne({ groupId: chatId }); await msg.reply("🚫 Cancelled."); }
-                }
+                    if (command === "!unschedule") {
+                        const r = await ScheduledSprint.deleteMany({ groupId: chatId });
+                        if (r.deletedCount > 0) return sock.sendMessage(chatId, { text: `✅ Cancelled.` }, { quoted: msg });
+                        return sock.sendMessage(chatId, { text: "🤷 None found." }, { quoted: msg });
+                    }
 
-            } catch (err) { console.error("Handler error:", err); }
-        });
+                    if (command === "!time") {
+                        const s = activeSprints[chatId];
+                        if (!s) return sock.sendMessage(chatId, { text: "❌ No active sprint." }, { quoted: msg });
+                        const r = s.endsAt - Date.now();
+                        if (r <= 0) return sock.sendMessage(chatId, { text: "🛑 Time up!" }, { quoted: msg });
+                        const endDates = new Date(s.endsAt);
+                        const timeString = endDates.toLocaleTimeString('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit' });
+                        
+                        return sock.sendMessage(chatId, { text: `⏳ *${Math.floor(r/60000)}m ${Math.floor((r/1000)%60)}s* remaining\n(Ends approx ${timeString})` }, { quoted: msg });
+                    }
 
-        client.initialize();
+                    if (command === "!wc") {
+                        const s = activeSprints[chatId];
+                        if (!s) return sock.sendMessage(chatId, { text: "❌ No sprint." }, { quoted: msg });
+                        
+                        let c = parseInt(args[1]==='add'||args[1]==='+'?args[2]:args[1]);
+                        let add = args[1]==='add'||args[1]==='+';
+                        
+                        if (isNaN(c)) return sock.sendMessage(chatId, { text: "❌ Invalid." }, { quoted: msg });
+                        if (!s.participants[senderId]) s.participants[senderId] = { name: senderName, words: 0 };
+                        
+                        if (add) { 
+                            s.participants[senderId].words += c; 
+                            await sock.sendMessage(chatId, { text: `➕ Added. Total: ${s.participants[senderId].words}` }, { quoted: msg }); 
+                        }
+                        else { 
+                            s.participants[senderId].words = c; 
+                            await sock.sendMessage(chatId, { text: `✅` }, { quoted: msg }); 
+                        }
+
+                        await ActiveSprint.updateOne(
+                            { groupId: chatId }, 
+                            { $set: { participants: s.participants } }
+                        );
+                    }
+
+                    if (command === "!finish") {
+                        const s = activeSprints[chatId];
+                        if (!s) return sock.sendMessage(chatId, { text: "❌ No sprint." }, { quoted: msg });
+                        const l = Object.entries(s.participants).map(([u, d]) => ({ ...d, uid: u })).sort((a, b) => b.words - a.words);
+                        if (l.length === 0) { 
+                            delete activeSprints[chatId]; 
+                            await ActiveSprint.deleteOne({ groupId: chatId });
+                            console.log(`🏃 Sprint ENDED in ${chatId} (No participants)`);
+                            return sock.sendMessage(chatId, { text: "🏃 Ended. Empty." }, { quoted: msg }); 
+                        }
+                        let txt = `🏆 *SPRINT RESULTS* 🏆\n\n`;
+                        for (let i = 0; i < l.length; i++) {
+                            let p = l[i];
+                            txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} ${p.name} : ${p.words} words (${Math.round(p.words/s.duration)} WPM)\n`;
+                            try {
+                                await DailyStats.findOneAndUpdate({ userId: p.uid, groupId: chatId, date: todayStr }, { name: p.name, $inc: { words: p.words }, timestamp: new Date() }, { upsert: true });
+                                const g = await PersonalGoal.findOne({ userId: p.uid, isActive: true });
+                                if (g) { 
+                                    g.current += p.words; 
+                                    await g.save(); 
+                                    if (g.current >= g.target) { 
+                                        g.isActive = false; 
+                                        await g.save(); 
+                                        txt += `\n🎉 Goal Hit!`; 
+                                    } 
+                                }
+                            } catch (e) {}
+                        }
+                        delete activeSprints[chatId];
+                        await ActiveSprint.deleteOne({ groupId: chatId });
+                        
+                        console.log(`🏃 Sprint ENDED in ${chatId} with ${l.length} writers`);
+
+                        txt += "\nGreat job, everyone!\n\n👉 *Next Step:* Type `!sprint 15` to go again or `!schedule` to plan ahead!";
+                        
+                        await sock.sendMessage(chatId, { text: txt });
+                    }
+
+                    if (["!daily", "!weekly", "!monthly"].includes(command)) {
+                        const d = command === "!daily";
+                        const days = d ? 1 : command === "!weekly" ? 7 : 30;
+                        
+                        let title = "";
+                        if (d) title = `Daily Leaderboard (${todayStr})`;
+                        else if (command === "!weekly") title = "Weekly Leaderboard";
+                        else title = "Monthly Leaderboard";
+
+                        let stats;
+                        if (d) stats = await DailyStats.find({ groupId: chatId, date: todayStr }).sort({ words: -1 });
+                        else {
+                            const dt = new Date(); dt.setDate(dt.getDate() - days);
+                            stats = await DailyStats.aggregate([{ $match: { groupId: chatId, timestamp: { $gte: dt } } }, { $group: { _id: "$userId", totalWords: { $sum: "$words" }, name: { $first: "$name" } } }, { $sort: { totalWords: -1 } }, { $limit: 15 }]);
+                        }
+                        if (stats.length === 0) return sock.sendMessage(chatId, { text: "📉 No stats." }, { quoted: msg });
+                        let txt = `🏆 *${title}*\n\n`;
+                        stats.forEach((s, i) => { txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} ${s.name}: ${d ? s.words : s.totalWords} words\n`; });
+                        await sock.sendMessage(chatId, { text: txt });
+                    }
+
+                    if (command === "!goal") {
+                        const sub = args[1]?.toLowerCase();
+                        
+                        if (sub === "set") {
+                            const t = parseInt(args[2]);
+                            if (isNaN(t)) return sock.sendMessage(chatId, { text: "❌ Use: `!goal set 5000`" }, { quoted: msg });
+                            await PersonalGoal.updateMany({ userId: senderId }, { isActive: false });
+                            await PersonalGoal.create({ userId: senderId, name: senderName, target: t, current: 0 });
+                            return sock.sendMessage(chatId, { text: `🎯 Goal set: ${t} words` }, { quoted: msg });
+                        }
+                        
+                        if (sub === "check") {
+                            const g = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+                            if (!g) return sock.sendMessage(chatId, { text: "❌ No active goal. Start one with `!goal set [number]`" }, { quoted: msg });
+                            
+                            const rawPct = (g.current / g.target) * 100;
+                            const pct = Math.min(100, Math.max(0, rawPct));
+                            const filledCount = Math.round(pct / 10); 
+                            const emptyCount = 10 - filledCount;
+                            const bar = "🟩".repeat(filledCount) + "⬜".repeat(emptyCount);
+                            
+                            const txt = `🎯 *Goal Progress*\n` +
+                                        `👤 ${g.name}\n` +
+                                        `📊 ${g.current} / ${g.target} words\n` +
+                                        `${bar} (${rawPct.toFixed(1)}%)\n` +
+                                        `📅 Started: ${g.startDate}`;
+                                        
+                            return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
+                        }
+                    }
+
+                    if (command === "!cancel") {
+                        if (activeSprints[chatId]) { 
+                            delete activeSprints[chatId]; 
+                            await ActiveSprint.deleteOne({ groupId: chatId }); 
+                            await sock.sendMessage(chatId, { text: "🚫 Cancelled." }, { quoted: msg }); 
+                        }
+                    }
+
+                } catch (err) { console.error("Handler error:", err); }
+            });
+        };
+
+        initializeBot();
+
     })
     .catch(err => { console.error("❌ MongoDB error:", err); process.exit(1); });
 
-// 🛡️ Prevent crash on unhandled errors
 process.on('unhandledRejection', (reason, promise) => {
     console.log('⚠️ Unhandled Rejection:', reason);
 });
