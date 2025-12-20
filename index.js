@@ -2,6 +2,7 @@
 //       IMPORTS
 // =======================
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
+const { MongoStore } = require('wwebjs-mongo');
 const mongoose = require("mongoose");
 const express = require('express');
 const http = require('http'); 
@@ -25,7 +26,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const TIMEZONE = "Africa/Lagos"; 
 
-const OWNER_NUMBER = '2347087899166@c.us'; 
+const OWNER_NUMBER = '2347087899166'; 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123"; 
 
 app.use(express.json()); 
@@ -132,7 +133,18 @@ app.get('/api/stats', async (req, res) => {
             { $limit: 10 }
         ]);
 
-        const topGroups = topGroupsRaw.map(g => ({ name: g._id || "Unknown", words: g.total }));
+        const topGroups = await Promise.all(topGroupsRaw.map(async (g) => {
+            let groupName = g._id || "Unknown";
+            if (sock && isConnected) {
+                try {
+                    const chat = await sock.chatModificationListen.groupMetadata?.(g._id) || { subject: g._id };
+                    if (chat.subject) groupName = chat.subject;
+                } catch (e) {
+                    // Use group ID if we can't fetch name
+                }
+            }
+            return { name: groupName, words: g.total };
+        }));
 
         const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
         const totalWritersAgg = await DailyStats.distinct("name");
@@ -458,10 +470,19 @@ mongoose.connect(MONGO_URI)
 
                     // Get sender name
                     let senderName = senderId.split('@')[0];
+                    let groupName = chatId;
                     try {
                         const contact = await sock.getContactBasicInfo(senderId);
                         if (contact.pushName) senderName = contact.pushName;
                     } catch (err) { senderName = senderId.split('@')[0]; }
+                    
+                    // Get group name for group chats
+                    if (isGroup) {
+                        try {
+                            const groupMetadata = await sock.groupMetadata(chatId);
+                            if (groupMetadata?.subject) groupName = groupMetadata.subject;
+                        } catch (err) { groupName = chatId; }
+                    }
 
                     const args = body.trim().split(" ");
                     const command = args[0].toLowerCase();
@@ -571,7 +592,7 @@ mongoose.connect(MONGO_URI)
                         let count = parseInt(args[1]);
                         if (isNaN(count) || count <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!log 500`" }, { quoted: msg });
                         try {
-                            await DailyStats.findOneAndUpdate({ userId: senderId, groupId: chatId, date: todayStr }, { name: senderName, $inc: { words: count }, timestamp: new Date() }, { upsert: true, new: true });
+                            await DailyStats.findOneAndUpdate({ userId: senderId, groupId: chatId, date: todayStr }, { name: senderName, groupId: groupName, $inc: { words: count }, timestamp: new Date() }, { upsert: true, new: true });
                             const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
                             
                             await sock.sendMessage(chatId, { text: `✅ Logged ${count} words.` }, { quoted: msg });
