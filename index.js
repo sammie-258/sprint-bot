@@ -399,46 +399,50 @@ mongoose.connect(MONGO_URI)
         //   BAILEYS INITIALIZATION
         // =======================
         
-        const { state, saveCreds } = await useMultiFileAuthState('.auth_info_baileys');
-        
-        const initializeBot = async () => {
-            const { version } = await fetchLatestBaileysVersion();
+const initializeBot = async () => {
+    const { version } = await fetchLatestBaileysVersion();
+    
+    const { state, saveCreds } = await useMultiFileAuthState('.auth_info_baileys');
+    
+    sock = makeWASocket({
+        version,
+        auth: state,
+        printQRInTerminal: false,
+        browser: ['Sprint Bot', 'Chrome', '120.0'],
+        msgRetryCounterMax: 15,
+        defaultQueryTimeoutMs: 60000,
+    });
+
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            qrCodeData = qr;
+            console.log('📱 New QR Code Generated');
+            isConnected = false;
+        }
+
+        if (connection === 'connecting') {
+            console.log('⏳ Connecting...');
+        } else if (connection === 'open') {
+            isConnected = true;
+            console.log('✅ Bot Connected!');
+            qrCodeData = null;
+        } else if (connection === 'close') {
+            isConnected = false;
+            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('❌ Connection closed, code:', lastDisconnect?.error?.output?.statusCode);
             
-            sock = makeWASocket({
-                version,
-                auth: state,
-                printQRInTerminal: false,
-                browser: ['Sprint Bot', 'Chrome', '120.0'],
-                msgRetryCounterMax: 15,
-                defaultQueryTimeoutMs: 60000,
-            });
+            if (shouldReconnect) {
+                console.log('🔄 Attempting to reconnect...');
+                setTimeout(() => initializeBot(), 5000);
+            } else {
+                console.log('⚠️ Logged out - QR required');
+            }
+        }
+    });
 
-            sock.ev.on('connection.update', (update) => {
-                const { connection, lastDisconnect, qr } = update;
-
-                if (qr) {
-                    qrCodeData = qr;
-                    console.log('New QR Code Generated');
-                }
-
-                if (connection === 'connecting') {
-                    console.log('⏳ Connecting...');
-                } else if (connection === 'open') {
-                    isConnected = true;
-                    console.log('✅ Bot Connected!');
-                    qrCodeData = null;
-                } else if (connection === 'close') {
-                    isConnected = false;
-                    const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                    console.log('❌ Connection closed, Reconnecting:', shouldReconnect);
-                    
-                    if (shouldReconnect) {
-                        setTimeout(() => initializeBot(), 3000);
-                    }
-                }
-            });
-
-            sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', saveCreds);
 
             sock.ev.on('messages.upsert', async (m) => {
                 try {
