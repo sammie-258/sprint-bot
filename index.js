@@ -12,13 +12,22 @@ const path = require('path');
 require("dotenv").config();
 
 // =======================
+//   MANUAL GARBAGE COLLECTION
+// =======================
+// 🗑️ FORCE CLEANUP EVERY 30 SECONDS TO SAVE RAM
+if (global.gc) {
+    setInterval(() => {
+        global.gc();
+    }, 30000);
+}
+
+// =======================
 //   CONFIG & SERVER SETUP
 // =======================
 const app = express();
 const PORT = process.env.PORT || 3000;
-const TIMEZONE = "Africa/Lagos"; // GMT+1
+const TIMEZONE = "Africa/Lagos"; 
 
-// 👑 SUPER ADMIN CONFIG
 const OWNER_NUMBER = '2347087899166'; 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123"; 
 
@@ -80,12 +89,6 @@ const ScheduledSprint = mongoose.model("ScheduledSprint", scheduleSchema);
 const blacklistSchema = new mongoose.Schema({ userId: String });
 const Blacklist = mongoose.model("Blacklist", blacklistSchema);
 
-const MONGO_URI = process.env.MONGO_URI; 
-if (!MONGO_URI) { console.error("❌ ERROR: MONGO_URI is missing!"); process.exit(1); }
-
-let activeSprints = {}; 
-
-// New Schema for running sprints
 const activeSprintSchema = new mongoose.Schema({
     groupId: String,
     endsAt: Number,
@@ -93,6 +96,11 @@ const activeSprintSchema = new mongoose.Schema({
     participants: { type: Object, default: {} } // Stores user words
 });
 const ActiveSprint = mongoose.model("ActiveSprint", activeSprintSchema);
+
+const MONGO_URI = process.env.MONGO_URI; 
+if (!MONGO_URI) { console.error("❌ ERROR: MONGO_URI is missing!"); process.exit(1); }
+
+let activeSprints = {}; 
 
 // =======================
 //   WEB API ENDPOINTS
@@ -108,12 +116,14 @@ app.get('/api/stats', async (req, res) => {
         let qrImage = null;
         if (!isConnected && qrCodeData) qrImage = await QRCode.toDataURL(qrCodeData);
 
+        // 1. Top 10 All-Time Writers
         const topWritersRaw = await DailyStats.aggregate([
             { $group: { _id: "$name", total: { $sum: "$words" } } }, 
             { $sort: { total: -1 } }, { $limit: 10 }
         ]);
         const topWriters = topWritersRaw.map(w => ({ name: w._id, words: w.total }));
 
+        // 2. Today's Top 10 Writers
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const todayWritersRaw = await DailyStats.aggregate([
             { $match: { date: todayStr } }, 
@@ -122,6 +132,7 @@ app.get('/api/stats', async (req, res) => {
         ]);
         const todayWriters = todayWritersRaw.map(w => ({ name: w._id, words: w.total }));
 
+        // 3. Top Groups
         const topGroupsRaw = await DailyStats.aggregate([
             { $match: { groupId: { $exists: true, $ne: "Manual_Correction" } } }, 
             { $group: { _id: "$groupId", total: { $sum: "$words" } } },
@@ -142,10 +153,12 @@ app.get('/api/stats', async (req, res) => {
             return { name: groupName, words: g.total };
         }));
 
+        // 4. General Totals
         const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
         const totalWritersAgg = await DailyStats.distinct("name");
         const allGroupIds = await DailyStats.distinct("groupId");
         
+        // 5. 7-Day Chart Data
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const chartDataRaw = await DailyStats.aggregate([
@@ -347,11 +360,27 @@ app.post('/api/admin/update', requireAdmin, async (req, res) => {
 // 👑 ADMIN: BROADCAST
 app.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
     try {
-        const { message } = req.body;
+        const { message, targetGroups, imageUrl } = req.body;
         if (!client || !isConnected) return res.status(500).json({ error: "Bot offline" });
-        const chats = await client.getChats();
-        const groups = chats.filter(c => c.id.server === 'g.us');
-        for (const group of groups) { await group.sendMessage(`📢 *ANNOUNCEMENT*\n\n${message}`); }
+
+        // 1. Prepare Media (if image provided)
+        let media = null;
+        if (imageUrl) {
+            try { media = await MessageMedia.fromUrl(imageUrl); } 
+            catch (e) { return res.status(400).json({ error: "Invalid Image URL" }); }
+        }
+
+        const allChats = await client.getChats();
+        let groups = allChats.filter(c => c.id.server === 'g.us');
+        if (targetGroups && targetGroups.length > 0) {
+            groups = groups.filter(g => targetGroups.includes(g.id._serialized));
+        }
+
+        for (const group of groups) { 
+            if (media) await group.sendMessage(media, { caption: message || "" });
+            else if (message) await group.sendMessage(`📢 *ANNOUNCEMENT*\n\n${message}`);
+            await new Promise(r => setTimeout(r, 500)); 
+        }
         res.json({ success: true, count: groups.length });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -400,7 +429,7 @@ mongoose.connect(MONGO_URI)
 
         client = new Client({
             authStrategy: new RemoteAuth({
-                clientId: 'sprint-session-render-v1', // 🟢 FRESH SESSION FOR RENDER
+                clientId: 'sprint-session-v8', // 🟢 v8 Clean Start
                 store: store,
                 backupSyncIntervalMs: 600000, 
                 dataPath: path.join(__dirname, '.wwebjs_auth') 
@@ -419,7 +448,6 @@ mongoose.connect(MONGO_URI)
                     "--disable-accelerated-2d-canvas",
                     "--no-first-run",
                     "--no-zygote",
-                    // "--single-process", ❌ REMOVED THIS (IT CAUSED THE CRASHES)
                     "--disable-gpu",
                     "--disable-extensions",
                     "--disable-default-apps",
@@ -432,8 +460,12 @@ mongoose.connect(MONGO_URI)
                     "--disable-ipc-flooding-protection",
                     "--disable-notifications",
                     "--disable-renderer-backgrounding",
-                    // 🟢 NEW: Saves memory safely without crashing
-                    "--disable-features=site-per-process", 
+                    "--disable-features=site-per-process",
+                    // 🟢 ULTRA-LIGHT MODE ARGS
+                    "--disable-software-rasterizer",
+                    "--disable-speech-api",
+                    "--disable-sync",
+                    "--disable-webgl"
                 ],
                 timeout: 60000
             }
@@ -714,41 +746,41 @@ mongoose.connect(MONGO_URI)
                     const r = s.endsAt - Date.now();
                     if (r <= 0) return msg.reply("🛑 Time up!");
                     const endDates = new Date(s.endsAt);
-    const timeString = endDates.toLocaleTimeString('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit' });
-    
-    return msg.reply(`⏳ *${Math.floor(r/60000)}m ${Math.floor((r/1000)%60)}s* remaining\n(Ends approx ${timeString})`);
-}
+                    const timeString = endDates.toLocaleTimeString('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit' });
+                    
+                    return msg.reply(`⏳ *${Math.floor(r/60000)}m ${Math.floor((r/1000)%60)}s* remaining\n(Ends approx ${timeString})`);
+                }
 
                 if (command === "!wc") {
-    const s = activeSprints[chatId];
-    if (!s) return msg.reply("❌ No sprint.");
-    
-    let c = parseInt(args[1]==='add'||args[1]==='+'?args[2]:args[1]);
-    let add = args[1]==='add'||args[1]==='+';
-    
-    if (isNaN(c)) return msg.reply("❌ Invalid.");
-    if (!s.participants[senderId]) s.participants[senderId] = { name: senderName, words: 0 };
-    
-    if (add) { s.participants[senderId].words += c; await msg.reply(`➕ Added. Total: ${s.participants[senderId].words}`); }
-    else { s.participants[senderId].words = c; await msg.react('✅'); }
+                    const s = activeSprints[chatId];
+                    if (!s) return msg.reply("❌ No sprint.");
+                    
+                    let c = parseInt(args[1]==='add'||args[1]==='+'?args[2]:args[1]);
+                    let add = args[1]==='add'||args[1]==='+';
+                    
+                    if (isNaN(c)) return msg.reply("❌ Invalid.");
+                    if (!s.participants[senderId]) s.participants[senderId] = { name: senderName, words: 0 };
+                    
+                    if (add) { s.participants[senderId].words += c; await msg.reply(`➕ Added. Total: ${s.participants[senderId].words}`); }
+                    else { s.participants[senderId].words = c; await msg.react('✅'); }
 
-    // 🟢 SYNC TO DB
-    await ActiveSprint.updateOne(
-        { groupId: chatId }, 
-        { $set: { participants: s.participants } }
-    );
-}
+                    // 🟢 SYNC TO DB
+                    await ActiveSprint.updateOne(
+                        { groupId: chatId }, 
+                        { $set: { participants: s.participants } }
+                    );
+                }
 
                 if (command === "!finish") {
                     const s = activeSprints[chatId];
                     if (!s) return msg.reply("❌ No sprint.");
                     const l = Object.entries(s.participants).map(([u, d]) => ({ ...d, uid: u })).sort((a, b) => b.words - a.words);
                     if (l.length === 0) { 
-        delete activeSprints[chatId]; 
-        await ActiveSprint.deleteOne({ groupId: chatId });
-        console.log(`🏁 Sprint ENDED in ${chatId} (No participants)`); // Fix #4
-        return msg.reply("🏁 Ended. Empty."); 
-    }
+                        delete activeSprints[chatId]; 
+                        await ActiveSprint.deleteOne({ groupId: chatId });
+                        console.log(`🏁 Sprint ENDED in ${chatId} (No participants)`);
+                        return msg.reply("🏁 Ended. Empty."); 
+                    }
                     let txt = `🏆 *SPRINT RESULTS* 🏆\n\n`, men = [];
                     for (let i = 0; i < l.length; i++) {
                         let p = l[i]; men.push(p.uid);
@@ -760,15 +792,14 @@ mongoose.connect(MONGO_URI)
                         } catch (e) {}
                     }
                     delete activeSprints[chatId];
-    await ActiveSprint.deleteOne({ groupId: chatId });
-    
-    console.log(`🏁 Sprint ENDED in ${chatId} with ${l.length} writers`); // Fix #4
+                    await ActiveSprint.deleteOne({ groupId: chatId });
+                    
+                    console.log(`🏁 Sprint ENDED in ${chatId} with ${l.length} writers`); 
 
-    // Fix #2: Add suggestion to start new sprint
-    txt += "\nGreat job, everyone!\n\n👉 *Next Step:* Type `!sprint 15` to go again or `!schedule` to plan ahead!";
-    
-    await chat.sendMessage(txt, { mentions: men });
-}
+                    txt += "\nGreat job, everyone!\n\n👉 *Next Step:* Type `!sprint 15` to go again or `!schedule` to plan ahead!";
+                    
+                    await chat.sendMessage(txt, { mentions: men });
+                }
 
                 if (["!daily", "!weekly", "!monthly"].includes(command)) {
                     const d = command === "!daily";
@@ -835,13 +866,12 @@ mongoose.connect(MONGO_URI)
         client.initialize();
     })
     .catch(err => { console.error("❌ MongoDB error:", err); process.exit(1); });
-    // 🛡️ Prevent crash on unhandled errors
+
+// 🛡️ Prevent crash on unhandled errors
 process.on('unhandledRejection', (reason, promise) => {
     console.log('⚠️ Unhandled Rejection:', reason);
-    // Don't exit here, just log it.
 });
 
 process.on('uncaughtException', (err) => {
     console.log('⚠️ Uncaught Exception:', err);
-    // Don't exit here either.
 });
