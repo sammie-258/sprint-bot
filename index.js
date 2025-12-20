@@ -933,3 +933,37 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('uncaughtException', (err) => {
     console.log('⚠️ Uncaught Exception:', err);
 });
+app.get('/api/admin/cleanup-duplicates', requireAdmin, async (req, res) => {
+    try {
+        const duplicates = await DailyStats.collection.aggregate([
+            {
+                $group: {
+                    _id: { userId: "$userId", groupId: "$groupId", date: "$date" },
+                    totalWords: { $sum: "$words" },
+                    ids: { $push: "$_id" },
+                    latestTime: { $max: "$timestamp" }
+                }
+            },
+            { $match: { ids: { $size: { $gt: 1 } } } }
+        ]).toArray();
+
+        let cleaned = 0;
+        for (const dup of duplicates) {
+            // Keep the first, delete others
+            const keepId = dup.ids[0];
+            await DailyStats.updateOne(
+                { _id: keepId },
+                { $set: { words: dup.totalWords } }
+            );
+            // Delete the rest
+            await DailyStats.deleteMany({
+                _id: { $in: dup.ids.slice(1) }
+            });
+            cleaned++;
+        }
+
+        res.json({ success: true, duplicatesFixed: cleaned });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
