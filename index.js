@@ -469,19 +469,10 @@ mongoose.connect(MONGO_URI)
 
                     // Get sender name
                     let senderName = senderId.split('@')[0];
-                    let groupName = chatId;
                     try {
                         const contact = await sock.getContactBasicInfo(senderId);
                         if (contact.pushName) senderName = contact.pushName;
                     } catch (err) { senderName = senderId.split('@')[0]; }
-                    
-                    // Get group name for group chats
-                    if (isGroup) {
-                        try {
-                            const groupMetadata = await sock.groupMetadata(chatId);
-                            if (groupMetadata?.subject) groupName = groupMetadata.subject;
-                        } catch (err) { groupName = chatId; }
-                    }
 
                     const args = body.trim().split(" ");
                     const command = args[0].toLowerCase();
@@ -591,7 +582,7 @@ mongoose.connect(MONGO_URI)
                         let count = parseInt(args[1]);
                         if (isNaN(count) || count <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!log 500`" }, { quoted: msg });
                         try {
-                            await DailyStats.findOneAndUpdate({ userId: senderId, groupId: chatId, date: todayStr }, { name: senderName, groupId: groupName, $inc: { words: count }, timestamp: new Date() }, { upsert: true, new: true });
+                            await DailyStats.findOneAndUpdate({ userId: senderId, groupId: chatId, date: todayStr }, { name: senderName, $inc: { words: count }, timestamp: new Date() }, { upsert: true, new: true });
                             const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
                             
                             await sock.sendMessage(chatId, { text: `✅ Logged ${count} words.` }, { quoted: msg });
