@@ -26,7 +26,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const TIMEZONE = "Africa/Lagos"; 
 
-const OWNER_NUMBER = '2347087899166'; 
+const OWNER_NUMBER = '2347087899166@c.us'; 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123"; 
 
 app.use(express.json()); 
