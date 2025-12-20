@@ -19,6 +19,17 @@ if (global.gc) {
 }
 
 // =======================
+//   HELPER: NORMALIZE USER IDs
+// =======================
+const normalizeUserId = (id) => {
+    if (!id) return null;
+    let normalized = id.split(':')[0];
+    if (!normalized.includes('@')) normalized += '@s.whatsapp.net';
+    else if (normalized.endsWith('@c.us')) normalized = normalized.replace('@c.us', '@s.whatsapp.net');
+    return normalized;
+};
+
+// =======================
 //   CONFIG & SERVER SETUP
 // =======================
 const app = express();
@@ -37,75 +48,6 @@ app.use((req, res, next) => {
     res.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
     if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
-});
-
-// Add this endpoint to your index.js (in the Express app section)
-
-app.get('/api/admin/cleanup-duplicates', requireAdmin, async (req, res) => {
-    try {
-        console.log("🧹 Starting duplicate cleanup...");
-        
-        // Find all records
-        const allRecords = await DailyStats.find({}).lean();
-        
-        // Group by userId+groupId+date
-        const groups = {};
-        for (const record of allRecords) {
-            const key = `${record.userId}|${record.groupId}|${record.date}`;
-            if (!groups[key]) {
-                groups[key] = [];
-            }
-            groups[key].push(record);
-        }
-
-        let duplicatesFixed = 0;
-        let totalDeleted = 0;
-
-        // Process each group
-        for (const [key, records] of Object.entries(groups)) {
-            if (records.length > 1) {
-                // Sum all words
-                const totalWords = records.reduce((sum, r) => sum + (r.words || 0), 0);
-                
-                // Find record with latest timestamp
-                const keeper = records.reduce((latest, current) => 
-                    new Date(current.timestamp) > new Date(latest.timestamp) ? current : latest
-                );
-
-                // Update keeper with total words
-                await DailyStats.updateOne(
-                    { _id: keeper._id },
-                    { $set: { words: totalWords, timestamp: new Date() } }
-                );
-
-                // Delete all others
-                const othersToDelete = records
-                    .filter(r => r._id.toString() !== keeper._id.toString())
-                    .map(r => r._id);
-
-                if (othersToDelete.length > 0) {
-                    const deleteResult = await DailyStats.deleteMany({
-                        _id: { $in: othersToDelete }
-                    });
-                    totalDeleted += deleteResult.deletedCount;
-                }
-
-                duplicatesFixed++;
-                console.log(`✅ Fixed: ${key} (${records.length} → 1, total words: ${totalWords})`);
-            }
-        }
-
-        res.json({ 
-            success: true, 
-            duplicateGroupsFixed: duplicatesFixed,
-            recordsDeleted: totalDeleted,
-            message: `Fixed ${duplicatesFixed} duplicate groups, deleted ${totalDeleted} records`
-        });
-
-    } catch (e) {
-        console.error("❌ Cleanup error:", e);
-        res.status(500).json({ error: e.message });
-    }
 });
 
 // Admin Auth Helper
@@ -168,6 +110,13 @@ if (!MONGO_URI) { console.error("❌ ERROR: MONGO_URI is missing!"); process.exi
 let activeSprints = {}; 
 
 // =======================
+//   CACHE FOR PERFORMANCE
+// =======================
+let statsCache = null;
+let cacheTime = 0;
+const CACHE_DURATION = 300000; // 5 minutes
+
+// =======================
 //   WEB API ENDPOINTS
 // =======================
 
@@ -175,93 +124,13 @@ app.get('/', (req, res) => {
     res.redirect('https://quillreads.com/sprint-bot-dashboard');
 });
 
-// 🟢 MIGRATION LOGIC (Refactored to be accessible via multiple routes)
-const runSmartMigration = async (req, res) => {
-    try {
-        console.log("⚠️ Starting Smart Database Merge...");
-        const log = { merged_stats: 0, renamed_stats: 0, merged_goals: 0, renamed_goals: 0, schedules: 0, errors: [] };
-
-        // 1. Fix DailyStats
-        // Find all legacy records (@c.us)
-        const legacyStats = await DailyStats.find({ userId: { $regex: '@c.us' } });
-        
-        for (const oldDoc of legacyStats) {
-            try {
-                const newId = oldDoc.userId.replace('@c.us', '@s.whatsapp.net');
-                
-                // Check if a record already exists for this User + Group + Date with the NEW ID
-                const existingNewDoc = await DailyStats.findOne({
-                    userId: newId,
-                    groupId: oldDoc.groupId,
-                    date: oldDoc.date
-                });
-
-                if (existingNewDoc) {
-                    // CONFLICT FOUND: Merge old words into new record
-                    existingNewDoc.words += oldDoc.words;
-                    // Keep the most recent timestamp
-                    if (oldDoc.timestamp > existingNewDoc.timestamp) existingNewDoc.timestamp = oldDoc.timestamp;
-                    
-                    await existingNewDoc.save();
-                    await DailyStats.deleteOne({ _id: oldDoc._id }); // Remove the old duplicate
-                    log.merged_stats++;
-                } else {
-                    // NO CONFLICT: Just rename
-                    oldDoc.userId = newId;
-                    await oldDoc.save();
-                    log.renamed_stats++;
-                }
-            } catch (err) {
-                log.errors.push(`Stats ID ${oldDoc._id}: ${err.message}`);
-            }
-        }
-
-        // 2. Fix PersonalGoals (Now with merging logic)
-        const legacyGoals = await PersonalGoal.find({ userId: { $regex: '@c.us' } });
-        for (const g of legacyGoals) {
-            try {
-                const newId = g.userId.replace('@c.us', '@s.whatsapp.net');
-                
-                // Check if user already created a goal on the new ID
-                const existingNewGoal = await PersonalGoal.findOne({ userId: newId, isActive: true });
-                
-                if (existingNewGoal && g.isActive) {
-                    // Merge progress
-                    existingNewGoal.current += g.current;
-                    await existingNewGoal.save();
-                    await PersonalGoal.deleteOne({ _id: g._id });
-                    log.merged_goals++;
-                } else {
-                    // Just rename
-                    g.userId = newId;
-                    await g.save();
-                    log.renamed_goals++;
-                }
-            } catch(e) { log.errors.push(`Goal ID ${g._id}: ${e.message}`); }
-        }
-
-        // 3. Fix Schedules
-        const schedRes = await ScheduledSprint.updateMany(
-            { createdBy: { $regex: '@c.us' } },
-            [ { $set: { createdBy: { $replaceOne: { input: "$createdBy", find: "@c.us", replacement: "@s.whatsapp.net" } } } } ]
-        );
-        log.schedules = schedRes.modifiedCount;
-
-        console.log("✅ Smart Fix Complete:", log);
-        res.json({ success: true, log });
-
-    } catch (e) {
-        console.error("Smart Fix Error:", e);
-        res.status(500).json({ error: e.message });
-    }
-};
-
-// 🟢 ROUTES FOR MIGRATION (Both Old and New URLs work)
-app.get('/api/admin/fix-db-merge', requireAdmin, runSmartMigration);
-app.get('/api/admin/migrate-legacy', requireAdmin, runSmartMigration);
-
 app.get('/api/stats', async (req, res) => {
     try {
+        // Return cached if less than 5 min old
+        if (statsCache && Date.now() - cacheTime < CACHE_DURATION) {
+            return res.json(statsCache);
+        }
+
         let qrImage = null;
         if (!isConnected && qrCodeData) qrImage = await QR.toDataURL(qrCodeData);
 
@@ -319,7 +188,7 @@ app.get('/api/stats', async (req, res) => {
         ]);
         const chartData = { labels: chartDataRaw.map(d => d._id), data: chartDataRaw.map(d => d.total) };
 
-        res.json({ 
+        const result = { 
             isConnected, 
             qrCode: qrImage, 
             topWriters, 
@@ -330,11 +199,15 @@ app.get('/api/stats', async (req, res) => {
             totalGroups: allGroupIds.filter(id => id !== "Manual_Correction").length,
             maintenanceMode,
             chartData 
-        });
+        };
+
+        // Cache the result
+        statsCache = result;
+        cacheTime = Date.now();
+
+        res.json(result);
     } catch (e) { console.error("API Error:", e); res.status(500).json({ error: "Server Error" }); }
 });
-
-// --- ADMIN API ENDPOINTS ---
 
 app.get('/api/admin/system', requireAdmin, async (req, res) => {
     const uptime = process.uptime();
@@ -352,34 +225,8 @@ app.get('/api/admin/system', requireAdmin, async (req, res) => {
 app.post('/api/admin/maintenance', requireAdmin, (req, res) => {
     const { status } = req.body; 
     maintenanceMode = status;
+    statsCache = null; // Clear cache
     res.json({ success: true, status: maintenanceMode });
-});
-
-app.get('/api/admin/groups', requireAdmin, async (req, res) => {
-    try {
-        if (!sock || !isConnected) return res.status(500).json({ error: "Bot offline" });
-        
-        const groups = await sock.groupFetchAllParticipating();
-        const result = Object.values(groups).map(g => ({
-            id: g.id,
-            name: g.subject,
-            participants: g.participants.length
-        }));
-        
-        res.json(result);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/groups/leave', requireAdmin, async (req, res) => {
-    try {
-        const { chatId } = req.body;
-        if (sock && isConnected) {
-            await sock.groupLeave(chatId);
-            res.json({ success: true });
-        } else {
-            res.status(500).json({ error: "Bot offline" });
-        }
-    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/users/rename', requireAdmin, async (req, res) => {
@@ -387,64 +234,12 @@ app.post('/api/admin/users/rename', requireAdmin, async (req, res) => {
         const { userId, newName } = req.body;
         if (!userId || !newName) return res.status(400).json({ message: "Missing fields" });
 
-        await DailyStats.updateMany({ userId }, { name: newName });
-        await PersonalGoal.updateMany({ userId }, { name: newName });
+        const normalized = normalizeUserId(userId);
+        await DailyStats.updateMany({ userId: normalized }, { name: newName });
+        await PersonalGoal.updateMany({ userId: normalized }, { name: newName });
+        statsCache = null; // Clear cache
         
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/admin/sprints', requireAdmin, async (req, res) => {
-    const sprints = [];
-    for (const [chatId, sprint] of Object.entries(activeSprints)) {
-        const timeLeft = Math.max(0, sprint.endsAt - Date.now());
-        sprints.push({
-            id: chatId,
-            name: chatId,
-            timeLeft: Math.ceil(timeLeft / 1000 / 60), 
-            participants: Object.keys(sprint.participants).length
-        });
-    }
-    res.json(sprints);
-});
-
-app.post('/api/admin/sprints/stop', requireAdmin, async (req, res) => {
-    const { chatId } = req.body;
-    if (activeSprints[chatId]) {
-        delete activeSprints[chatId];
-        await ActiveSprint.deleteOne({ groupId: chatId }); 
-        try {
-            if (sock && isConnected) {
-                await sock.sendMessage(chatId, { text: "🛑 **ADMIN STOP**: Sprint cancelled by Super Admin." });
-            }
-        } catch(e) {}
-        return res.json({ success: true });
-    }
-    res.status(404).json({ error: "Sprint not found" });
-});
-
-app.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
-    try {
-        const sprints = await ScheduledSprint.find({ startTime: { $gt: new Date() } }).sort({ startTime: 1 });
-        const result = sprints.map((s) => ({
-            id: s._id,
-            groupName: s.groupId,
-            startTime: s.startTime,
-            duration: s.duration,
-            createdBy: s.createdBy ? s.createdBy.split('@')[0] : 'Unknown'
-        }));
-        res.json(result);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
-    const { id } = req.body;
-    try {
-        const sprint = await ScheduledSprint.findById(id);
-        if (sprint) {
-            await ScheduledSprint.deleteOne({ _id: id });
-        }
-        res.json({ success: true });
+        res.json({ success: true, message: `Updated all records for ${normalized}` });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -465,14 +260,15 @@ app.post('/api/admin/update', requireAdmin, async (req, res) => {
         const { userId, amount, type } = req.body; 
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         
-        let doc = await DailyStats.findOne({ userId, date: todayStr }).sort({ timestamp: -1 });
+        const normalized = normalizeUserId(userId);
+        let doc = await DailyStats.findOne({ userId: normalized, date: todayStr }).sort({ timestamp: -1 });
 
         if (!doc) {
-            const history = await DailyStats.findOne({ userId }).sort({ timestamp: -1 });
+            const history = await DailyStats.findOne({ userId: normalized }).sort({ timestamp: -1 });
             if (!history) return res.status(404).json({ message: "No history found for this user." });
             
             doc = await DailyStats.create({
-                userId, name: history.name, groupId: history.groupId,
+                userId: normalized, name: history.name, groupId: history.groupId,
                 date: todayStr, words: 0, timestamp: new Date()
             });
         }
@@ -482,13 +278,14 @@ app.post('/api/admin/update', requireAdmin, async (req, res) => {
             doc.words = parseInt(amount);
             doc.timestamp = new Date();
             await doc.save();
-            await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: diff } });
+            await PersonalGoal.findOneAndUpdate({ userId: normalized, isActive: true }, { $inc: { current: diff } });
         } else {
             doc.words += parseInt(amount);
             doc.timestamp = new Date();
             await doc.save();
-            await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: parseInt(amount) } });
+            await PersonalGoal.findOneAndUpdate({ userId: normalized, isActive: true }, { $inc: { current: parseInt(amount) } });
         }
+        statsCache = null; // Clear cache
         res.json({ success: true, newTotal: doc.words });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -501,7 +298,7 @@ app.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
         const chats = await sock.groupFetchAllParticipating();
         let count = 0;
         
-        for (const [jid, group] of Object.entries(chats)) {
+        for (const [jid] of Object.entries(chats)) {
             try {
                 await sock.sendMessage(jid, { text: `📢 *ANNOUNCEMENT*\n\n${message}` });
                 count++;
@@ -513,7 +310,7 @@ app.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server running on port ${PORT}`));
 
 setInterval(() => {
     http.get(`http://localhost:${PORT}/`, (res) => {}).on('error', (err) => {});
@@ -616,7 +413,6 @@ mongoose.connect(MONGO_URI)
                 defaultQueryTimeoutMs: 60000,
             });
 
-            // QR Code Event
             sock.ev.on('connection.update', (update) => {
                 const { connection, lastDisconnect, qr } = update;
 
@@ -634,7 +430,7 @@ mongoose.connect(MONGO_URI)
                 } else if (connection === 'close') {
                     isConnected = false;
                     const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                    console.log('❌ Connection closed:', lastDisconnect?.error, 'Reconnecting:', shouldReconnect);
+                    console.log('❌ Connection closed, Reconnecting:', shouldReconnect);
                     
                     if (shouldReconnect) {
                         setTimeout(() => initializeBot(), 3000);
@@ -642,10 +438,8 @@ mongoose.connect(MONGO_URI)
                 }
             });
 
-            // Credentials Update
             sock.ev.on('creds.update', saveCreds);
 
-            // Message Handler
             sock.ev.on('messages.upsert', async (m) => {
                 try {
                     const msg = m.messages[0];
@@ -654,10 +448,8 @@ mongoose.connect(MONGO_URI)
                     const chatId = msg.key.remoteJid;
                     const isGroup = chatId.endsWith('@g.us');
                     
-                    // 🟢 FIX: Normalize Sender ID (Remove Device :15 etc)
-                    // This converts 1234:2@s.whatsapp.net -> 1234@s.whatsapp.net
-                    let rawSender = msg.key.participant || msg.key.remoteJid;
-                    const senderId = rawSender.split(':')[0] + '@s.whatsapp.net';
+                    const rawSender = msg.key.participant || msg.key.remoteJid;
+                    const senderId = normalizeUserId(rawSender);
                     
                     if (await Blacklist.exists({ userId: senderId })) return;
                     
@@ -671,11 +463,9 @@ mongoose.connect(MONGO_URI)
 
                     if (!isGroup && !isOwner) return;
 
-                    // Extract text from message
                     let body = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
                     if (!body.startsWith("!")) return;
 
-                    // Get sender name
                     let senderName = senderId.split('@')[0];
                     try {
                         const contact = await sock.getContactBasicInfo(senderId);
@@ -686,12 +476,9 @@ mongoose.connect(MONGO_URI)
                     const command = args[0].toLowerCase();
                     const todayStr = getTodayDateGMT1();
 
-                    // 🟢 FIX: Helper to handle @c.us vs @s.whatsapp.net for admin inputs
                     const getTargetId = (argIndex = 1) => {
-                        // In Baileys, mentions are stored in msg.message.extendedTextMessage.contextInfo.mentionedJid
-                        // But if user typed a number manually:
                         const potentialNumber = args[argIndex]?.replace(/\D/g, '');
-                        if (potentialNumber && potentialNumber.length > 5) return potentialNumber + '@s.whatsapp.net';
+                        if (potentialNumber && potentialNumber.length > 5) return normalizeUserId(potentialNumber + '@s.whatsapp.net');
                         return null;
                     };
 
@@ -713,21 +500,13 @@ mongoose.connect(MONGO_URI)
                             return sock.sendMessage(chatId, { text: `✅ Broadcasted to ${count} groups.` }, { quoted: msg });
                         }
 
-                        if (command === "!sys") {
-                            const uptime = process.uptime();
-                            return sock.sendMessage(chatId, { text: `⚙️ **System**\n⏱️ ${Math.floor(uptime/60)}m\n🔧 Maintenance: ${maintenanceMode ? "ON" : "OFF"}` }, { quoted: msg });
-                        }
-
                         if (command === "!correct" || command === "!setword") {
                             const targetId = getTargetId(1);
                             const amount = parseInt(args[2]);
                             const isSet = command === "!setword";
                             if (!targetId || isNaN(amount)) return sock.sendMessage(chatId, { text: `❌ Usage: \`${command} number 500\`` }, { quoted: msg });
 
-                            let filter = { userId: targetId, date: todayStr };
-                            if (isGroup) filter.groupId = chatId;
-
-                            let targetDoc = await DailyStats.findOne(filter).sort({ timestamp: -1 });
+                            let targetDoc = await DailyStats.findOne({ userId: targetId, date: todayStr }).sort({ timestamp: -1 });
 
                             if (!targetDoc) {
                                 const history = await DailyStats.findOne({ userId: targetId }).sort({ timestamp: -1 });
@@ -749,6 +528,7 @@ mongoose.connect(MONGO_URI)
                             }
                             targetDoc.timestamp = new Date();
                             await targetDoc.save();
+                            statsCache = null;
                             return sock.sendMessage(chatId, { text: `✅ Done. New Total: ${targetDoc.words}` }, { quoted: msg });
                         }
 
@@ -793,6 +573,7 @@ mongoose.connect(MONGO_URI)
                         try {
                             await DailyStats.findOneAndUpdate({ userId: senderId, groupId: chatId, date: todayStr }, { name: senderName, $inc: { words: count }, timestamp: new Date() }, { upsert: true, new: true });
                             const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+                            statsCache = null;
                             
                             await sock.sendMessage(chatId, { text: `✅ Logged ${count} words.` }, { quoted: msg });
 
@@ -822,6 +603,7 @@ mongoose.connect(MONGO_URI)
                         if (!n) return sock.sendMessage(chatId, { text: "❌ Use: `!myname Sam`" }, { quoted: msg });
                         await DailyStats.updateMany({ userId: senderId }, { name: n });
                         await PersonalGoal.updateMany({ userId: senderId }, { name: n });
+                        statsCache = null;
                         return sock.sendMessage(chatId, { text: `✅ Name: ${n}` }, { quoted: msg });
                     }
 
@@ -890,7 +672,6 @@ mongoose.connect(MONGO_URI)
                     if (command === "!finish") {
                         const s = activeSprints[chatId];
                         if (!s) return sock.sendMessage(chatId, { text: "❌ No sprint." }, { quoted: msg });
-                        // 🟢 FIX: Ensure ID is passed to array for updates
                         const l = Object.entries(s.participants).map(([u, d]) => ({ ...d, uid: u })).sort((a, b) => b.words - a.words);
                         if (l.length === 0) { 
                             delete activeSprints[chatId]; 
@@ -918,6 +699,7 @@ mongoose.connect(MONGO_URI)
                         }
                         delete activeSprints[chatId];
                         await ActiveSprint.deleteOne({ groupId: chatId });
+                        statsCache = null;
                         
                         console.log(`🏃 Sprint ENDED in ${chatId} with ${l.length} writers`);
 
