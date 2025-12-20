@@ -41,7 +41,6 @@ app.use((req, res, next) => {
 
 // Admin Auth Helper
 const requireAdmin = (req, res, next) => {
-    // Check header or query param (for easy browser access to migration)
     const password = req.headers['x-admin-password'] || req.query.password;
     if (password === ADMIN_PASSWORD) return next();
     res.status(403).json({ error: "Unauthorized" });
@@ -107,55 +106,66 @@ app.get('/', (req, res) => {
     res.redirect('https://quillreads.com/sprint-bot-dashboard');
 });
 
-// 🟢 FIX: DATABASE MIGRATION ENDPOINT (Iterative approach to fix Mongoose Error)
-app.get('/api/admin/migrate-legacy', requireAdmin, async (req, res) => {
+// 🟢 NEW: SMART MERGE TOOL (Run this to fix duplicates/old IDs)
+app.get('/api/admin/fix-db-merge', requireAdmin, async (req, res) => {
     try {
-        console.log("⚠️ Starting Database Migration (Iterative Mode)...");
+        console.log("⚠️ Starting Smart Database Merge...");
+        const log = { merged: 0, renamed: 0, errors: [] };
+
+        // 1. Fix DailyStats
+        // Find all legacy records (@c.us)
+        const legacyStats = await DailyStats.find({ userId: { $regex: '@c.us' } });
         
-        const migrateCollection = async (Model, fieldName) => {
-            // Find all documents containing the old ID format
-            const query = {};
-            query[fieldName] = { $regex: '@c.us' };
-            
-            const docs = await Model.find(query);
-            let count = 0;
-            
-            for (const doc of docs) {
-                // Manually replace and save
-                if (doc[fieldName] && doc[fieldName].includes('@c.us')) {
-                    doc[fieldName] = doc[fieldName].replace('@c.us', '@s.whatsapp.net');
-                    try {
-                        await doc.save();
-                        count++;
-                    } catch (err) {
-                        console.error(`Failed to update doc ${doc._id}:`, err.message);
-                    }
+        for (const oldDoc of legacyStats) {
+            try {
+                const newId = oldDoc.userId.replace('@c.us', '@s.whatsapp.net');
+                
+                // Check if a record already exists for this User + Group + Date with the NEW ID
+                const existingNewDoc = await DailyStats.findOne({
+                    userId: newId,
+                    groupId: oldDoc.groupId,
+                    date: oldDoc.date
+                });
+
+                if (existingNewDoc) {
+                    // CONFLICT FOUND: Merge old words into new record
+                    existingNewDoc.words += oldDoc.words;
+                    // Keep the most recent timestamp
+                    if (oldDoc.timestamp > existingNewDoc.timestamp) existingNewDoc.timestamp = oldDoc.timestamp;
+                    
+                    await existingNewDoc.save();
+                    await DailyStats.deleteOne({ _id: oldDoc._id }); // Remove the old duplicate
+                    log.merged++;
+                } else {
+                    // NO CONFLICT: Just rename
+                    oldDoc.userId = newId;
+                    await oldDoc.save();
+                    log.renamed++;
                 }
+            } catch (err) {
+                log.errors.push(`Stats ID ${oldDoc._id}: ${err.message}`);
             }
-            return count;
-        };
+        }
 
-        // 1. Migrate DailyStats
-        const statsCount = await migrateCollection(DailyStats, 'userId');
+        // 2. Fix PersonalGoals (Simple rename usually, merge if duplicate active)
+        const legacyGoals = await PersonalGoal.find({ userId: { $regex: '@c.us' } });
+        for (const g of legacyGoals) {
+            const newId = g.userId.replace('@c.us', '@s.whatsapp.net');
+            g.userId = newId;
+            await g.save();
+        }
 
-        // 2. Migrate PersonalGoal
-        const goalsCount = await migrateCollection(PersonalGoal, 'userId');
+        // 3. Fix Schedules
+        await ScheduledSprint.updateMany(
+            { createdBy: { $regex: '@c.us' } },
+            [ { $set: { createdBy: { $replaceOne: { input: "$createdBy", find: "@c.us", replacement: "@s.whatsapp.net" } } } } ]
+        );
 
-        // 3. Migrate ScheduledSprint
-        const schedCount = await migrateCollection(ScheduledSprint, 'createdBy');
+        console.log("✅ Smart Fix Complete:", log);
+        res.json({ success: true, log });
 
-        console.log("✅ Migration Complete");
-        res.json({
-            success: true,
-            message: "Legacy IDs migrated successfully.",
-            details: {
-                statsUpdated: statsCount,
-                goalsUpdated: goalsCount,
-                schedulesUpdated: schedCount
-            }
-        });
     } catch (e) {
-        console.error("Migration Error:", e);
+        console.error("Smart Fix Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -186,19 +196,16 @@ app.get('/api/stats', async (req, res) => {
             { $limit: 10 }
         ]);
 
-        // 🟢 FIX: Correct Metadata Fetching for Baileys
         const topGroups = await Promise.all(topGroupsRaw.map(async (g) => {
             let groupName = "Unknown Group";
-            // Check if ID is actually a group ID
             if (g._id && (g._id.endsWith('@g.us') || g._id.length > 15)) {
                 if (sock && isConnected) {
                     try {
-                        // Use Baileys native metadata fetch
                         const meta = await sock.groupMetadata(g._id);
                         if (meta && meta.subject) groupName = meta.subject;
                         else groupName = g._id;
                     } catch (e) {
-                        groupName = g._id.split('@')[0]; // Fallback to ID
+                        groupName = g._id.split('@')[0];
                     }
                 } else {
                     groupName = g._id.split('@')[0];
@@ -258,7 +265,6 @@ app.post('/api/admin/maintenance', requireAdmin, (req, res) => {
     res.json({ success: true, status: maintenanceMode });
 });
 
-// 🟢 NEW: Groups Endpoint for Admin Dashboard
 app.get('/api/admin/groups', requireAdmin, async (req, res) => {
     try {
         if (!sock || !isConnected) return res.status(500).json({ error: "Bot offline" });
@@ -274,7 +280,6 @@ app.get('/api/admin/groups', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 🟢 NEW: Leave Group Endpoint
 app.post('/api/admin/groups/leave', requireAdmin, async (req, res) => {
     try {
         const { chatId } = req.body;
@@ -287,7 +292,6 @@ app.post('/api/admin/groups/leave', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 🟢 NEW: Rename User Endpoint
 app.post('/api/admin/users/rename', requireAdmin, async (req, res) => {
     try {
         const { userId, newName } = req.body;
@@ -306,7 +310,7 @@ app.get('/api/admin/sprints', requireAdmin, async (req, res) => {
         const timeLeft = Math.max(0, sprint.endsAt - Date.now());
         sprints.push({
             id: chatId,
-            name: chatId, // Note: Fetching real names here might be slow, usually handle in frontend or cache
+            name: chatId,
             timeLeft: Math.ceil(timeLeft / 1000 / 60), 
             participants: Object.keys(sprint.participants).length
         });
@@ -495,7 +499,6 @@ mongoose.connect(MONGO_URI)
                     if (!started) {
                         await sock.sendMessage(sprint.groupId, { text: `⚠️ Scheduled sprint skipped.` });
                     } else {
-                        // 🟢 FIX: Handle user ID split safely
                         let creatorName = 'Someone';
                         if(sprint.createdBy) creatorName = sprint.createdBy.split('@')[0].split(':')[0];
                         await sock.sendMessage(sprint.groupId, { text: `(Sprint scheduled by @${creatorName})` });
