@@ -51,6 +51,29 @@ let isConnected = false;
 let sock = null; 
 let maintenanceMode = false; 
 
+// --- NEW: Group Cache System ---
+let groupCache = {}; // Stores ID -> Name mapping
+let lastCacheUpdate = 0;
+
+const updateGroupCache = async (force = false) => {
+    // Only update if 5 minutes have passed, or if forced
+    if (!force && Date.now() - lastCacheUpdate < 5 * 60 * 1000) return;
+    
+    if (sock && isConnected) {
+        try {
+            const groups = await sock.groupFetchAllParticipating();
+            for (const [jid, data] of Object.entries(groups)) {
+                groupCache[jid] = data.subject;
+            }
+            lastCacheUpdate = Date.now();
+            console.log("🔄 Group cache updated.");
+        } catch (e) {
+            console.log("⚠️ Cache update paused (Rate Limit or Connection issue). Using old data.");
+        }
+    }
+};
+// -------------------------------
+
 // =======================
 //   DATABASE SCHEMAS
 // =======================
@@ -111,20 +134,8 @@ app.get('/api/stats', async (req, res) => {
         let qrImage = null;
         if (!isConnected && qrCodeData) qrImage = await QR.toDataURL(qrCodeData);
 
-        // --- NEW: Fetch Group Names from WhatsApp ---
-        let groupNames = {};
-        if (isConnected && sock) {
-            try {
-                // This fetches data for all groups the bot is currently in
-                const groups = await sock.groupFetchAllParticipating();
-                for (const [jid, data] of Object.entries(groups)) {
-                    groupNames[jid] = data.subject;
-                }
-            } catch (e) {
-                console.log("Could not fetch group names:", e);
-            }
-        }
-        // ---------------------------------------------
+        // Use Cached Data instead of hitting WhatsApp API
+        await updateGroupCache(); // Tries to update if 5 mins have passed
 
         const topWritersRaw = await DailyStats.aggregate([
             { $group: { _id: "$name", total: { $sum: "$words" } } }, 
@@ -147,12 +158,10 @@ app.get('/api/stats', async (req, res) => {
             { $limit: 10 }
         ]);
 
-        // --- UPDATED: Map IDs to Names here ---
         const topGroups = topGroupsRaw.map(g => ({ 
-            name: groupNames[g._id] || g._id || "Unknown Group", // Use fetched name, otherwise fallback to ID
+            name: groupCache[g._id] || g._id || "Unknown Group", // READ FROM CACHE
             words: g.total 
         }));
-        // --------------------------------------
 
         const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
         const totalWritersAgg = await DailyStats.distinct("name");
@@ -203,24 +212,15 @@ res.json({ success: true, status: maintenanceMode });
 
 app.get('/api/admin/sprints', requireAdmin, async (req, res) => {
     try {
-        // Fetch real group names
-        let groupMap = {};
-        if (sock && isConnected) {
-            try {
-                const groups = await sock.groupFetchAllParticipating();
-                for (const [jid, data] of Object.entries(groups)) {
-                    groupMap[jid] = data.subject;
-                }
-            } catch (e) { console.log("Group fetch error:", e); }
-        }
-
+        await updateGroupCache(); // Check if update needed
+        
         const sprints = [];
         for (const [chatId, sprint] of Object.entries(activeSprints)) {
             const timeLeft = Math.max(0, sprint.endsAt - Date.now());
             sprints.push({
                 id: chatId,
-                name: groupMap[chatId] || chatId, // Use fetched name or fallback to ID
-                timeLeft: Math.ceil(timeLeft / 1000 / 60),
+                name: groupCache[chatId] || chatId, // READ FROM CACHE
+                timeLeft: Math.ceil(timeLeft / 1000 / 60), 
                 participants: Object.keys(sprint.participants).length
             });
         }
@@ -245,21 +245,12 @@ res.status(404).json({ error: "Sprint not found" });
 
 app.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
     try {
-        // Fetch real group names
-        let groupMap = {};
-        if (sock && isConnected) {
-            try {
-                const groups = await sock.groupFetchAllParticipating();
-                for (const [jid, data] of Object.entries(groups)) {
-                    groupMap[jid] = data.subject;
-                }
-            } catch (e) { console.log("Group fetch error:", e); }
-        }
+        await updateGroupCache(); // Check if update needed
 
         const sprints = await ScheduledSprint.find({ startTime: { $gt: new Date() } }).sort({ startTime: 1 });
         const result = sprints.map((s) => ({
             id: s._id,
-            groupName: groupMap[s.groupId] || s.groupId, // Use fetched name or fallback to ID
+            groupName: groupCache[s.groupId] || s.groupId, // READ FROM CACHE
             startTime: s.startTime,
             duration: s.duration,
             createdBy: s.createdBy.split('@')[0]
@@ -293,13 +284,13 @@ res.json(users);
 
 app.get('/api/admin/groups', requireAdmin, async (req, res) => {
     try {
-        if (!sock || !isConnected) return res.json([]);
+        await updateGroupCache(); // Check if update needed
 
-        const groups = await sock.groupFetchAllParticipating();
-        const groupList = Object.entries(groups).map(([jid, data]) => ({
+        // We need the full list, so we might need to map the cache keys
+        const groupList = Object.entries(groupCache).map(([jid, name]) => ({
             id: jid,
-            name: data.subject,
-            participants: data.participants ? data.participants.length : 0
+            name: name,
+            participants: 0 // Note: Caching names means we lose live participant count here to save bandwidth
         }));
 
         res.json(groupList);
@@ -495,10 +486,15 @@ console.log('New QR Code Generated');
 
 if (connection === 'connecting') {
 console.log('⏳ Connecting...');
+// ... inside sock.ev.on('connection.update') ...
 } else if (connection === 'open') {
-isConnected = true;
-console.log('✅ Bot Connected!');
-qrCodeData = null;
+    isConnected = true;
+    console.log('✅ Bot Connected!');
+    qrCodeData = null;
+    
+    // --- NEW: Run initial cache update ---
+    updateGroupCache(true); 
+    // -------------------------------------
 } else if (connection === 'close') {
 isConnected = false;
 const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
