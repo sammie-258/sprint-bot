@@ -268,36 +268,54 @@ res.json(users);
 });
 
 app.post('/api/admin/update', requireAdmin, async (req, res) => {
-try {
-const { userId, amount, type } = req.body; 
-const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+    try {
+        const { userId, amount, type, name } = req.body; // Added 'name' here
 
-let doc = await DailyStats.findOne({ userId, date: todayStr }).sort({ timestamp: -1 });
+        // --- NEW: Handle Name Update ---
+        if (type === 'name') {
+            if (!name || name.trim() === "") {
+                return res.status(400).json({ error: "Name cannot be empty." });
+            }
+            
+            // Update the name in ALL past records so the leaderboard stays consistent
+            await DailyStats.updateMany({ userId }, { name });
+            
+            // Update the name in their personal goal settings too
+            await PersonalGoal.updateMany({ userId }, { name });
 
-if (!doc) {
-const history = await DailyStats.findOne({ userId }).sort({ timestamp: -1 });
-if (!history) return res.status(404).json({ message: "No history found for this user." });
+            return res.json({ success: true, message: `Name updated to ${name}` });
+        }
+        // -------------------------------
 
-doc = await DailyStats.create({
-userId, name: history.name, groupId: history.groupId,
-date: todayStr, words: 0, timestamp: new Date()
-});
-}
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
 
-if (type === 'set') {
-const diff = parseInt(amount) - doc.words;
-doc.words = parseInt(amount);
-doc.timestamp = new Date();
-await doc.save();
-await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: diff } });
-} else {
-doc.words += parseInt(amount);
-doc.timestamp = new Date();
-await doc.save();
-await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: parseInt(amount) } });
-}
-res.json({ success: true, newTotal: doc.words });
-} catch (e) { res.status(500).json({ error: e.message }); }
+        let doc = await DailyStats.findOne({ userId, date: todayStr }).sort({ timestamp: -1 });
+
+        if (!doc) {
+            const history = await DailyStats.findOne({ userId }).sort({ timestamp: -1 });
+            if (!history) return res.status(404).json({ message: "No history found for this user." });
+
+            doc = await DailyStats.create({
+                userId, name: history.name, groupId: history.groupId,
+                date: todayStr, words: 0, timestamp: new Date()
+            });
+        }
+
+        if (type === 'set') {
+            const diff = parseInt(amount) - doc.words;
+            doc.words = parseInt(amount);
+            doc.timestamp = new Date();
+            await doc.save();
+            await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: diff } });
+        } else {
+            // Default is 'add'
+            doc.words += parseInt(amount);
+            doc.timestamp = new Date();
+            await doc.save();
+            await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: parseInt(amount) } });
+        }
+        res.json({ success: true, newTotal: doc.words });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
