@@ -107,59 +107,79 @@ res.redirect('https://quillreads.com/sprint-bot-dashboard');
 });
 
 app.get('/api/stats', async (req, res) => {
-try {
-let qrImage = null;
-if (!isConnected && qrCodeData) qrImage = await QR.toDataURL(qrCodeData);
+    try {
+        let qrImage = null;
+        if (!isConnected && qrCodeData) qrImage = await QR.toDataURL(qrCodeData);
 
-const topWritersRaw = await DailyStats.aggregate([
-{ $group: { _id: "$name", total: { $sum: "$words" } } }, 
-{ $sort: { total: -1 } }, { $limit: 10 }
-]);
-const topWriters = topWritersRaw.map(w => ({ name: w._id, words: w.total }));
+        // --- NEW: Fetch Group Names from WhatsApp ---
+        let groupNames = {};
+        if (isConnected && sock) {
+            try {
+                // This fetches data for all groups the bot is currently in
+                const groups = await sock.groupFetchAllParticipating();
+                for (const [jid, data] of Object.entries(groups)) {
+                    groupNames[jid] = data.subject;
+                }
+            } catch (e) {
+                console.log("Could not fetch group names:", e);
+            }
+        }
+        // ---------------------------------------------
 
-const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
-const todayWritersRaw = await DailyStats.aggregate([
-{ $match: { date: todayStr } }, 
-{ $group: { _id: "$name", total: { $sum: "$words" } } }, 
-{ $sort: { total: -1 } }, { $limit: 10 }
-]);
-const todayWriters = todayWritersRaw.map(w => ({ name: w._id, words: w.total }));
+        const topWritersRaw = await DailyStats.aggregate([
+            { $group: { _id: "$name", total: { $sum: "$words" } } }, 
+            { $sort: { total: -1 } }, { $limit: 10 }
+        ]);
+        const topWriters = topWritersRaw.map(w => ({ name: w._id, words: w.total }));
 
-const topGroupsRaw = await DailyStats.aggregate([
-{ $match: { groupId: { $exists: true, $ne: "Manual_Correction" } } }, 
-{ $group: { _id: "$groupId", total: { $sum: "$words" } } },
-{ $sort: { total: -1 } },
-{ $limit: 10 }
-]);
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+        const todayWritersRaw = await DailyStats.aggregate([
+            { $match: { date: todayStr } }, 
+            { $group: { _id: "$name", total: { $sum: "$words" } } }, 
+            { $sort: { total: -1 } }, { $limit: 10 }
+        ]);
+        const todayWriters = todayWritersRaw.map(w => ({ name: w._id, words: w.total }));
 
-const topGroups = topGroupsRaw.map(g => ({ name: g._id || "Unknown", words: g.total }));
+        const topGroupsRaw = await DailyStats.aggregate([
+            { $match: { groupId: { $exists: true, $ne: "Manual_Correction" } } }, 
+            { $group: { _id: "$groupId", total: { $sum: "$words" } } },
+            { $sort: { total: -1 } },
+            { $limit: 10 }
+        ]);
 
-const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
-const totalWritersAgg = await DailyStats.distinct("name");
-const allGroupIds = await DailyStats.distinct("groupId");
+        // --- UPDATED: Map IDs to Names here ---
+        const topGroups = topGroupsRaw.map(g => ({ 
+            name: groupNames[g._id] || g._id || "Unknown Group", // Use fetched name, otherwise fallback to ID
+            words: g.total 
+        }));
+        // --------------------------------------
 
-const sevenDaysAgo = new Date();
-sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-const chartDataRaw = await DailyStats.aggregate([
-{ $match: { timestamp: { $gte: sevenDaysAgo } } },
-{ $group: { _id: "$date", total: { $sum: "$words" } } },
-{ $sort: { _id: 1 } } 
-]);
-const chartData = { labels: chartDataRaw.map(d => d._id), data: chartDataRaw.map(d => d.total) };
+        const totalWordsAgg = await DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]);
+        const totalWritersAgg = await DailyStats.distinct("name");
+        const allGroupIds = await DailyStats.distinct("groupId");
 
-res.json({ 
-isConnected, 
-qrCode: qrImage, 
-topWriters, 
-todayWriters, 
-topGroups,
-totalWords: totalWordsAgg[0]?.total || 0, 
-totalWriters: totalWritersAgg.length, 
-totalGroups: allGroupIds.filter(id => id !== "Manual_Correction").length,
-maintenanceMode,
-chartData 
-});
-} catch (e) { console.error("API Error:", e); res.status(500).json({ error: "Server Error" }); }
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const chartDataRaw = await DailyStats.aggregate([
+            { $match: { timestamp: { $gte: sevenDaysAgo } } },
+            { $group: { _id: "$date", total: { $sum: "$words" } } },
+            { $sort: { _id: 1 } } 
+        ]);
+        const chartData = { labels: chartDataRaw.map(d => d._id), data: chartDataRaw.map(d => d.total) };
+
+        res.json({ 
+            isConnected, 
+            qrCode: qrImage, 
+            topWriters, 
+            todayWriters, 
+            topGroups,
+            totalWords: totalWordsAgg[0]?.total || 0, 
+            totalWriters: totalWritersAgg.length, 
+            totalGroups: allGroupIds.filter(id => id !== "Manual_Correction").length,
+            maintenanceMode,
+            chartData 
+        });
+    } catch (e) { console.error("API Error:", e); res.status(500).json({ error: "Server Error" }); }
 });
 
 app.get('/api/admin/system', requireAdmin, async (req, res) => {
