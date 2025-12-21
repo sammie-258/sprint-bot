@@ -456,7 +456,10 @@ const started = await startSprintSession(sprint.groupId, sprint.duration);
 if (!started) {
 await sock.sendMessage(sprint.groupId, { text: `⚠️ Scheduled sprint skipped.` });
 } else {
-await sock.sendMessage(sprint.groupId, { text: `(Sprint scheduled by @${sprint.createdBy.split('@')[0]})` });
+    await sock.sendMessage(sprint.groupId, { 
+        text: `(Sprint scheduled by @${sprint.createdBy.split('@')[0]})`,
+        mentions: [sprint.createdBy] // <--- This turns the text into a blue clickable tag
+    });
 }
 await ScheduledSprint.deleteOne({ _id: sprint._id });
 }
@@ -756,41 +759,51 @@ await ActiveSprint.updateOne(
 }
 
 if (command === "!finish") {
-const s = activeSprints[chatId];
-if (!s) return sock.sendMessage(chatId, { text: "❌ No sprint." }, { quoted: msg });
-const l = Object.entries(s.participants).map(([u, d]) => ({ ...d, uid: u })).sort((a, b) => b.words - a.words);
-if (l.length === 0) { 
-delete activeSprints[chatId]; 
-await ActiveSprint.deleteOne({ groupId: chatId });
-console.log(`🏃 Sprint ENDED in ${chatId} (No participants)`);
-return sock.sendMessage(chatId, { text: "🏃 Ended. Empty." }, { quoted: msg }); 
-}
-let txt = `🏆 *SPRINT RESULTS* 🏆\n\n`;
-for (let i = 0; i < l.length; i++) {
-let p = l[i];
-txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} ${p.name} : ${p.words} words (${Math.round(p.words/s.duration)} WPM)\n`;
-try {
-await DailyStats.findOneAndUpdate({ userId: p.uid, groupId: chatId, date: todayStr }, { name: p.name, $inc: { words: p.words }, timestamp: new Date() }, { upsert: true });
-const g = await PersonalGoal.findOne({ userId: p.uid, isActive: true });
-if (g) { 
-g.current += p.words; 
-await g.save(); 
-if (g.current >= g.target) { 
-g.isActive = false; 
-await g.save(); 
-txt += `\n🎉 Goal Hit!`; 
-} 
-}
-} catch (e) {}
-}
-delete activeSprints[chatId];
-await ActiveSprint.deleteOne({ groupId: chatId });
+    const s = activeSprints[chatId];
+    if (!s) return sock.sendMessage(chatId, { text: "❌ No sprint." }, { quoted: msg });
+    
+    const l = Object.entries(s.participants).map(([u, d]) => ({ ...d, uid: u })).sort((a, b) => b.words - a.words);
+    
+    if (l.length === 0) { 
+        delete activeSprints[chatId]; 
+        await ActiveSprint.deleteOne({ groupId: chatId });
+        console.log(`🏃 Sprint ENDED in ${chatId} (No participants)`);
+        return sock.sendMessage(chatId, { text: "🏃 Ended. Empty." }, { quoted: msg }); 
+    }
 
-console.log(`🏃 Sprint ENDED in ${chatId} with ${l.length} writers`);
+    let txt = `🏆 *SPRINT RESULTS* 🏆\n\n`;
+    let mentions = []; // 1. Create array to store IDs
 
-txt += "\nGreat job, everyone!\n\n👉 *Next Step:* Type `!sprint 15` to go again or `!schedule` to plan ahead!";
+    for (let i = 0; i < l.length; i++) {
+        let p = l[i];
+        mentions.push(p.uid); // 2. Add user ID to mentions list
+        
+        // 3. Use @number format in the text string
+        txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} @${p.uid.split('@')[0]} : ${p.words} words (${Math.round(p.words/s.duration)} WPM)\n`;
+        
+        try {
+            await DailyStats.findOneAndUpdate({ userId: p.uid, groupId: chatId, date: todayStr }, { name: p.name, $inc: { words: p.words }, timestamp: new Date() }, { upsert: true });
+            const g = await PersonalGoal.findOne({ userId: p.uid, isActive: true });
+            if (g) { 
+                g.current += p.words; 
+                await g.save(); 
+                if (g.current >= g.target) { 
+                    g.isActive = false; 
+                    await g.save(); 
+                    txt += `\n🎉 Goal Hit!`; 
+                } 
+            }
+        } catch (e) {}
+    }
+    delete activeSprints[chatId];
+    await ActiveSprint.deleteOne({ groupId: chatId });
 
-await sock.sendMessage(chatId, { text: txt });
+    console.log(`🏃 Sprint ENDED in ${chatId} with ${l.length} writers`);
+
+    txt += "\nGreat job, everyone!\n\n👉 *Next Step:* Type `!sprint 15` to go again or `!schedule` to plan ahead!";
+
+    // 4. Pass the mentions array here
+    await sock.sendMessage(chatId, { text: txt, mentions: mentions });
 }
 
 if (["!daily", "!weekly", "!monthly"].includes(command)) {
@@ -837,7 +850,7 @@ const bar = "🟩".repeat(filledCount) + "⬜".repeat(emptyCount);
 
 const txt = `🎯 *Goal Progress*\n` +
 `👤 ${g.name}\n` +
-`📊 ${g.current} / ${g.target} words\n` +
+`📊 ` + "```" + `${g.current} / ${g.target}` + "```" + ` words\n` +  // <--- Wrapped in ``` for highlighting
 `${bar} (${rawPct.toFixed(1)}%)\n` +
 `📅 Started: ${g.startDate}`;
 
