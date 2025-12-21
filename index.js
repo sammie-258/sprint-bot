@@ -202,17 +202,30 @@ res.json({ success: true, status: maintenanceMode });
 });
 
 app.get('/api/admin/sprints', requireAdmin, async (req, res) => {
-const sprints = [];
-for (const [chatId, sprint] of Object.entries(activeSprints)) {
-const timeLeft = Math.max(0, sprint.endsAt - Date.now());
-sprints.push({
-id: chatId,
-name: chatId,
-timeLeft: Math.ceil(timeLeft / 1000 / 60), 
-participants: Object.keys(sprint.participants).length
-});
-}
-res.json(sprints);
+    try {
+        // Fetch real group names
+        let groupMap = {};
+        if (sock && isConnected) {
+            try {
+                const groups = await sock.groupFetchAllParticipating();
+                for (const [jid, data] of Object.entries(groups)) {
+                    groupMap[jid] = data.subject;
+                }
+            } catch (e) { console.log("Group fetch error:", e); }
+        }
+
+        const sprints = [];
+        for (const [chatId, sprint] of Object.entries(activeSprints)) {
+            const timeLeft = Math.max(0, sprint.endsAt - Date.now());
+            sprints.push({
+                id: chatId,
+                name: groupMap[chatId] || chatId, // Use fetched name or fallback to ID
+                timeLeft: Math.ceil(timeLeft / 1000 / 60),
+                participants: Object.keys(sprint.participants).length
+            });
+        }
+        res.json(sprints);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/sprints/stop', requireAdmin, async (req, res) => {
@@ -231,17 +244,28 @@ res.status(404).json({ error: "Sprint not found" });
 });
 
 app.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
-try {
-const sprints = await ScheduledSprint.find({ startTime: { $gt: new Date() } }).sort({ startTime: 1 });
-const result = sprints.map((s) => ({
-id: s._id,
-groupName: s.groupId,
-startTime: s.startTime,
-duration: s.duration,
-createdBy: s.createdBy.split('@')[0]
-}));
-res.json(result);
-} catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        // Fetch real group names
+        let groupMap = {};
+        if (sock && isConnected) {
+            try {
+                const groups = await sock.groupFetchAllParticipating();
+                for (const [jid, data] of Object.entries(groups)) {
+                    groupMap[jid] = data.subject;
+                }
+            } catch (e) { console.log("Group fetch error:", e); }
+        }
+
+        const sprints = await ScheduledSprint.find({ startTime: { $gt: new Date() } }).sort({ startTime: 1 });
+        const result = sprints.map((s) => ({
+            id: s._id,
+            groupName: groupMap[s.groupId] || s.groupId, // Use fetched name or fallback to ID
+            startTime: s.startTime,
+            duration: s.duration,
+            createdBy: s.createdBy.split('@')[0]
+        }));
+        res.json(result);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
@@ -265,6 +289,24 @@ const users = await DailyStats.aggregate([
 ]);
 res.json(users);
 } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/admin/groups', requireAdmin, async (req, res) => {
+    try {
+        if (!sock || !isConnected) return res.json([]);
+
+        const groups = await sock.groupFetchAllParticipating();
+        const groupList = Object.entries(groups).map(([jid, data]) => ({
+            id: jid,
+            name: data.subject,
+            participants: data.participants ? data.participants.length : 0
+        }));
+
+        res.json(groupList);
+    } catch (e) {
+        console.error("Admin Group Fetch Error:", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.post('/api/admin/update', requireAdmin, async (req, res) => {
