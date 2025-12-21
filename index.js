@@ -52,18 +52,21 @@ let sock = null;
 let maintenanceMode = false; 
 
 // --- NEW: Group Cache System ---
-let groupCache = {}; // Stores ID -> Name mapping
+let groupCache = {}; // Stores ID -> { subject, size }
 let lastCacheUpdate = 0;
 
 const updateGroupCache = async (force = false) => {
-    // Only update if 5 minutes have passed, or if forced
     if (!force && Date.now() - lastCacheUpdate < 5 * 60 * 1000) return;
     
     if (sock && isConnected) {
         try {
             const groups = await sock.groupFetchAllParticipating();
             for (const [jid, data] of Object.entries(groups)) {
-                groupCache[jid] = data.subject;
+                // Store both Name and Participant Count
+                groupCache[jid] = { 
+                    subject: data.subject, 
+                    size: data.participants ? data.participants.length : 0 
+                };
             }
             lastCacheUpdate = Date.now();
             console.log("🔄 Group cache updated.");
@@ -159,7 +162,7 @@ app.get('/api/stats', async (req, res) => {
         ]);
 
         const topGroups = topGroupsRaw.map(g => ({ 
-            name: groupCache[g._id] || g._id || "Unknown Group", // READ FROM CACHE
+            name: groupCache[g._id]?.subject || g._id || "Unknown Group", // READ FROM CACHE
             words: g.total 
         }));
 
@@ -219,7 +222,7 @@ app.get('/api/admin/sprints', requireAdmin, async (req, res) => {
             const timeLeft = Math.max(0, sprint.endsAt - Date.now());
             sprints.push({
                 id: chatId,
-                name: groupCache[chatId] || chatId, // READ FROM CACHE
+                name: groupCache[chatId]?.subject || chatId, // READ FROM CACHE
                 timeLeft: Math.ceil(timeLeft / 1000 / 60), 
                 participants: Object.keys(sprint.participants).length
             });
@@ -250,7 +253,7 @@ app.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
         const sprints = await ScheduledSprint.find({ startTime: { $gt: new Date() } }).sort({ startTime: 1 });
         const result = sprints.map((s) => ({
             id: s._id,
-            groupName: groupCache[s.groupId] || s.groupId, // READ FROM CACHE
+            groupName: groupCache[s.groupId]?.subject || s.groupId, // READ FROM CACHE
             startTime: s.startTime,
             duration: s.duration,
             createdBy: s.createdBy.split('@')[0]
@@ -284,13 +287,12 @@ res.json(users);
 
 app.get('/api/admin/groups', requireAdmin, async (req, res) => {
     try {
-        await updateGroupCache(); // Check if update needed
+        await updateGroupCache(); 
 
-        // We need the full list, so we might need to map the cache keys
-        const groupList = Object.entries(groupCache).map(([jid, name]) => ({
+        const groupList = Object.entries(groupCache).map(([jid, data]) => ({
             id: jid,
-            name: name,
-            participants: 0 // Note: Caching names means we lose live participant count here to save bandwidth
+            name: data.subject,  // Read name from object
+            participants: data.size // Read size from object
         }));
 
         res.json(groupList);
@@ -536,15 +538,16 @@ let body = msg.message.conversation || msg.message.extendedTextMessage?.text || 
 if (!body.startsWith("!")) return;
 
 // Get sender name (Default to Number)
+    // 1. Get sender name (Default to Number)
     let senderName = senderId.split('@')[0];
     
-    // 1. Try to get WhatsApp Profile Name
-    try {
-        const contact = await sock.getContactBasicInfo(senderId);
-        if (contact.pushName) senderName = contact.pushName;
-    } catch (err) { senderName = senderId.split('@')[0]; }
+    // 2. Try to get WhatsApp "PushName" (The name they set on their profile)
+    // This comes directly with the message, so it is fast and reliable.
+    if (msg.pushName) {
+        senderName = msg.pushName;
+    }
 
-    // 2. CHECK DATABASE: If they have a custom name saved from before, use that instead
+    // 3. CHECK DATABASE: If they have a custom !myname saved, OVERRIDE everything
     const savedProfile = await DailyStats.findOne({ userId: senderId }).sort({ timestamp: -1 });
     if (savedProfile && savedProfile.name) {
         senderName = savedProfile.name;
