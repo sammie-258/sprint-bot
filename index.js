@@ -21,12 +21,20 @@ if (global.gc) {
 // =======================
 //   HELPER: NORMALIZE USER IDs
 // =======================
-const normalizeUserId = (id) => {
-    if (!id) return null;
-    let normalized = id.split(':')[0];
-    if (!normalized.includes('@')) normalized += '@s.whatsapp.net';
-    else if (normalized.endsWith('@c.us')) normalized = normalized.replace('@c.us', '@s.whatsapp.net');
-    return normalized;
+const normalizeUserId = (jid) => {
+    if (!jid) return null;
+    return jid.split('@')[0].split(':')[0]; // Extract just phone number
+};
+
+const toBaileysFormat = (phoneNumber) => {
+    if (!phoneNumber) return null;
+    if (phoneNumber.includes('@')) return phoneNumber;
+    return phoneNumber + '@s.whatsapp.net';
+};
+
+const isOwnerUser = (rawSender, ownerNumber) => {
+    const normalized = normalizeUserId(rawSender);
+    return normalized === ownerNumber;
 };
 
 // =======================
@@ -386,8 +394,7 @@ mongoose.connect(MONGO_URI)
                     if (!started) {
                         await sock.sendMessage(sprint.groupId, { text: `⚠️ Scheduled sprint skipped.` });
                     } else {
-                        let creatorName = 'Someone';
-                        if(sprint.createdBy) creatorName = sprint.createdBy.split('@')[0].split(':')[0];
+                        let creatorName = sprint.createdBy || 'Someone';
                         await sock.sendMessage(sprint.groupId, { text: `(Sprint scheduled by @${creatorName})` });
                     }
                     await ScheduledSprint.deleteOne({ _id: sprint._id });
@@ -470,21 +477,25 @@ const initializeBot = async () => {
                     let body = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
                     if (!body.startsWith("!")) return;
 
-                    let senderName = senderId.split('@')[0];
-                    try {
-                        const contact = await sock.getContactBasicInfo(senderId);
-                        if (contact.pushName) senderName = contact.pushName;
-                    } catch (err) { senderName = senderId.split('@')[0]; }
+                    let senderName = senderId;
+if (msg.pushName) {
+    senderName = msg.pushName;
+} else {
+    try {
+        const contact = await sock.onWhatsApp(toBaileysFormat(senderId));
+        if (contact[0]?.notify) senderName = contact[0].notify;
+    } catch (err) {}
+}
 
                     const args = body.trim().split(" ");
                     const command = args[0].toLowerCase();
                     const todayStr = getTodayDateGMT1();
 
                     const getTargetId = (argIndex = 1) => {
-                        const potentialNumber = args[argIndex]?.replace(/\D/g, '');
-                        if (potentialNumber && potentialNumber.length > 5) return normalizeUserId(potentialNumber + '@s.whatsapp.net');
-                        return null;
-                    };
+    const potentialNumber = args[argIndex]?.replace(/\D/g, '');
+    if (potentialNumber && potentialNumber.length > 5) return potentialNumber;
+    return null;
+};
 
                     // --- ADMIN COMMANDS ---
                     if (isOwner) {
