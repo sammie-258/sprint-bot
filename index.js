@@ -976,6 +976,35 @@ if (sub === "check") {
 const g = await PersonalGoal.findOne({ userId: senderId, isActive: true });
 if (!g) return sock.sendMessage(chatId, { text: "❌ No active goal. Start one with `!goal set [number]`" }, { quoted: msg });
 
+// ... existing !goal set and !goal check code ...
+
+if (sub === "history") {
+    // 1. Fetch last 5 inactive goals
+    const history = await PersonalGoal.find({ userId: senderId, isActive: false })
+                                      .sort({ _id: -1 }) // Newest first
+                                      .limit(5);
+
+    if (history.length === 0) {
+        return sock.sendMessage(chatId, { text: "📜 No past goals found." }, { quoted: msg });
+    }
+
+    let txt = `📜 *GOAL HISTORY (Last 5)*\n━━━━━━━━━━━━━━\n`;
+
+    history.forEach((g) => {
+        // 2. Determine Status (Win or Fail)
+        const percent = Math.min(100, (g.current / g.target) * 100).toFixed(1);
+        const isWin = g.current >= g.target;
+        const icon = isWin ? "✅" : "❌";
+        
+        // 3. Format Date (g.startDate is stored as YYYY-MM-DD)
+        txt += `${icon} *${g.startDate}*\n`;
+        txt += `   Target: ${g.target.toLocaleString()} words\n`;
+        txt += `   Result: ${g.current.toLocaleString()} (${percent}%)\n\n`;
+    });
+
+    return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
+}
+
 const rawPct = (g.current / g.target) * 100;
 const pct = Math.min(100, Math.max(0, rawPct));
 const filledCount = Math.round(pct / 10); 
