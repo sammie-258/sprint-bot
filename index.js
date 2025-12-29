@@ -297,16 +297,62 @@ res.json({ success: true });
 } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// --- UPDATED: Search with Full Profile & Ban Status ---
 app.post('/api/admin/search', requireAdmin, async (req, res) => {
-try {
-const { query } = req.body;
-const users = await DailyStats.aggregate([
-{ $match: { name: { $regex: query, $options: 'i' } } },
-{ $group: { _id: "$userId", name: { $first: "$name" }, totalWords: { $sum: "$words" }, lastActive: { $max: "$date" } } },
-{ $limit: 15 }
-]);
-res.json(users);
-} catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        const { query } = req.body;
+        
+        // 1. Get basic stats (Total Words & Name)
+        const users = await DailyStats.aggregate([
+            { $match: { name: { $regex: query, $options: 'i' } } },
+            { $group: { _id: "$userId", name: { $first: "$name" }, totalWords: { $sum: "$words" }, lastActive: { $max: "$date" } } },
+            { $limit: 15 }
+        ]);
+
+        // 2. Enrich with Profile Data (Rank, Streak, Ban Status)
+        const enrichedUsers = await Promise.all(users.map(async (u) => {
+            const profile = await UserProfile.findOne({ userId: u._id });
+            const isBanned = await Blacklist.exists({ userId: u._id });
+            
+            // Calculate Rank Helper
+            let rank = "Unranked ⚪"; 
+            const total = profile ? profile.totalWordsAllTime : u.totalWords;
+            if (total >= 10000) rank = "Aspiring Author ✍️";
+            if (total >= 50000) rank = "Novelist 📘";
+            if (total >= 100000) rank = "Prolific Writer 📚";
+            if (total >= 250000) rank = "Word Architect 🏗️";
+            if (total >= 500000) rank = "Word Expert 🎓";
+            if (total >= 1000000) rank = "Novel God ⚡";
+
+            return {
+                ...u,
+                rank: rank,
+                streak: profile ? profile.currentStreak : 0,
+                bestStreak: profile ? profile.bestStreak : 0,
+                trueTotal: total,
+                isBanned: !!isBanned
+            };
+        }));
+
+        res.json(enrichedUsers);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- NEW: Ban/Unban Endpoint ---
+app.post('/api/admin/ban', requireAdmin, async (req, res) => {
+    try {
+        const { userId, action } = req.body; // action: 'ban' or 'unban'
+        
+        if (action === 'ban') {
+            await Blacklist.updateOne({ userId }, { userId }, { upsert: true });
+            console.log(`🚫 BANNED User: ${userId}`);
+        } else {
+            await Blacklist.deleteOne({ userId });
+            console.log(`✅ UNBANNED User: ${userId}`);
+        }
+        
+        res.json({ success: true, isBanned: action === 'ban' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/admin/groups', requireAdmin, async (req, res) => {
