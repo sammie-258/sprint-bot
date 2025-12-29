@@ -691,30 +691,36 @@ return;
 
 // --- REGULAR COMMANDS ---
 if (command === "!help") {
-return sock.sendMessage(chatId, { text: `🤖 *SPRINT BOT MENU*
+    return sock.sendMessage(chatId, { text: 
+`🤖 *SPRINT BOT COMMANDS*
+━━━━━━━━━━━━━━━━━━
 
 🏃 *Sprinting*
-!sprint 20 : Start a 20 min sprint
-!wc 500 : Log 500 words
-!time : Check time remaining
-!finish : End sprint & view results
-!cancel : Stop the current timer
+• *!sprint 20* → Start 20 min sprint
+• *!wc 500* → Log 500 words (in sprint)
+• *!time* → Check time remaining
+• *!finish* → End sprint & view results
+
+📊 *Stats & Profile*
+• *!profile* → View Rank, Streak & Total
+• *!daily* → Today's Leaderboard
+• *!weekly* → This Week's Top Writers
+• *!top10* → All-Time Hall of Fame
+• *!myname Sam* → Set your display name
+
+🎯 *Goals & History*
+• *!goal set 1000* → Set a personal target
+• *!goal check* → View goal progress
+• *!goal history* → View past 5 goals
 
 📅 *Planning*
-!schedule 20 in 60 : Sprint in 60 mins
-!unschedule : Cancel scheduled sprints
+• *!schedule 20 in 60* → Plan a sprint
+• *!unschedule* → Cancel plans
 
-📊 *Stats & Goals*
-!daily : Today's leaderboard
-!weekly : Last 7 days leaderboard
-!monthly : Last 30 days leaderboard
-!top10 : All-time Hall of Fame
-!goal set 50000 : Set personal target
-!goal check : View goal progress
-
-⚙ *Utils*
-!log 500 : Manually add words (no timer)
-!myname Sam : Update your display name` }, { quoted: msg });
+⚙️ *Utils*
+• *!log 500* → Add words (No timer)
+• *!cancel* → Stop current timer
+` }, { quoted: msg });
 }
 
 if (command === "!log") {
@@ -794,11 +800,15 @@ if (command === "!profile") {
 
     const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
 
-    let rank = "Novice Scribbler 🪶";
-    if (profile.totalWordsAllTime > 10000) rank = "Ink Apprentice ✒️";
-    if (profile.totalWordsAllTime > 50000) rank = "Word Warrior ⚔️";
-    if (profile.totalWordsAllTime > 100000) rank = "Novel God 💎";
-
+    let rank = "Unranked ⚪"; 
+    
+    if (profile.totalWordsAllTime >= 10000) rank = "Aspiring Author ✍️";
+    if (profile.totalWordsAllTime >= 50000) rank = "Novelist 📘";
+    if (profile.totalWordsAllTime >= 100000) rank = "Prolific Writer 📚";
+    if (profile.totalWordsAllTime >= 250000) rank = "Word Architect 🏗️";
+    if (profile.totalWordsAllTime >= 500000) rank = "Word Expert 🎓";
+    if (profile.totalWordsAllTime >= 1000000) rank = "Novel God ⚡";
+    
     let txt = `👤 *WRITER PROFILE*\n` +
               `━━━━━━━━━━━━━━\n` +
               `📛 *${profile.name}*\n` +
@@ -949,15 +959,49 @@ if (d) title = `Daily Leaderboard (${todayStr})`;
 else if (command === "!weekly") title = "Weekly Leaderboard";
 else title = "Monthly Leaderboard";
 
+// ... inside the ["!daily", "!weekly", "!monthly"] block ...
+
 let stats;
-if (d) stats = await DailyStats.find({ groupId: chatId, date: todayStr }).sort({ words: -1 });
-else {
-const dt = new Date(); dt.setDate(dt.getDate() - days);
-stats = await DailyStats.aggregate([{ $match: { groupId: chatId, timestamp: { $gte: dt } } }, { $group: { _id: "$userId", totalWords: { $sum: "$words" }, name: { $first: "$name" } } }, { $sort: { totalWords: -1 } }, { $limit: 15 }]);
+if (d) {
+    // DAILY: Global Sync (Aggregates words across ALL groups for today)
+    stats = await DailyStats.aggregate([
+        { $match: { date: todayStr } }, // 1. Find all logs for today
+        { $group: { 
+            _id: "$userId", 
+            totalWords: { $sum: "$words" }, // 2. Sum them up per user
+            name: { $first: "$name" },
+            streak: { $first: "$userId" } // Hack to pass ID for streak check later
+        }}, 
+        { $sort: { totalWords: -1 } }, 
+        { $limit: 15 }
+    ]);
 }
+else {
+    // WEEKLY/MONTHLY: (Already aggregated correctly in your old code, but let's ensure it's global too)
+    const dt = new Date(); dt.setDate(dt.getDate() - days);
+    stats = await DailyStats.aggregate([
+        { $match: { timestamp: { $gte: dt } } }, // Remove 'groupId: chatId' to make it global
+        { $group: { _id: "$userId", totalWords: { $sum: "$words" }, name: { $first: "$name" } } }, 
+        { $sort: { totalWords: -1 } }, 
+        { $limit: 15 }
+    ]);
+}
+
 if (stats.length === 0) return sock.sendMessage(chatId, { text: "📉 No stats." }, { quoted: msg });
+
 let txt = `🏆 *${title}*\n\n`;
-stats.forEach((s, i) => { txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} ${s.name}: ${d ? s.words : s.totalWords} words\n`; });
+
+// Fetch streaks for visual flare
+for (let i = 0; i < stats.length; i++) {
+    const s = stats[i];
+    
+    // Check streak
+    const p = await UserProfile.findOne({ userId: s._id });
+    const fire = (p && p.currentStreak > 2) ? "🔥" : "";
+    
+    txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} ${s.name} ${fire}: ${s.totalWords.toLocaleString()} words\n`;
+}
+
 await sock.sendMessage(chatId, { text: txt });
 }
 
