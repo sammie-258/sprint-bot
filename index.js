@@ -119,10 +119,23 @@ participants: { type: Object, default: {} }
 });
 const ActiveSprint = mongoose.model("ActiveSprint", activeSprintSchema);
 
+// --- NEW: User Profile (For Streaks & XP) ---
+const userProfileSchema = new mongoose.Schema({
+    userId: String,
+    name: String,
+    currentStreak: { type: Number, default: 0 },
+    bestStreak: { type: Number, default: 0 },
+    lastActiveDate: String, // Format: "YYYY-MM-DD"
+    totalWordsAllTime: { type: Number, default: 0 },
+    joinedAt: { type: Date, default: Date.now }
+});
+const UserProfile = mongoose.model("UserProfile", userProfileSchema);
+
 const MONGO_URI = process.env.MONGO_URI; 
 if (!MONGO_URI) { console.error("❌ ERROR: MONGO_URI is missing!"); process.exit(1); }
 
 let activeSprints = {}; 
+
 
 // =======================
 //   WEB API ENDPOINTS
@@ -412,6 +425,53 @@ ActiveSprint.deleteOne({ _id: doc._id }).exec();
 
 const getTodayDateGMT1 = () => new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
 
+// --- NEW: Streak Manager Helper ---
+const updateStreak = async (userId, name, wordsToAdd) => {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+    
+    // Calculate "Yesterday" in Lagos Time
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const yesterday = d.toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+
+    let profile = await UserProfile.findOne({ userId });
+
+    if (!profile) {
+        // First time user? Create profile.
+        profile = await UserProfile.create({
+            userId, 
+            name, 
+            currentStreak: 1, 
+            bestStreak: 1, 
+            lastActiveDate: today, 
+            totalWordsAllTime: wordsToAdd
+        });
+        return { profile, status: 'new' };
+    }
+
+    // Update Name & Total Words
+    profile.name = name; 
+    profile.totalWordsAllTime += wordsToAdd;
+
+    // STREAK LOGIC
+    if (profile.lastActiveDate === today) {
+        // Already wrote today. Streak stays same.
+    } else if (profile.lastActiveDate === yesterday) {
+        // Wrote yesterday? Streak goes up! 🔥
+        profile.currentStreak += 1;
+        if (profile.currentStreak > profile.bestStreak) profile.bestStreak = profile.currentStreak;
+        profile.lastActiveDate = today;
+    } else {
+        // Missed a day? Reset to 1. 😢
+        profile.currentStreak = 1;
+        profile.lastActiveDate = today;
+    }
+
+    await profile.save();
+    return { profile, status: 'updated' };
+};
+// ----------------------------------
+
 const startSprintSession = async (chatId, duration) => {
 if (activeSprints[chatId]) return false; 
 console.log(`🏃 Sprint STARTED in ${chatId} for ${duration} mins`);
@@ -658,25 +718,33 @@ return sock.sendMessage(chatId, { text: `🤖 *SPRINT BOT MENU*
 }
 
 if (command === "!log") {
-let count = parseInt(args[1]);
-if (isNaN(count) || count <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!log 500`" }, { quoted: msg });
-try {
-await DailyStats.findOneAndUpdate({ userId: senderId, groupId: chatId, date: todayStr }, { name: senderName, $inc: { words: count }, timestamp: new Date() }, { upsert: true, new: true });
-const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+    let count = parseInt(args[1]);
+    if (isNaN(count) || count <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!log 500`" }, { quoted: msg });
+    
+    try {
+        // 1. Update Daily Leaderboard (Existing logic)
+        await DailyStats.findOneAndUpdate({ userId: senderId, groupId: chatId, date: todayStr }, { name: senderName, $inc: { words: count }, timestamp: new Date() }, { upsert: true, new: true });
+        
+        // 2. Update Personal Goal (Existing logic)
+        const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+        if (goal) {
+            goal.current += count;
+            if (goal.current >= goal.target) { 
+                goal.isActive = false; 
+                await goal.save(); 
+                await sock.sendMessage(chatId, { text: `🎉 *GOAL HIT!* 🏆\n\nCongratulations! You smashed your target of ${goal.target} words!` });
+            } else {
+                await goal.save();
+            }
+        }
 
-await sock.sendMessage(chatId, { text: `✅ Logged ${count} words.` }, { quoted: msg });
+        // 3. --- NEW: Update Streak & Profile ---
+        const { profile } = await updateStreak(senderId, senderName, count);
+        const streakIcon = profile.currentStreak > 2 ? `🔥 ${profile.currentStreak}` : `${profile.currentStreak}`;
+        
+        await sock.sendMessage(chatId, { text: `✅ Logged ${count} words.\n📈 Streak: ${streakIcon} days` }, { quoted: msg });
 
-if (goal) {
-goal.current += count;
-if (goal.current >= goal.target) { 
-goal.isActive = false; 
-await goal.save(); 
-await sock.sendMessage(chatId, { text: `🎉 *GOAL HIT!* 🏆\n\nCongratulations! You smashed your target of ${goal.target} words!` });
-} else {
-await goal.save();
-}
-}
-} catch (e) { console.error(e); }
+    } catch (e) { console.error(e); }
 }
 
 if (command === "!top10" || command === "!top") {
@@ -693,6 +761,33 @@ if (!n) return sock.sendMessage(chatId, { text: "❌ Use: `!myname Sam`" }, { qu
 await DailyStats.updateMany({ userId: senderId }, { name: n });
 await PersonalGoal.updateMany({ userId: senderId }, { name: n });
 return sock.sendMessage(chatId, { text: `✅ Name: ${n}` }, { quoted: msg });
+}
+
+if (command === "!profile") {
+    const profile = await UserProfile.findOne({ userId: senderId });
+    const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+
+    if (!profile) return sock.sendMessage(chatId, { text: "📭 No profile yet. Log some words to start!" }, { quoted: msg });
+
+    let rank = "Novice Scribbler 🪶";
+    if (profile.totalWordsAllTime > 10000) rank = "Ink Apprentice ✒️";
+    if (profile.totalWordsAllTime > 50000) rank = "Word Warrior ⚔️";
+    if (profile.totalWordsAllTime > 100000) rank = "Novel God 💎";
+
+    let txt = `👤 *WRITER PROFILE*\n` +
+              `━━━━━━━━━━━━━━\n` +
+              `📛 *${profile.name}*\n` +
+              `🎖️ Rank: ${rank}\n\n` +
+              `🔥 Current Streak: *${profile.currentStreak} days*\n` +
+              `🏆 Best Streak: ${profile.bestStreak} days\n` +
+              `📚 All-Time Words: ${profile.totalWordsAllTime.toLocaleString()}\n`;
+    
+    if (goal) {
+        const pct = ((goal.current / goal.target) * 100).toFixed(1);
+        txt += `\n🎯 *Current Goal:*\n${goal.current} / ${goal.target} (${pct}%)`;
+    }
+
+    return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
 }
 
 if (command === "!sprint") {
@@ -781,7 +876,14 @@ if (command === "!finish") {
         txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} @${p.uid.split('@')[0]} : ${p.words} words (${Math.round(p.words/s.duration)} WPM)\n`;
         
         try {
+            // Update Daily Stats
             await DailyStats.findOneAndUpdate({ userId: p.uid, groupId: chatId, date: todayStr }, { name: p.name, $inc: { words: p.words }, timestamp: new Date() }, { upsert: true });
+            
+            // --- NEW: Update Streak for this participant ---
+            await updateStreak(p.uid, p.name, p.words);
+            // -----------------------------------------------
+
+            // Update Goal
             const g = await PersonalGoal.findOne({ userId: p.uid, isActive: true });
             if (g) { 
                 g.current += p.words; 
