@@ -131,6 +131,17 @@ const userProfileSchema = new mongoose.Schema({
 });
 const UserProfile = mongoose.model("UserProfile", userProfileSchema);
 
+// --- NEW: Group Challenge Schema ---
+const challengeSchema = new mongoose.Schema({
+    groupId: String,
+    target: Number,
+    current: { type: Number, default: 0 },
+    contributors: { type: Object, default: {} }, // Stores { userId: { name: "Sam", words: 500 } }
+    createdBy: String,
+    startedAt: { type: Date, default: Date.now }
+});
+const GroupChallenge = mongoose.model("GroupChallenge", challengeSchema);
+
 const MONGO_URI = process.env.MONGO_URI; 
 if (!MONGO_URI) { console.error("❌ ERROR: MONGO_URI is missing!"); process.exit(1); }
 
@@ -472,6 +483,51 @@ const updateStreak = async (userId, name, wordsToAdd) => {
 };
 // ----------------------------------
 
+// --- NEW: Challenge Manager Helper ---
+const updateChallenge = async (groupId, userId, name, wordsToAdd) => {
+    const challenge = await GroupChallenge.findOne({ groupId });
+    if (!challenge) return; // No active challenge in this group
+
+    // 1. Update Total
+    challenge.current += wordsToAdd;
+
+    // 2. Update Individual Contributor
+    if (!challenge.contributors[userId]) {
+        challenge.contributors[userId] = { name: name, words: 0 };
+    }
+    challenge.contributors[userId].words += wordsToAdd;
+    // Update name in case they changed it
+    challenge.contributors[userId].name = name; 
+
+    // 3. Check for VICTORY
+    if (challenge.current >= challenge.target) {
+        // Sort contributors by words
+        const leaderboard = Object.values(challenge.contributors).sort((a, b) => b.words - a.words);
+        const top = leaderboard[0];
+
+        let txt = `🎉 *CHALLENGE DESTROYED!* 🎉\n` +
+                  `━━━━━━━━━━━━━━━━\n` +
+                  `🎯 Target: *${challenge.target.toLocaleString()} words*\n` +
+                  `⚡ Final Total: ${challenge.current.toLocaleString()}\n\n` +
+                  `👑 *MVP:* ${top.name} (${top.words})\n\n` +
+                  `📜 *Contributors:* \n`;
+        
+        leaderboard.forEach((c, i) => {
+            txt += `${i+1}. ${c.name}: ${c.words}\n`;
+        });
+
+        // Delete the finished challenge
+        await GroupChallenge.deleteOne({ _id: challenge._id });
+        
+        return { completed: true, text: txt, mentions: Object.keys(challenge.contributors) };
+    } else {
+        // Just save progress
+        await GroupChallenge.updateOne({ _id: challenge._id }, { current: challenge.current, contributors: challenge.contributors });
+        return { completed: false };
+    }
+};
+// -------------------------------------
+
 const startSprintSession = async (chatId, duration) => {
 if (activeSprints[chatId]) return false; 
 console.log(`🏃 Sprint STARTED in ${chatId} for ${duration} mins`);
@@ -748,8 +804,17 @@ if (command === "!log") {
         const { profile } = await updateStreak(senderId, senderName, count);
         const streakIcon = profile.currentStreak > 2 ? `🔥 ${profile.currentStreak}` : `${profile.currentStreak}`;
         
-        await sock.sendMessage(chatId, { text: `✅ Logged ${count} words.\n📈 Streak: ${streakIcon} days` }, { quoted: msg });
+        // --- NEW: Update Group Challenge ---
+        const challengeRes = await updateChallenge(chatId, senderId, senderName, count);
+        // -----------------------------------
 
+        if (challengeRes && challengeRes.completed) {
+            // Send Victory Message if challenge finished
+            await sock.sendMessage(chatId, { text: challengeRes.text, mentions: challengeRes.mentions });
+        } else {
+            // Normal Log Message
+            await sock.sendMessage(chatId, { text: `✅ Logged ${count} words.\n📈 Streak: ${streakIcon} days` }, { quoted: msg });
+        }
     } catch (e) { console.error(e); }
 }
 
@@ -831,6 +896,43 @@ if (command === "!profile") {
     }
 
     return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
+}
+
+if (command === "!challenge") {
+    const sub = args[1];
+    
+    // Check Status
+    const active = await GroupChallenge.findOne({ groupId: chatId });
+    
+    if (sub === "status" || sub === "check") {
+        if (!active) return sock.sendMessage(chatId, { text: "💤 No active challenge. Start one with `!challenge 5000`" }, { quoted: msg });
+        const pct = ((active.current / active.target) * 100).toFixed(1);
+        const bar = "🟩".repeat(Math.round(pct/10)) + "⬜".repeat(10 - Math.round(pct/10));
+        return sock.sendMessage(chatId, { text: `⚔️ *Current Challenge*\n\n🎯 Target: ${active.target}\n📊 Progress: ${active.current} (${pct}%)\n${bar}` }, { quoted: msg });
+    }
+
+    // Stop Challenge
+    if (sub === "stop" || sub === "cancel") {
+        if (!active) return sock.sendMessage(chatId, { text: "❌ No challenge to stop." }, { quoted: msg });
+        await GroupChallenge.deleteOne({ groupId: chatId });
+        return sock.sendMessage(chatId, { text: "🚫 Challenge cancelled." }, { quoted: msg });
+    }
+
+    // Start New Challenge
+    const target = parseInt(sub);
+    if (isNaN(target) || target <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!challenge 5000`" }, { quoted: msg });
+
+    if (active) return sock.sendMessage(chatId, { text: `⚠️ A challenge is already active (${active.current}/${active.target}).\nFinish it or use \`!challenge stop\`.` }, { quoted: msg });
+
+    await GroupChallenge.create({
+        groupId: chatId,
+        target: target,
+        current: 0,
+        contributors: {},
+        createdBy: senderId
+    });
+
+    return sock.sendMessage(chatId, { text: `⚔️ *NEW CHALLENGE STARTED!* ⚔️\n\n🎯 Target: *${target.toLocaleString()} words*\n\nEvery \`!log\` and sprint finish counts towards this goal. Let's write!` }, { quoted: msg });
 }
 
 if (command === "!sprint") {
@@ -936,6 +1038,14 @@ if (command === "!finish") {
                     await g.save(); 
                     txt += `\n🎉 Goal Hit!`; 
                 } 
+            }
+            // --- NEW: Update Group Challenge ---
+            const chRes = await updateChallenge(chatId, p.uid, p.name, p.words);
+            if (chRes && chRes.completed) {
+                // We delay the victory message slightly so it appears AFTER the sprint results
+                setTimeout(async () => {
+                    await sock.sendMessage(chatId, { text: chRes.text, mentions: chRes.mentions });
+                }, 2000);
             }
         } catch (e) {}
     }
