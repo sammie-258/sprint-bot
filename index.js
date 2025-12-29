@@ -753,30 +753,29 @@ if (command === "!help") {
 
 🏃 *Sprinting*
 • *!sprint 20* → Start 20 min sprint
-• *!wc 500* → Log 500 words (in sprint)
+• *!wc 500* → Log words (during sprint)
 • *!time* → Check time remaining
 • *!finish* → End sprint & view results
+• *!cancel* → Stop the timer
+
+⚔️ *Challenges*
+• *!challenge 5000* → Start group boss
+• *!challenge check* → View progress
 
 📊 *Stats & Profile*
-• *!profile* → View Rank, Streak & Total
-• *!daily* → Today's Leaderboard
-• *!weekly* → This Week's Top Writers
+• *!profile* → Rank, Streak & Total
+• *!daily* → Today's Global Top 10
 • *!top10* → All-Time Hall of Fame
-• *!myname Sam* → Set your display name
+• *!myname Sam* → Update display name
 
-🎯 *Goals & History*
-• *!goal set 1000* → Set a personal target
-• *!goal check* → View goal progress
-• *!goal history* → View past 5 goals
-
-📅 *Planning*
-• *!schedule 20 in 60* → Plan a sprint
-• *!unschedule* → Cancel plans
+🎯 *Goals*
+• *!goal set 1000* → Set daily target
+• *!goal check* → View progress
+• *!goal history* → Past goals
 
 ⚙️ *Utils*
 • *!log 500* → Add words (No timer)
-• *!cancel* → Stop current timer
-` }, { quoted: msg });
+• *!schedule 20 in 60* → Plan a sprint` }, { quoted: msg });
 }
 
 if (command === "!log") {
@@ -936,10 +935,19 @@ if (command === "!challenge") {
 }
 
 if (command === "!sprint") {
-let m = parseInt(args[1]);
-if (isNaN(m) || m <= 0 || m > 180) return sock.sendMessage(chatId, { text: "❌ Use: `!sprint 20`" }, { quoted: msg });
-if (activeSprints[chatId]) return sock.sendMessage(chatId, { text: "⚠️ Running." }, { quoted: msg });
-await startSprintSession(chatId, m);
+    let m = parseInt(args[1]);
+    if (isNaN(m) || m <= 0 || m > 180) return sock.sendMessage(chatId, { text: "❌ Use: `!sprint 20`" }, { quoted: msg });
+    
+    if (activeSprints[chatId]) {
+        const s = activeSprints[chatId];
+        const timeLeft = Math.ceil((s.endsAt - Date.now()) / 60000);
+        return sock.sendMessage(chatId, { 
+            text: `⚠️ **Sprint Already Active!**\n\nThere is a sprint running with approx *${timeLeft} mins* left.\n\nJoin in by typing \`!wc [number]\` now!` 
+        }, { quoted: msg });
+    }
+    // ----------------------------
+
+    await startSprintSession(chatId, m);
 }
 
 if (command === "!schedule") {
@@ -973,28 +981,31 @@ return sock.sendMessage(chatId, { text: `⏳ *${Math.floor(r/60000)}m ${Math.flo
 }
 
 if (command === "!wc") {
-const s = activeSprints[chatId];
-if (!s) return sock.sendMessage(chatId, { text: "❌ No sprint." }, { quoted: msg });
+    const s = activeSprints[chatId];
+    
+    // --- BETTER ERROR (Your Version) ---
+    if (!s) return sock.sendMessage(chatId, { text: "❌ **No Active Sprint**\n\nYou can use !log to manually add your word count, or start a new sprint!\nTry typing: `!log 500` or `!sprint 20`" }, { quoted: msg });
+    // -----------------------------------
 
-let c = parseInt(args[1]==='add'||args[1]==='+'?args[2]:args[1]);
-let add = args[1]==='add'||args[1]==='+';
+    let c = parseInt(args[1]==='add'||args[1]==='+'?args[2]:args[1]);
+    let add = args[1]==='add'||args[1]==='+';
 
-if (isNaN(c)) return sock.sendMessage(chatId, { text: "❌ Invalid." }, { quoted: msg });
-if (!s.participants[senderId]) s.participants[senderId] = { name: senderName, words: 0 };
+    if (isNaN(c)) return sock.sendMessage(chatId, { text: "❌ Invalid." }, { quoted: msg });
+    if (!s.participants[senderId]) s.participants[senderId] = { name: senderName, words: 0 };
 
-if (add) { 
-s.participants[senderId].words += c; 
-await sock.sendMessage(chatId, { text: `➕ Added. Total: ${s.participants[senderId].words}` }, { quoted: msg }); 
-}
-else { 
-s.participants[senderId].words = c; 
-await sock.sendMessage(chatId, { text: `✅` }, { quoted: msg }); 
-}
+    if (add) { 
+        s.participants[senderId].words += c; 
+        await sock.sendMessage(chatId, { text: `➕ Added. Total: ${s.participants[senderId].words}` }, { quoted: msg }); 
+    }
+    else { 
+        s.participants[senderId].words = c; 
+        await sock.sendMessage(chatId, { text: `✅` }, { quoted: msg }); 
+    }
 
-await ActiveSprint.updateOne(
-{ groupId: chatId }, 
-{ $set: { participants: s.participants } }
-);
+    await ActiveSprint.updateOne(
+        { groupId: chatId }, 
+        { $set: { participants: s.participants } }
+    );
 }
 
 if (command === "!finish") {
@@ -1007,7 +1018,9 @@ if (command === "!finish") {
         delete activeSprints[chatId]; 
         await ActiveSprint.deleteOne({ groupId: chatId });
         console.log(`🏃 Sprint ENDED in ${chatId} (No participants)`);
-        return sock.sendMessage(chatId, { text: "🏃 Ended. Empty." }, { quoted: msg }); 
+        return sock.sendMessage(chatId, { 
+            text: "🏃 **Sprint Finished**\n\nNo words were logged this time. 🦗\n\nReady to try again? Type `!sprint 15` to start a new one!" 
+        }, { quoted: msg }); 
     }
 
     let txt = `🏆 *SPRINT RESULTS* 🏆\n\n`;
