@@ -764,10 +764,35 @@ return sock.sendMessage(chatId, { text: `✅ Name: ${n}` }, { quoted: msg });
 }
 
 if (command === "!profile") {
-    const profile = await UserProfile.findOne({ userId: senderId });
-    const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+    // 1. Get or Create Profile
+    let profile = await UserProfile.findOne({ userId: senderId });
+    
+    // 2. FORCE SYNC: Calculate true total from DailyStats history
+    const historyStats = await DailyStats.aggregate([
+        { $match: { userId: senderId } },
+        { $group: { _id: null, total: { $sum: "$words" } } }
+    ]);
+    const trueTotal = historyStats[0]?.total || 0;
 
-    if (!profile) return sock.sendMessage(chatId, { text: "📭 No profile yet. Log some words to start!" }, { quoted: msg });
+    // If profile doesn't exist, create it with the true total
+    if (!profile) {
+        profile = await UserProfile.create({
+            userId: senderId,
+            name: senderName,
+            currentStreak: 0,
+            bestStreak: 0,
+            lastActiveDate: "",
+            totalWordsAllTime: trueTotal 
+        });
+    } else {
+        // If profile exists but total is wrong (e.g. only showing 1), update it
+        if (profile.totalWordsAllTime < trueTotal) {
+            profile.totalWordsAllTime = trueTotal;
+            await profile.save();
+        }
+    }
+
+    const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
 
     let rank = "Novice Scribbler 🪶";
     if (profile.totalWordsAllTime > 10000) rank = "Ink Apprentice ✒️";
@@ -782,9 +807,17 @@ if (command === "!profile") {
               `🏆 Best Streak: ${profile.bestStreak} days\n` +
               `📚 All-Time Words: ${profile.totalWordsAllTime.toLocaleString()}\n`;
     
+    // --- VISUAL FIX: Add Progress Bar ---
     if (goal) {
-        const pct = ((goal.current / goal.target) * 100).toFixed(1);
-        txt += `\n🎯 *Current Goal:*\n${goal.current} / ${goal.target} (${pct}%)`;
+        const rawPct = (goal.current / goal.target) * 100;
+        const pct = Math.min(100, Math.max(0, rawPct));
+        const filledCount = Math.round(pct / 10); 
+        const emptyCount = 10 - filledCount;
+        const bar = "🟩".repeat(filledCount) + "⬜".repeat(emptyCount);
+
+        txt += `\n🎯 *Current Goal:*\n` + 
+               "```" + `${goal.current} / ${goal.target}` + "```" + ` (${pct.toFixed(1)}%)\n` +
+               `${bar}`;
     }
 
     return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
