@@ -962,63 +962,61 @@ await sock.sendMessage(chatId, { text: txt });
 }
 
 if (command === "!goal") {
-const sub = args[1]?.toLowerCase();
+    const sub = args[1]?.toLowerCase();
 
-if (sub === "set") {
-const t = parseInt(args[2]);
-if (isNaN(t)) return sock.sendMessage(chatId, { text: "❌ Use: `!goal set 5000`" }, { quoted: msg });
-await PersonalGoal.updateMany({ userId: senderId }, { isActive: false });
-await PersonalGoal.create({ userId: senderId, name: senderName, target: t, current: 0 });
-return sock.sendMessage(chatId, { text: `🎯 Goal set: ${t} words` }, { quoted: msg });
-}
-
-if (sub === "check") {
-const g = await PersonalGoal.findOne({ userId: senderId, isActive: true });
-if (!g) return sock.sendMessage(chatId, { text: "❌ No active goal. Start one with `!goal set [number]`" }, { quoted: msg });
-
-// ... existing !goal set and !goal check code ...
-
-if (sub === "history") {
-    // 1. Fetch last 5 inactive goals
-    const history = await PersonalGoal.find({ userId: senderId, isActive: false })
-                                      .sort({ _id: -1 }) // Newest first
-                                      .limit(5);
-
-    if (history.length === 0) {
-        return sock.sendMessage(chatId, { text: "📜 No past goals found." }, { quoted: msg });
+    // 1. SET GOAL
+    if (sub === "set") {
+        const t = parseInt(args[2]);
+        if (isNaN(t)) return sock.sendMessage(chatId, { text: "❌ Use: `!goal set 5000`" }, { quoted: msg });
+        await PersonalGoal.updateMany({ userId: senderId }, { isActive: false });
+        await PersonalGoal.create({ userId: senderId, name: senderName, target: t, current: 0 });
+        return sock.sendMessage(chatId, { text: `🎯 Goal set: ${t} words` }, { quoted: msg });
     }
 
-    let txt = `📜 *GOAL HISTORY (Last 5)*\n━━━━━━━━━━━━━━\n`;
+    // 2. GOAL HISTORY (Moved outside of 'check')
+    if (sub === "history") {
+        const history = await PersonalGoal.find({ userId: senderId, isActive: false })
+                                          .sort({ _id: -1 })
+                                          .limit(5);
 
-    history.forEach((g) => {
-        // 2. Determine Status (Win or Fail)
-        const percent = Math.min(100, (g.current / g.target) * 100).toFixed(1);
-        const isWin = g.current >= g.target;
-        const icon = isWin ? "✅" : "❌";
-        
-        // 3. Format Date (g.startDate is stored as YYYY-MM-DD)
-        txt += `${icon} *${g.startDate}*\n`;
-        txt += `   Target: ${g.target.toLocaleString()} words\n`;
-        txt += `   Result: ${g.current.toLocaleString()} (${percent}%)\n\n`;
-    });
+        if (history.length === 0) {
+            return sock.sendMessage(chatId, { text: "📜 No past goals found." }, { quoted: msg });
+        }
 
-    return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
-}
+        let txt = `📜 *GOAL HISTORY (Last 5)*\n━━━━━━━━━━━━━━\n`;
 
-const rawPct = (g.current / g.target) * 100;
-const pct = Math.min(100, Math.max(0, rawPct));
-const filledCount = Math.round(pct / 10); 
-const emptyCount = 10 - filledCount;
-const bar = "🟩".repeat(filledCount) + "⬜".repeat(emptyCount);
+        history.forEach((g) => {
+            const percent = Math.min(100, (g.current / g.target) * 100).toFixed(1);
+            const isWin = g.current >= g.target;
+            const icon = isWin ? "✅" : "❌";
+            
+            txt += `${icon} *${g.startDate}*\n`;
+            txt += `   Target: ${g.target.toLocaleString()} words\n`;
+            txt += `   Result: ${g.current.toLocaleString()} (${percent}%)\n\n`;
+        });
 
-const txt = `🎯 *Goal Progress*\n` +
-`👤 ${g.name}\n` +
-`📊 ` + "```" + `${g.current} / ${g.target}` + "```" + ` words\n` +  // <--- Wrapped in ``` for highlighting
-`${bar} (${rawPct.toFixed(1)}%)\n` +
-`📅 Started: ${g.startDate}`;
+        return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
+    }
 
-return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
-}
+    // 3. CHECK GOAL (Default if no other sub-command matches, or explicit 'check')
+    if (sub === "check" || !sub) {
+        const g = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+        if (!g) return sock.sendMessage(chatId, { text: "❌ No active goal. Start one with `!goal set [number]`" }, { quoted: msg });
+
+        const rawPct = (g.current / g.target) * 100;
+        const pct = Math.min(100, Math.max(0, rawPct));
+        const filledCount = Math.round(pct / 10); 
+        const emptyCount = 10 - filledCount;
+        const bar = "🟩".repeat(filledCount) + "⬜".repeat(emptyCount);
+
+        const txt = `🎯 *Goal Progress*\n` +
+        `👤 ${g.name}\n` +
+        `📊 ` + "```" + `${g.current} / ${g.target}` + "```" + ` words\n` + 
+        `${bar} (${rawPct.toFixed(1)}%)\n` +
+        `📅 Started: ${g.startDate}`;
+
+        return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
+    }
 }
 
 if (command === "!cancel") {
