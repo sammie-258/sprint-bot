@@ -376,28 +376,25 @@ app.get('/api/admin/groups', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/update', requireAdmin, async (req, res) => {
     try {
-        const { userId, amount, type, name } = req.body; // Added 'name' here
+        const { userId, amount, type, name } = req.body; 
 
-        // --- NEW: Handle Name Update ---
+        // 1. Handle Name Update
         if (type === 'name') {
             if (!name || name.trim() === "") {
                 return res.status(400).json({ error: "Name cannot be empty." });
             }
-            
-            // Update the name in ALL past records so the leaderboard stays consistent
+            // Update name everywhere
             await DailyStats.updateMany({ userId }, { name });
-            
-            // Update the name in their personal goal settings too
             await PersonalGoal.updateMany({ userId }, { name });
-
+            await UserProfile.updateMany({ userId }, { name }); // <--- ADDED THIS TO SYNC PROFILE NAME
             return res.json({ success: true, message: `Name updated to ${name}` });
         }
-        // -------------------------------
 
+        // 2. Handle Word Count Update
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
-
         let doc = await DailyStats.findOne({ userId, date: todayStr }).sort({ timestamp: -1 });
 
+        // If no entry for today exists, create one using last known data
         if (!doc) {
             const history = await DailyStats.findOne({ userId }).sort({ timestamp: -1 });
             if (!history) return res.status(404).json({ message: "No history found for this user." });
@@ -408,20 +405,37 @@ app.post('/api/admin/update', requireAdmin, async (req, res) => {
             });
         }
 
+        let diff = 0;
+        let newDailyTotal = 0;
+
+        // Calculate the difference (delta) so we can apply it to the lifetime profile
         if (type === 'set') {
-            const diff = parseInt(amount) - doc.words;
+            diff = parseInt(amount) - doc.words;
             doc.words = parseInt(amount);
-            doc.timestamp = new Date();
-            await doc.save();
-            await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: diff } });
         } else {
             // Default is 'add'
-            doc.words += parseInt(amount);
-            doc.timestamp = new Date();
-            await doc.save();
-            await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: parseInt(amount) } });
+            diff = parseInt(amount);
+            doc.words += diff;
         }
-        res.json({ success: true, newTotal: doc.words });
+        
+        newDailyTotal = doc.words;
+        doc.timestamp = new Date();
+        await doc.save();
+
+        // 3. SYNC OTHER COLLECTIONS
+        // Update Personal Goal
+        await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: diff } });
+
+        // --- FIX STARTS HERE ---
+        // Update the Lifetime UserProfile so the Manage Writers tab updates immediately
+        await UserProfile.findOneAndUpdate(
+            { userId }, 
+            { $inc: { totalWordsAllTime: diff } }, 
+            { upsert: true } // Create profile if it doesn't exist
+        );
+        // --- FIX ENDS HERE ---
+
+        res.json({ success: true, newTotal: newDailyTotal });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
