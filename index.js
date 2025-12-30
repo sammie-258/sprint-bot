@@ -25,7 +25,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const TIMEZONE = "Africa/Lagos"; 
 
-const OWNER_NUMBER = '2347087899166@c.us'; 
+const OWNER_NUMBER = '223733486772376@lid'; 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123"; 
 
 app.use(express.json()); 
@@ -145,7 +145,8 @@ const GroupChallenge = mongoose.model("GroupChallenge", challengeSchema);
 const MONGO_URI = process.env.MONGO_URI; 
 if (!MONGO_URI) { console.error("❌ ERROR: MONGO_URI is missing!"); process.exit(1); }
 
-let activeSprints = {}; 
+let activeSprints = {};
+let activePomodoros = {}; 
 
 
 // =======================
@@ -996,6 +997,33 @@ if (command === "!sprint") {
     await startSprintSession(chatId, m);
 }
 
+if (command === "!pomo") {
+    // Usage: !pomo [sprint] [break] [rounds]
+    // Default: 25 sprint, 5 break, 4 rounds
+    const sprintTime = parseInt(args[1]) || 25;
+    const breakTime = parseInt(args[2]) || 5;
+    const rounds = parseInt(args[3]) || 4;
+
+    if (activeSprints[chatId]) return sock.sendMessage(chatId, { text: "⚠️ A sprint is already running!" }, { quoted: msg });
+    if (activePomodoros[chatId]) return sock.sendMessage(chatId, { text: "⚠️ A Pomodoro session is already active!" }, { quoted: msg });
+
+    // Save Pomo State
+    activePomodoros[chatId] = {
+        sprintTime,
+        breakTime,
+        roundsLeft: rounds,
+        totalRounds: rounds,
+        isBreak: false
+    };
+
+    await sock.sendMessage(chatId, { 
+        text: `🍅 *POMODORO STARTED!* 🍅\n\n🔄 Rounds: ${rounds}\n🏃 Sprint: ${sprintTime}m\n☕ Break: ${breakTime}m\n\n*Round 1/${rounds} starting NOW!*` 
+    }, { quoted: msg });
+
+    // Start First Sprint
+    await startSprintSession(chatId, sprintTime);
+}
+
 if (command === "!schedule") {
 if (args[2] !== 'in') return sock.sendMessage(chatId, { text: "❌ Use: `!schedule 20 in 60`" }, { quoted: msg });
 const d = parseInt(args[1]), w = parseInt(args[3]);
@@ -1060,63 +1088,103 @@ if (command === "!finish") {
     
     const l = Object.entries(s.participants).map(([u, d]) => ({ ...d, uid: u })).sort((a, b) => b.words - a.words);
     
-    if (l.length === 0) { 
-        delete activeSprints[chatId]; 
-        await ActiveSprint.deleteOne({ groupId: chatId });
-        console.log(`🏃 Sprint ENDED in ${chatId} (No participants)`);
-        return sock.sendMessage(chatId, { 
-            text: "🏃 **Sprint Finished**\n\nNo words were logged this time. 🦗\n\nReady to try again? Type `!sprint 15` to start a new one!" 
-        }, { quoted: msg }); 
-    }
-
-    let txt = `🏆 *SPRINT RESULTS* 🏆\n\n`;
-    let mentions = []; // 1. Create array to store IDs
-
-    for (let i = 0; i < l.length; i++) {
-        let p = l[i];
-        mentions.push(p.uid); // 2. Add user ID to mentions list
-        
-        // 3. Use @number format in the text string
-        txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} @${p.uid.split('@')[0]} : ${p.words} words (${Math.round(p.words/s.duration)} WPM)\n`;
-        
-        try {
-            // Update Daily Stats
-            await DailyStats.findOneAndUpdate({ userId: p.uid, groupId: chatId, date: todayStr }, { name: p.name, $inc: { words: p.words }, timestamp: new Date() }, { upsert: true });
-            
-            // --- NEW: Update Streak for this participant ---
-            await updateStreak(p.uid, p.name, p.words);
-            // -----------------------------------------------
-
-            // Update Goal
-            const g = await PersonalGoal.findOne({ userId: p.uid, isActive: true });
-            if (g) { 
-                g.current += p.words; 
-                await g.save(); 
-                if (g.current >= g.target) { 
-                    g.isActive = false; 
-                    await g.save(); 
-                    txt += `\n🎉 Goal Hit!`; 
-                } 
-            }
-            // --- NEW: Update Group Challenge ---
-            const chRes = await updateChallenge(chatId, p.uid, p.name, p.words);
-            if (chRes && chRes.completed) {
-                // We delay the victory message slightly so it appears AFTER the sprint results
-                setTimeout(async () => {
-                    await sock.sendMessage(chatId, { text: chRes.text, mentions: chRes.mentions });
-                }, 2000);
-            }
-        } catch (e) {}
-    }
-    delete activeSprints[chatId];
+    // Cleanup sprint data
+    delete activeSprints[chatId]; 
     await ActiveSprint.deleteOne({ groupId: chatId });
 
-    console.log(`🏃 Sprint ENDED in ${chatId} with ${l.length} writers`);
+    let mentions = []; 
 
-    txt += "\nGreat job, everyone!\n\n👉 *Next Step:* Type `!sprint 15` to go again or `!schedule` to plan ahead!";
+    // 1. Handle Empty Sprint
+    if (l.length === 0) { 
+        console.log(`🏃 Sprint ENDED in ${chatId} (No participants)`);
+        await sock.sendMessage(chatId, { 
+            text: "🏃 **Sprint Finished**\n\nNo words were logged this time. 🦗" 
+        }, { quoted: msg }); 
 
-    // 4. Pass the mentions array here
-    await sock.sendMessage(chatId, { text: txt, mentions: mentions });
+        if (!activePomodoros[chatId]) {
+            return sock.sendMessage(chatId, { text: "Ready to try again? Type `!sprint 15` to start a new one!" });
+        }
+    } 
+    
+    // 2. Handle Sprint with Results
+    else { 
+        let txt = `🏆 *SPRINT RESULTS* 🏆\n\n`;
+
+        for (let i = 0; i < l.length; i++) {
+            let p = l[i];
+            mentions.push(p.uid); // Collect IDs to tag later
+            
+            txt += `${i===0?'🥇':i===1?'🥈':i===2?'🥉':'🎖️'} @${p.uid.split('@')[0]} : ${p.words} words (${Math.round(p.words/s.duration)} WPM)\n`;
+            
+            try {
+                // Stats & Gamification Updates
+                await DailyStats.findOneAndUpdate({ userId: p.uid, groupId: chatId, date: todayStr }, { name: p.name, $inc: { words: p.words }, timestamp: new Date() }, { upsert: true });
+                await updateStreak(p.uid, p.name, p.words);
+
+                const g = await PersonalGoal.findOne({ userId: p.uid, isActive: true });
+                if (g) { 
+                    g.current += p.words; 
+                    await g.save(); 
+                    if (g.current >= g.target) { g.isActive = false; await g.save(); txt += `\n🎉 Goal Hit!`; } 
+                }
+                
+                const chRes = await updateChallenge(chatId, p.uid, p.name, p.words);
+                if (chRes && chRes.completed) {
+                    setTimeout(async () => { await sock.sendMessage(chatId, { text: chRes.text, mentions: chRes.mentions }); }, 2000);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        if (!activePomodoros[chatId]) {
+            txt += "\nGreat job, everyone!\n\n👉 *Next Step:* Type `!sprint 15` to go again or `!schedule` to plan ahead!";
+        }
+
+        await sock.sendMessage(chatId, { text: txt, mentions: mentions });
+    }
+
+    // 3. POMODORO LOGIC (Updated with Tagging)
+    if (activePomodoros[chatId]) {
+        const pomo = activePomodoros[chatId];
+        pomo.roundsLeft--;
+
+        // --- NEW: SAVE PARTICIPANTS ---
+        // We save the 'mentions' array from the sprint so we can tag them later
+        if (mentions.length > 0) pomo.lastParticipants = mentions;
+        // ------------------------------
+
+        if (pomo.roundsLeft > 0) {
+            // START BREAK
+            pomo.isBreak = true;
+            await sock.sendMessage(chatId, { 
+                text: `🛑 *Sprint Ended!* \n\n☕ Take a *${pomo.breakTime} min* break.\nNext round starts automatically.` 
+            });
+
+            setTimeout(async () => {
+                // Check if Pomo wasn't cancelled during the break
+                if (activePomodoros[chatId]) {
+                    pomo.isBreak = false;
+                    const roundNum = pomo.totalRounds - pomo.roundsLeft + 1;
+                    
+                    // --- NEW: TAG PARTICIPANTS ---
+                    const writersToTag = pomo.lastParticipants || [];
+                    const tagText = writersToTag.length > 0 ? `\n\nSummoning: ${writersToTag.map(id => '@' + id.split('@')[0]).join(' ')}` : "";
+                    
+                    await sock.sendMessage(chatId, { 
+                        text: `🔔 *BREAK OVER!* \n\n🏃 Round ${roundNum}/${pomo.totalRounds}: ${pomo.sprintTime} mins!\nWrite! Write! Write!${tagText}`,
+                        mentions: writersToTag
+                    });
+                    // -----------------------------
+                    
+                    await startSprintSession(chatId, pomo.sprintTime);
+                }
+            }, pomo.breakTime * 60000); 
+
+        } else {
+            // POMO FINISHED
+            delete activePomodoros[chatId];
+            await sock.sendMessage(chatId, { text: `🎉 *POMODORO COMPLETE!* 🍅\n\nYou survived ${pomo.totalRounds} rounds. Amazing focus!` });
+        }
+    }
 }
 
 if (["!daily", "!weekly", "!monthly"].includes(command)) {
