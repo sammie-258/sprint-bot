@@ -28,7 +28,8 @@ const TIMEZONE = "Africa/Lagos";
 const OWNER_NUMBER = '223733486772376@lid'; 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123"; 
 
-app.use(express.json()); 
+app.use(express.json({ limit: '10mb' })); // Allow images up to 10MB
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // CORS
 app.use((req, res, next) => {
@@ -425,23 +426,50 @@ app.post('/api/admin/update', requireAdmin, async (req, res) => {
 });
 
 app.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
-try {
-const { message } = req.body;
-if (!sock || !isConnected) return res.status(500).json({ error: "Bot offline" });
+    try {
+        const { message, image } = req.body; // 'image' is a Base64 string
 
-const chats = await sock.groupFetchAllParticipating();
-let count = 0;
+        // Validation: Must have at least text OR image
+        if (!message && !image) return res.status(400).json({ error: "Provide text or image" });
 
-for (const [jid, group] of Object.entries(chats)) {
-try {
-await sock.sendMessage(jid, { text: `📢 *ANNOUNCEMENT*\n\n${message}` });
-count++;
-await new Promise(r => setTimeout(r, 500));
-} catch(e) { console.log("Broadcast error", e); }
-}
+        const groups = await ActiveSprint.find({}); // Or however you track groups
+        // If you don't track all groups in ActiveSprint, you might need a GroupList collection.
+        // For now, let's assume you broadcast to active groups or use a list you saved.
+        // IMPORTANT: If you want to broadcast to ALL groups the bot is in, you need to save them to DB when bot joins.
+        // For this example, I will assume you want to send to 'DailyStats' unique groupIds or similar.
+        // But to keep it simple and safe, let's just loop through a known list or active sprints.
+        // BETTER: Use your existing logic for fetching groups.
+        
+        // Let's assume you have a way to get all groupIds. 
+        // If not, use: const groups = await GroupChallenge.distinct("groupId"); 
+        // Or strictly strictly:
+        const chats = await sock.groupFetchAllParticipating();
+        const groupIds = Object.keys(chats);
 
-res.json({ success: true, count });
-} catch (e) { res.status(500).json({ error: e.message }); }
+        let count = 0;
+        
+        for (const id of groupIds) {
+            try {
+                if (image) {
+                    // Send Image (with or without caption)
+                    const buffer = Buffer.from(image.split(",")[1], 'base64');
+                    await sock.sendMessage(id, { image: buffer, caption: message || "" });
+                } else {
+                    // Send Text Only
+                    await sock.sendMessage(id, { text: message });
+                }
+                count++;
+                await new Promise(r => setTimeout(r, 500)); // Delay to prevent spam blocks
+            } catch (e) {
+                console.error(`Failed to send to ${id}`);
+            }
+        }
+
+        res.json({ success: true, count });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
