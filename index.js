@@ -1300,12 +1300,25 @@ if (command === "!goal") {
     }
 }
 
-if (command === "!cancel") {
-if (activeSprints[chatId]) { 
-delete activeSprints[chatId]; 
-await ActiveSprint.deleteOne({ groupId: chatId }); 
-await sock.sendMessage(chatId, { text: "🚫 Cancelled." }, { quoted: msg }); 
-}
+if (command === "!cancel" || command === "!stop") {
+    let text = "";
+
+    // Cancel Sprint
+    if (activeSprints[chatId]) {
+        clearTimeout(activeSprints[chatId].timeout); // Stop timer
+        delete activeSprints[chatId];
+        await ActiveSprint.deleteOne({ groupId: chatId });
+        text += "🚫 Sprint cancelled.\n";
+    }
+
+    // Cancel Pomodoro
+    if (activePomodoros[chatId]) {
+        delete activePomodoros[chatId];
+        text += "🚫 Pomodoro session cancelled.";
+    }
+
+    if (!text) text = "💤 Nothing to cancel.";
+    await sock.sendMessage(chatId, { text }, { quoted: msg });
 }
 
 } catch (err) { console.error("Handler error:", err); }
