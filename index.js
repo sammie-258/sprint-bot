@@ -826,31 +826,34 @@ if (command === "!help") {
 `🤖 *SPRINT BOT COMMANDS*
 ━━━━━━━━━━━━━━━━━━
 
-🏃 *Sprinting*
+🍅 *Sprinting & Focus*
 • *!sprint 20* → Start 20 min sprint
+• *!pomo 25 5 4* → Start Pomodoro (Sprint/Break/Rounds)
 • *!wc 500* → Log words (during sprint)
 • *!time* → Check time remaining
 • *!finish* → End sprint & view results
-• *!cancel* → Stop the timer
+• *!cancel* → Stop current timer
 
 ⚔️ *Challenges*
-• *!challenge 5000* → Start group boss
-• *!challenge check* → View progress
+• *!challenge 5000* → Start group boss battle
+• *!challenge check* → View boss HP
+• *!challenge stop* → Cancel challenge
 
 📊 *Stats & Profile*
 • *!profile* → Rank, Streak & Total
-• *!daily* → Today's Global Top 10
+• *!daily* → Today's Global Leaderboard
 • *!top10* → All-Time Hall of Fame
-• *!myname Sam* → Update display name
+• *!myname Sam* → Set your display name
 
 🎯 *Goals*
 • *!goal set 1000* → Set daily target
 • *!goal check* → View progress
-• *!goal history* → Past goals
+• *!goal history* → View past records
 
 ⚙️ *Utils*
-• *!log 500* → Add words (No timer)
-• *!schedule 20 in 60* → Plan a sprint` }, { quoted: msg });
+• *!log 500* → Add words manually (No timer)
+• *!schedule 20 in 60* → Plan a sprint
+• *!unschedule* → Cancel plans` }, { quoted: msg });
 }
 
 if (command === "!log") {
