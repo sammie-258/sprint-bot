@@ -14,7 +14,14 @@
     <script>
         tailwind.config = {
             darkMode: 'class',
-            theme: { extend: {} }
+            theme: {
+                extend: {
+                    colors: {
+                        glassDark: "rgba(30, 41, 59, 0.7)",
+                        glassLight: "rgba(255, 255, 255, 0.6)",
+                    }
+                }
+            }
         }
     </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -22,12 +29,23 @@
 
     <style>
         body { font-family: 'Outfit', sans-serif; }
-        .glass-panel { 
+        
+        /* Dark Mode Glass */
+        .dark .glass-panel { 
             background: rgba(15, 23, 42, 0.6); 
             backdrop-filter: blur(16px); 
             border: 1px solid rgba(255, 255, 255, 0.1); 
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
+
+        /* Light Mode Glass */
+        .glass-panel { 
+            background: rgba(255, 255, 255, 0.65); 
+            backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.6); 
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
+        }
+
         .bg-pattern {
             background-image: url('https://images.unsplash.com/photo-1519681393798-3828fb4090bb?q=80&w=2940&auto=format&fit=crop');
             background-size: cover;
@@ -35,7 +53,7 @@
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 text-white bg-pattern bg-blend-multiply">
+<body class="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-100 dark:bg-slate-900 text-slate-800 dark:text-white transition-colors duration-300 relative bg-pattern bg-blend-overlay dark:bg-blend-multiply">
 
     <script>
         const USER_DATA = {
@@ -44,6 +62,7 @@
             rank: "{{RANK}}",
             total: "{{TOTAL}}",
             streak: "{{STREAK}}",
+            // Check if goal display is NOT hidden (meaning it is block)
             goalActive: "{{GOAL_DISPLAY}}" !== "hidden",
             goalCurrent: "{{GOAL_CURRENT}}",
             goalTarget: "{{GOAL_TARGET}}",
@@ -51,51 +70,60 @@
         };
     </script>
 
+    <div class="fixed top-4 right-4 flex gap-2 z-50">
+        <button onclick="toggleTheme()" class="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-lg flex items-center justify-center text-slate-600 dark:text-yellow-400 transition hover:scale-110">
+            <i class="fas fa-sun dark:hidden"></i>
+            <i class="fas fa-moon hidden dark:block"></i>
+        </button>
+    </div>
+
     <div class="glass-panel w-full max-w-sm rounded-3xl overflow-hidden relative transform transition duration-500 hover:scale-[1.01]">
         
         <div class="h-28 bg-gradient-to-r from-emerald-500 to-blue-600 relative">
             <div class="absolute -bottom-12 left-1/2 -translate-x-1/2">
-                <div class="w-24 h-24 rounded-full bg-slate-900 border-4 border-slate-800 flex items-center justify-center text-3xl font-bold shadow-xl text-white">
-                    {{INITIAL}}
+                <div class="w-24 h-24 rounded-full bg-white dark:bg-slate-900 border-4 border-white dark:border-slate-800 flex items-center justify-center text-3xl font-bold shadow-xl text-slate-800 dark:text-white">
+                    <span id="ui-initial"></span>
                 </div>
             </div>
         </div>
 
         <div class="pt-14 pb-8 px-6 text-center">
-            <h1 class="text-3xl font-extrabold mb-1 tracking-tight text-white">{{NAME}}</h1>
+            <h1 class="text-3xl font-extrabold mb-1 tracking-tight text-slate-800 dark:text-white" id="ui-name"></h1>
             
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-xs font-bold text-emerald-400 uppercase tracking-wider mb-8 shadow-sm">
-                👑 {{RANK}}
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-200/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-8 shadow-sm">
+                <span id="ui-rank"></span>
             </div>
 
             <div class="grid grid-cols-2 gap-4 mb-8">
-                <div class="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 shadow-sm">
-                    <div class="text-2xl font-bold text-white">{{TOTAL}}</div>
-                    <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1">Total Words</div>
+                <div class="bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm">
+                    <div class="text-2xl font-bold text-slate-800 dark:text-white" id="ui-total"></div>
+                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">Total Words</div>
                 </div>
                 
-                <div class="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 shadow-sm relative overflow-hidden">
+                <div class="bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm relative overflow-hidden">
                     <div class="text-2xl font-bold text-orange-500 flex items-center justify-center gap-1">
-                        {{STREAK}} <i class="fas fa-fire animate-pulse"></i>
+                        <span id="ui-streak"></span> <i class="fas fa-fire animate-pulse"></i>
                     </div>
-                    <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1">Day Streak</div>
+                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">Day Streak</div>
                 </div>
             </div>
 
-            <div class="{{GOAL_DISPLAY}} mb-6">
+            <div id="ui-goal-container" class="hidden mb-6">
                 <div class="flex justify-between text-xs mb-2 font-bold px-1">
-                    <span class="text-slate-400">Daily Goal</span>
-                    <span class="text-white">{{GOAL_CURRENT}} / {{GOAL_TARGET}}</span>
+                    <span class="text-slate-500 dark:text-slate-400">Daily Goal</span>
+                    <span class="text-slate-800 dark:text-white" id="ui-goal-text"></span>
                 </div>
-                <div class="w-full bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner">
-                    <div class="bg-gradient-to-r from-emerald-400 to-blue-500 h-full rounded-full" style="width: {{GOAL_PERCENT}}%"></div>
+                <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner">
+                    <div id="ui-goal-bar" class="bg-gradient-to-r from-emerald-400 to-blue-500 h-full rounded-full transition-all duration-1000 relative" style="width: 0%">
+                        <div class="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"></div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="bg-slate-900/50 p-4 text-center border-t border-slate-800">
+        <div class="bg-slate-100/50 dark:bg-slate-900/50 p-4 text-center border-t border-slate-200 dark:border-slate-800">
             <p class="text-xs text-slate-500 font-semibold tracking-wide">
-                Sprint Bot by QuillReads
+                <i class="fas fa-robot mr-1"></i> Sprint Bot by QuillReads
             </p>
         </div>
     </div>
@@ -112,26 +140,61 @@
     <canvas id="exportCanvas" width="1080" height="1350" style="display:none;"></canvas>
 
     <script>
-        /**
-         * Draws the profile card onto the HTML5 Canvas
-         */
+        // --- 1. Populate UI from USER_DATA ---
+        // This ensures the HTML body gets the correct numbers even if server only replaces the first instance
+        function initUI() {
+            document.getElementById('ui-name').innerText = USER_DATA.name;
+            document.getElementById('ui-initial').innerText = USER_DATA.initial;
+            document.getElementById('ui-rank').innerText = "👑 " + USER_DATA.rank;
+            document.getElementById('ui-total').innerText = USER_DATA.total;
+            document.getElementById('ui-streak').innerText = USER_DATA.streak;
+
+            if (USER_DATA.goalActive) {
+                document.getElementById('ui-goal-container').classList.remove('hidden');
+                document.getElementById('ui-goal-text').innerText = `${USER_DATA.goalCurrent} / ${USER_DATA.goalTarget}`;
+                
+                // Animate bar
+                setTimeout(() => {
+                    document.getElementById('ui-goal-bar').style.width = `${USER_DATA.goalPercent}%`;
+                }, 100);
+            }
+        }
+
+        // --- 2. Theme Logic ---
+        function toggleTheme() {
+            const html = document.documentElement;
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        // Initialize (Run on load)
+        if (localStorage.getItem('theme') === 'light') {
+            document.documentElement.classList.remove('dark');
+        } else {
+            document.documentElement.classList.add('dark');
+        }
+        
+        // Initialize Data
+        initUI();
+
+        // --- 3. Canvas Generation (Drawing the image) ---
         function drawCanvas(callback) {
             const canvas = document.getElementById('exportCanvas');
             const ctx = canvas.getContext('2d');
             
-            // Fonts
-            const fontBold = "bold 60px 'Outfit', sans-serif";
-            const fontRegular = "40px 'Outfit', sans-serif";
-            const fontSmall = "bold 30px 'Outfit', sans-serif";
-
-            // 1. Background
+            // Background
             const bgGrad = ctx.createLinearGradient(0, 0, 0, 1350);
             bgGrad.addColorStop(0, '#0f172a');
             bgGrad.addColorStop(1, '#1e293b');
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, 1080, 1350);
 
-            // 2. The Glass Card
+            // Card
             const cardX = 80;
             const cardY = 200;
             const cardW = 920;
@@ -142,31 +205,27 @@
             ctx.fillStyle = "rgba(30, 41, 59, 0.8)";
             ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
             ctx.lineWidth = 2;
-            
-            // Draw Rounded Rect for Card
             ctx.beginPath();
             ctx.roundRect(cardX, cardY, cardW, cardH, radius);
             ctx.fill();
             ctx.stroke();
-            ctx.clip(); // Clip for the banner
+            ctx.clip(); 
 
-            // 3. Banner
+            // Banner
             const banGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY);
-            banGrad.addColorStop(0, '#10b981'); // Emerald
-            banGrad.addColorStop(1, '#2563eb'); // Blue
+            banGrad.addColorStop(0, '#10b981'); 
+            banGrad.addColorStop(1, '#2563eb'); 
             ctx.fillStyle = banGrad;
             ctx.fillRect(cardX, cardY, cardW, 250);
             ctx.restore();
 
-            // 4. Avatar Circle
-            const avX = 540; // Center
+            // Avatar
+            const avX = 540; 
             const avY = cardY + 250; 
             const avR = 100;
-
-            // Circle Border/Bg
             ctx.beginPath();
             ctx.arc(avX, avY, avR, 0, Math.PI * 2);
-            ctx.fillStyle = "#0f172a"; // Dark bg
+            ctx.fillStyle = "#0f172a"; 
             ctx.fill();
             ctx.lineWidth = 10;
             ctx.strokeStyle = "#1e293b";
@@ -179,48 +238,42 @@
             ctx.textBaseline = "middle";
             ctx.fillText(USER_DATA.initial, avX, avY + 5);
 
-            // 5. User Name
+            // Name
             ctx.fillStyle = "#ffffff";
             ctx.font = "bold 70px 'Outfit', Arial";
             ctx.fillText(USER_DATA.name, 540, 620);
 
-            // 6. Rank Badge
+            // Rank Badge
             const rankText = "👑 " + USER_DATA.rank;
             ctx.font = "bold 35px 'Outfit', Arial";
             const rankWidth = ctx.measureText(rankText).width + 60;
-            
             ctx.fillStyle = "rgba(51, 65, 85, 0.8)";
             ctx.beginPath();
             ctx.roundRect(540 - (rankWidth/2), 660, rankWidth, 60, 30);
             ctx.fill();
-            
-            ctx.fillStyle = "#34d399"; // Emerald text
+            ctx.fillStyle = "#34d399";
             ctx.fillText(rankText, 540, 692);
 
-            // 7. Stats Boxes
+            // Stats Boxes
             drawStatBox(ctx, 130, 780, 390, 200, USER_DATA.total, "TOTAL WORDS", "white");
             drawStatBox(ctx, 560, 780, 390, 200, USER_DATA.streak + " 🔥", "DAY STREAK", "#f97316");
 
-            // 8. Goal (If Active)
+            // Goal
             if (USER_DATA.goalActive) {
                 const goalY = 1050;
-                // Labels
                 ctx.font = "bold 30px 'Outfit', Arial";
-                ctx.fillStyle = "#94a3b8"; // Gray
+                ctx.fillStyle = "#94a3b8"; 
                 ctx.textAlign = "left";
                 ctx.fillText("DAILY GOAL", 140, goalY);
-                
                 ctx.fillStyle = "#ffffff";
                 ctx.textAlign = "right";
                 ctx.fillText(`${USER_DATA.goalCurrent} / ${USER_DATA.goalTarget}`, 940, goalY);
 
-                // Bar Background
                 ctx.fillStyle = "#334155";
                 ctx.beginPath();
                 ctx.roundRect(130, goalY + 20, 820, 30, 15);
                 ctx.fill();
 
-                // Bar Fill
                 const maxW = 820;
                 const pct = Math.min(1, USER_DATA.goalPercent / 100);
                 const fillW = maxW * pct;
@@ -236,13 +289,12 @@
                 }
             }
 
-            // 9. Footer
+            // Footer
             ctx.fillStyle = "#64748b";
             ctx.font = "bold 30px 'Outfit', Arial";
             ctx.textAlign = "center";
             ctx.fillText("Sprint Bot by QuillReads", 540, 1280);
 
-            // Finish
             if (callback) callback(canvas);
         }
 
@@ -261,15 +313,12 @@
             ctx.textBaseline = "middle";
             ctx.fillText(value, x + w/2, y + h/2 - 15);
 
-            ctx.fillStyle = "#94a3b8"; // Slate 400
+            ctx.fillStyle = "#94a3b8"; 
             ctx.font = "bold 24px 'Outfit', Arial";
             ctx.fillText(label, x + w/2, y + h/2 + 40);
         }
 
-        // --- ACTIONS ---
-
         function downloadImage() {
-            // Load fonts first then draw
             document.fonts.ready.then(() => {
                 drawCanvas((canvas) => {
                     const link = document.createElement('a');
