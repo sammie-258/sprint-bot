@@ -676,41 +676,52 @@ const { version } = await fetchLatestBaileysVersion();
 sock = makeWASocket({
 version,
 auth: state,
-printQRInTerminal: false,
+printQRInTerminal: true,
 browser: ['Sprint Bot', 'Chrome', '120.0'],
 msgRetryCounterMax: 15,
 defaultQueryTimeoutMs: 60000,
+shouldIgnoreJid: (jid) => jid === 'status@broadcast' || jid.includes('broadcast'), // IGNORE STATUS UPDATES
+    syncFullHistory: false, // DO NOT DOWNLOAD HISTORY (Prevents timeout loops)
+    generateHighQualityLinkPreview: true,
 });
 
 // QR Code Event
-sock.ev.on('connection.update', (update) => {
-const { connection, lastDisconnect, qr } = update;
 
-if (qr) {
-qrCodeData = qr;
-console.log('New QR Code Generated');
-}
+sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update;
 
-if (connection === 'connecting') {
-console.log('⏳ Connecting...');
-// ... inside sock.ev.on('connection.update') ...
-} else if (connection === 'open') {
-    isConnected = true;
-    console.log('✅ Bot Connected!');
-    qrCodeData = null;
-    
-    // --- NEW: Run initial cache update ---
-    updateGroupCache(true); 
-    // -------------------------------------
-} else if (connection === 'close') {
-isConnected = false;
-const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-console.log('❌ Connection closed:', lastDisconnect?.error, 'Reconnecting:', shouldReconnect);
+    if (qr) {
+        qrCodeData = qr;
+        console.log('⚠️ New QR Code Generated - Scan required');
+    }
 
-if (shouldReconnect) {
-setTimeout(() => initializeBot(), 3000);
-}
-}
+    if (connection === 'connecting') {
+        console.log('⏳ Connecting...');
+    } 
+    else if (connection === 'open') {
+        isConnected = true;
+        console.log('✅ Bot Connected!');
+        qrCodeData = null;
+        updateGroupCache(true); 
+    } 
+    else if (connection === 'close') {
+        isConnected = false;
+        
+        // Extract status code
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+        console.log('❌ Connection closed. Code:', statusCode);
+
+        // If the error is 401 (Logged Out) or stream error, we might need to wipe creds
+        if (statusCode === DisconnectReason.loggedOut) {
+            console.log("🛑 Session invalid. Please delete .auth_info_baileys and restart to rescan.");
+            // Optional: process.exit(1) to force a restart if you use a process manager like PM2
+        } else {
+            console.log('🔄 Reconnecting...');
+            setTimeout(() => initializeBot(), 3000);
+        }
+    }
 });
 
 // Credentials Update
