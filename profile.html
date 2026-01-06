@@ -14,40 +14,20 @@
     <script>
         tailwind.config = {
             darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        glassDark: "rgba(30, 41, 59, 0.7)",
-                        glassLight: "rgba(255, 255, 255, 0.6)",
-                    }
-                }
-            }
+            theme: { extend: {} }
         }
     </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-    
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
     <style>
         body { font-family: 'Outfit', sans-serif; }
-        
-        /* Dark Mode Glass */
-        .dark .glass-panel { 
+        .glass-panel { 
             background: rgba(15, 23, 42, 0.6); 
             backdrop-filter: blur(16px); 
             border: 1px solid rgba(255, 255, 255, 0.1); 
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
-
-        /* Light Mode Glass */
-        .glass-panel { 
-            background: rgba(255, 255, 255, 0.65); 
-            backdrop-filter: blur(16px); 
-            border: 1px solid rgba(255, 255, 255, 0.6); 
-            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
-        }
-
         .bg-pattern {
             background-image: url('https://images.unsplash.com/photo-1519681393798-3828fb4090bb?q=80&w=2940&auto=format&fit=crop');
             background-size: cover;
@@ -55,140 +35,273 @@
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-100 dark:bg-slate-950 text-slate-800 dark:text-white transition-colors duration-300 relative bg-pattern bg-blend-overlay dark:bg-blend-multiply">
+<body class="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 text-white bg-pattern bg-blend-multiply">
 
-    <div class="fixed top-4 right-4 flex gap-2 z-50">
-        <button onclick="toggleTheme()" class="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-lg flex items-center justify-center text-slate-600 dark:text-yellow-400 transition hover:scale-110">
-            <i class="fas fa-sun dark:hidden"></i>
-            <i class="fas fa-moon hidden dark:block"></i>
-        </button>
-    </div>
+    <script>
+        const USER_DATA = {
+            name: "{{NAME}}",
+            initial: "{{INITIAL}}",
+            rank: "{{RANK}}",
+            total: "{{TOTAL}}",
+            streak: "{{STREAK}}",
+            goalActive: "{{GOAL_DISPLAY}}" !== "hidden",
+            goalCurrent: "{{GOAL_CURRENT}}",
+            goalTarget: "{{GOAL_TARGET}}",
+            goalPercent: parseFloat("{{GOAL_PERCENT}}") || 0
+        };
+    </script>
 
-    <div id="profile-card" class="glass-panel w-full max-w-sm rounded-3xl overflow-hidden relative transform transition duration-500 hover:scale-[1.01]">
+    <div class="glass-panel w-full max-w-sm rounded-3xl overflow-hidden relative transform transition duration-500 hover:scale-[1.01]">
         
         <div class="h-28 bg-gradient-to-r from-emerald-500 to-blue-600 relative">
-            <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/4 blur-xl"></div>
-            <div class="absolute bottom-0 left-0 w-16 h-16 bg-black/10 rounded-full translate-y-1/3 -translate-x-1/4 blur-lg"></div>
-
             <div class="absolute -bottom-12 left-1/2 -translate-x-1/2">
-                <div class="w-24 h-24 rounded-full bg-white dark:bg-slate-900 border-4 border-white dark:border-slate-800 flex items-center justify-center text-3xl font-bold shadow-xl text-slate-800 dark:text-white">
+                <div class="w-24 h-24 rounded-full bg-slate-900 border-4 border-slate-800 flex items-center justify-center text-3xl font-bold shadow-xl text-white">
                     {{INITIAL}}
                 </div>
             </div>
         </div>
 
         <div class="pt-14 pb-8 px-6 text-center">
-            <h1 class="text-3xl font-extrabold mb-1 tracking-tight text-slate-800 dark:text-white">{{NAME}}</h1>
+            <h1 class="text-3xl font-extrabold mb-1 tracking-tight text-white">{{NAME}}</h1>
             
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-200/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-8 shadow-sm">
-                <i class="fas fa-crown text-yellow-500"></i> {{RANK}}
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-xs font-bold text-emerald-400 uppercase tracking-wider mb-8 shadow-sm">
+                👑 {{RANK}}
             </div>
 
             <div class="grid grid-cols-2 gap-4 mb-8">
-                <div class="bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm">
-                    <div class="text-2xl font-bold text-slate-800 dark:text-white">{{TOTAL}}</div>
-                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">Total Words</div>
+                <div class="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 shadow-sm">
+                    <div class="text-2xl font-bold text-white">{{TOTAL}}</div>
+                    <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1">Total Words</div>
                 </div>
                 
-                <div class="bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm relative overflow-hidden">
+                <div class="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 shadow-sm relative overflow-hidden">
                     <div class="text-2xl font-bold text-orange-500 flex items-center justify-center gap-1">
                         {{STREAK}} <i class="fas fa-fire animate-pulse"></i>
                     </div>
-                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">Day Streak</div>
+                    <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1">Day Streak</div>
                 </div>
             </div>
 
-            <div id="goal-container" class="{{GOAL_DISPLAY}} mb-6">
+            <div class="{{GOAL_DISPLAY}} mb-6">
                 <div class="flex justify-between text-xs mb-2 font-bold px-1">
-                    <span class="text-slate-500 dark:text-slate-400">Daily Goal</span>
-                    <span class="text-slate-800 dark:text-white">{{GOAL_CURRENT}} / {{GOAL_TARGET}}</span>
+                    <span class="text-slate-400">Daily Goal</span>
+                    <span class="text-white">{{GOAL_CURRENT}} / {{GOAL_TARGET}}</span>
                 </div>
-                <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner">
-                    <div class="bg-gradient-to-r from-emerald-400 to-blue-500 h-full rounded-full transition-all duration-1000 relative" style="width: {{GOAL_PERCENT}}%">
-                        <div class="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"></div>
-                    </div>
+                <div class="w-full bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner">
+                    <div class="bg-gradient-to-r from-emerald-400 to-blue-500 h-full rounded-full" style="width: {{GOAL_PERCENT}}%"></div>
                 </div>
             </div>
         </div>
 
-        <div class="bg-slate-100/50 dark:bg-slate-900/50 p-4 text-center border-t border-slate-200 dark:border-slate-800">
+        <div class="bg-slate-900/50 p-4 text-center border-t border-slate-800">
             <p class="text-xs text-slate-500 font-semibold tracking-wide">
-                <i class="fas fa-robot mr-1"></i> Sprint Bot
+                Sprint Bot by QuillReads
             </p>
         </div>
     </div>
 
     <div class="mt-8 flex gap-4">
-        <button onclick="downloadCard()" class="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/30 transition transform hover:-translate-y-1 active:scale-95">
+        <button onclick="downloadImage()" class="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/30 transition transform hover:-translate-y-1 active:scale-95">
             <i class="fas fa-download"></i> Download
         </button>
-        <button onclick="shareProfile()" class="flex items-center gap-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 transition transform hover:-translate-y-1 active:scale-95">
+        <button onclick="shareImage()" class="flex items-center gap-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 transition transform hover:-translate-y-1 active:scale-95">
             <i class="fas fa-share-alt"></i> Share
         </button>
     </div>
 
+    <canvas id="exportCanvas" width="1080" height="1350" style="display:none;"></canvas>
+
     <script>
-        // 1. Theme Logic
-        function toggleTheme() {
-            const html = document.documentElement;
-            if (html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-            } else {
-                html.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-            }
-        }
-
-        // Initialize Theme (Default to Dark if not set)
-        if (localStorage.getItem('theme') === 'light') {
-            document.documentElement.classList.remove('dark');
-        } else {
-            document.documentElement.classList.add('dark');
-        }
-
-        // 2. Download Function
-        function downloadCard() {
-            const card = document.getElementById('profile-card');
+        /**
+         * Draws the profile card onto the HTML5 Canvas
+         */
+        function drawCanvas(callback) {
+            const canvas = document.getElementById('exportCanvas');
+            const ctx = canvas.getContext('2d');
             
-            // Temporarily disable scale transform for clean capture
-            card.style.transform = 'none';
+            // Fonts
+            const fontBold = "bold 60px 'Outfit', sans-serif";
+            const fontRegular = "40px 'Outfit', sans-serif";
+            const fontSmall = "bold 30px 'Outfit', sans-serif";
+
+            // 1. Background
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, 1350);
+            bgGrad.addColorStop(0, '#0f172a');
+            bgGrad.addColorStop(1, '#1e293b');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, 1080, 1350);
+
+            // 2. The Glass Card
+            const cardX = 80;
+            const cardY = 200;
+            const cardW = 920;
+            const cardH = 950;
+            const radius = 60;
+
+            ctx.save();
+            ctx.fillStyle = "rgba(30, 41, 59, 0.8)";
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.lineWidth = 2;
             
-            html2canvas(card, {
-                backgroundColor: null, // Transparent bg
-                scale: 2, // Higher quality
-                logging: false,
-                useCORS: true // For external images
-            }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = 'writer-profile.png';
-                link.href = canvas.toDataURL('image/png');
-                link.click();
+            // Draw Rounded Rect for Card
+            ctx.beginPath();
+            ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+            ctx.fill();
+            ctx.stroke();
+            ctx.clip(); // Clip for the banner
+
+            // 3. Banner
+            const banGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY);
+            banGrad.addColorStop(0, '#10b981'); // Emerald
+            banGrad.addColorStop(1, '#2563eb'); // Blue
+            ctx.fillStyle = banGrad;
+            ctx.fillRect(cardX, cardY, cardW, 250);
+            ctx.restore();
+
+            // 4. Avatar Circle
+            const avX = 540; // Center
+            const avY = cardY + 250; 
+            const avR = 100;
+
+            // Circle Border/Bg
+            ctx.beginPath();
+            ctx.arc(avX, avY, avR, 0, Math.PI * 2);
+            ctx.fillStyle = "#0f172a"; // Dark bg
+            ctx.fill();
+            ctx.lineWidth = 10;
+            ctx.strokeStyle = "#1e293b";
+            ctx.stroke();
+
+            // Initial
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 80px 'Outfit', Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(USER_DATA.initial, avX, avY + 5);
+
+            // 5. User Name
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 70px 'Outfit', Arial";
+            ctx.fillText(USER_DATA.name, 540, 620);
+
+            // 6. Rank Badge
+            const rankText = "👑 " + USER_DATA.rank;
+            ctx.font = "bold 35px 'Outfit', Arial";
+            const rankWidth = ctx.measureText(rankText).width + 60;
+            
+            ctx.fillStyle = "rgba(51, 65, 85, 0.8)";
+            ctx.beginPath();
+            ctx.roundRect(540 - (rankWidth/2), 660, rankWidth, 60, 30);
+            ctx.fill();
+            
+            ctx.fillStyle = "#34d399"; // Emerald text
+            ctx.fillText(rankText, 540, 692);
+
+            // 7. Stats Boxes
+            drawStatBox(ctx, 130, 780, 390, 200, USER_DATA.total, "TOTAL WORDS", "white");
+            drawStatBox(ctx, 560, 780, 390, 200, USER_DATA.streak + " 🔥", "DAY STREAK", "#f97316");
+
+            // 8. Goal (If Active)
+            if (USER_DATA.goalActive) {
+                const goalY = 1050;
+                // Labels
+                ctx.font = "bold 30px 'Outfit', Arial";
+                ctx.fillStyle = "#94a3b8"; // Gray
+                ctx.textAlign = "left";
+                ctx.fillText("DAILY GOAL", 140, goalY);
                 
-                // Reset style
-                card.style.transform = '';
+                ctx.fillStyle = "#ffffff";
+                ctx.textAlign = "right";
+                ctx.fillText(`${USER_DATA.goalCurrent} / ${USER_DATA.goalTarget}`, 940, goalY);
+
+                // Bar Background
+                ctx.fillStyle = "#334155";
+                ctx.beginPath();
+                ctx.roundRect(130, goalY + 20, 820, 30, 15);
+                ctx.fill();
+
+                // Bar Fill
+                const maxW = 820;
+                const pct = Math.min(1, USER_DATA.goalPercent / 100);
+                const fillW = maxW * pct;
+                
+                if (fillW > 0) {
+                    const grad = ctx.createLinearGradient(130, 0, 950, 0);
+                    grad.addColorStop(0, '#34d399');
+                    grad.addColorStop(1, '#3b82f6');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.roundRect(130, goalY + 20, fillW, 30, 15);
+                    ctx.fill();
+                }
+            }
+
+            // 9. Footer
+            ctx.fillStyle = "#64748b";
+            ctx.font = "bold 30px 'Outfit', Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("Sprint Bot by QuillReads", 540, 1280);
+
+            // Finish
+            if (callback) callback(canvas);
+        }
+
+        function drawStatBox(ctx, x, y, w, h, value, label, valueColor) {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+            ctx.strokeStyle = "rgba(255,255,255,0.1)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, 30);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = valueColor;
+            ctx.font = "bold 60px 'Outfit', Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(value, x + w/2, y + h/2 - 15);
+
+            ctx.fillStyle = "#94a3b8"; // Slate 400
+            ctx.font = "bold 24px 'Outfit', Arial";
+            ctx.fillText(label, x + w/2, y + h/2 + 40);
+        }
+
+        // --- ACTIONS ---
+
+        function downloadImage() {
+            // Load fonts first then draw
+            document.fonts.ready.then(() => {
+                drawCanvas((canvas) => {
+                    const link = document.createElement('a');
+                    link.download = `writer-profile-${USER_DATA.name}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                });
             });
         }
 
-        // 3. Share Function
-        async function shareProfile() {
-            const shareData = {
-                title: 'My Writer Profile',
-                text: 'Check out my writing stats on Sprint Bot! 🚀',
-                url: window.location.href
-            };
-
-            try {
-                if (navigator.share) {
-                    await navigator.share(shareData);
-                } else {
-                    // Fallback to clipboard
-                    await navigator.clipboard.writeText(window.location.href);
-                    alert('Link copied to clipboard!');
-                }
-            } catch (err) {
-                console.error('Error sharing:', err);
-            }
+        function shareImage() {
+            document.fonts.ready.then(() => {
+                drawCanvas((canvas) => {
+                    canvas.toBlob(async (blob) => {
+                        const file = new File([blob], "profile.png", { type: "image/png" });
+                        
+                        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                            try {
+                                await navigator.share({
+                                    files: [file],
+                                    title: 'My Writer Stats',
+                                    text: `Check out my writing stats on Sprint Bot! 🚀\nRank: ${USER_DATA.rank}\nTotal: ${USER_DATA.total} words`
+                                });
+                            } catch (err) {
+                                console.error("Share failed", err);
+                            }
+                        } else {
+                            alert("Sharing not supported on this browser. Try downloading instead!");
+                        }
+                    });
+                });
+            });
         }
     </script>
 </body>
