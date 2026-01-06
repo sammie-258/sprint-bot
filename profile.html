@@ -62,7 +62,6 @@
             rank: "{{RANK}}",
             total: "{{TOTAL}}",
             streak: "{{STREAK}}",
-            // Check if goal display is NOT hidden (meaning it is block)
             goalActive: "{{GOAL_DISPLAY}}" !== "hidden",
             goalCurrent: "{{GOAL_CURRENT}}",
             goalTarget: "{{GOAL_TARGET}}",
@@ -123,7 +122,7 @@
 
         <div class="bg-slate-100/50 dark:bg-slate-900/50 p-4 text-center border-t border-slate-200 dark:border-slate-800">
             <p class="text-xs text-slate-500 font-semibold tracking-wide">
-                <i class="fas fa-robot mr-1"></i> Sprint Bot by sam_marfe
+                <i class="fas fa-robot mr-1"></i> Sprint Bot by QuillReads
             </p>
         </div>
     </div>
@@ -140,8 +139,7 @@
     <canvas id="exportCanvas" width="1080" height="1350" style="display:none;"></canvas>
 
     <script>
-        // --- 1. Populate UI from USER_DATA ---
-        // This ensures the HTML body gets the correct numbers even if server only replaces the first instance
+        // --- 1. Populate UI ---
         function initUI() {
             document.getElementById('ui-name').innerText = USER_DATA.name;
             document.getElementById('ui-initial').innerText = USER_DATA.initial;
@@ -152,8 +150,6 @@
             if (USER_DATA.goalActive) {
                 document.getElementById('ui-goal-container').classList.remove('hidden');
                 document.getElementById('ui-goal-text').innerText = `${USER_DATA.goalCurrent} / ${USER_DATA.goalTarget}`;
-                
-                // Animate bar
                 setTimeout(() => {
                     document.getElementById('ui-goal-bar').style.width = `${USER_DATA.goalPercent}%`;
                 }, 100);
@@ -172,38 +168,49 @@
             }
         }
 
-        // Initialize (Run on load)
         if (localStorage.getItem('theme') === 'light') {
             document.documentElement.classList.remove('dark');
         } else {
             document.documentElement.classList.add('dark');
         }
         
-        // Initialize Data
         initUI();
 
-        // --- 3. Canvas Generation (Drawing the image) ---
+        // --- 3. Dynamic Canvas Generation ---
         function drawCanvas(callback) {
             const canvas = document.getElementById('exportCanvas');
             const ctx = canvas.getContext('2d');
+            const isDark = document.documentElement.classList.contains('dark');
+
+            // --- Theme Color Palette ---
+            const colors = isDark ? {
+                bgStart: '#0f172a', bgEnd: '#1e293b',
+                cardBg: 'rgba(30, 41, 59, 0.95)', cardStroke: 'rgba(255, 255, 255, 0.1)',
+                text: '#ffffff', subText: '#94a3b8',
+                avatarBg: '#0f172a', avatarStroke: '#1e293b',
+                statBg: 'rgba(255, 255, 255, 0.05)', statStroke: 'rgba(255, 255, 255, 0.1)',
+                goalBg: '#334155'
+            } : {
+                bgStart: '#f8fafc', bgEnd: '#e2e8f0', // Light slate
+                cardBg: 'rgba(255, 255, 255, 0.95)', cardStroke: 'rgba(0, 0, 0, 0.1)',
+                text: '#1e293b', subText: '#64748b',
+                avatarBg: '#ffffff', avatarStroke: '#e2e8f0',
+                statBg: 'rgba(0, 0, 0, 0.03)', statStroke: 'rgba(0, 0, 0, 0.05)',
+                goalBg: '#cbd5e1'
+            };
             
             // Background
             const bgGrad = ctx.createLinearGradient(0, 0, 0, 1350);
-            bgGrad.addColorStop(0, '#0f172a');
-            bgGrad.addColorStop(1, '#1e293b');
+            bgGrad.addColorStop(0, colors.bgStart);
+            bgGrad.addColorStop(1, colors.bgEnd);
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, 1080, 1350);
 
             // Card
-            const cardX = 80;
-            const cardY = 200;
-            const cardW = 920;
-            const cardH = 950;
-            const radius = 60;
-
+            const cardX = 80, cardY = 200, cardW = 920, cardH = 950, radius = 60;
             ctx.save();
-            ctx.fillStyle = "rgba(30, 41, 59, 0.8)";
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.fillStyle = colors.cardBg;
+            ctx.strokeStyle = colors.cardStroke;
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.roundRect(cardX, cardY, cardW, cardH, radius);
@@ -220,26 +227,24 @@
             ctx.restore();
 
             // Avatar
-            const avX = 540; 
-            const avY = cardY + 250; 
-            const avR = 100;
+            const avX = 540, avY = cardY + 250, avR = 100;
             ctx.beginPath();
             ctx.arc(avX, avY, avR, 0, Math.PI * 2);
-            ctx.fillStyle = "#0f172a"; 
+            ctx.fillStyle = colors.avatarBg; 
             ctx.fill();
             ctx.lineWidth = 10;
-            ctx.strokeStyle = "#1e293b";
+            ctx.strokeStyle = colors.avatarStroke;
             ctx.stroke();
 
             // Initial
-            ctx.fillStyle = "#ffffff";
+            ctx.fillStyle = isDark ? "#ffffff" : "#1e293b";
             ctx.font = "bold 80px 'Outfit', Arial";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(USER_DATA.initial, avX, avY + 5);
 
             // Name
-            ctx.fillStyle = "#ffffff";
+            ctx.fillStyle = colors.text;
             ctx.font = "bold 70px 'Outfit', Arial";
             ctx.fillText(USER_DATA.name, 540, 620);
 
@@ -247,29 +252,29 @@
             const rankText = "👑 " + USER_DATA.rank;
             ctx.font = "bold 35px 'Outfit', Arial";
             const rankWidth = ctx.measureText(rankText).width + 60;
-            ctx.fillStyle = "rgba(51, 65, 85, 0.8)";
+            ctx.fillStyle = isDark ? "rgba(51, 65, 85, 0.8)" : "rgba(203, 213, 225, 0.5)";
             ctx.beginPath();
             ctx.roundRect(540 - (rankWidth/2), 660, rankWidth, 60, 30);
             ctx.fill();
-            ctx.fillStyle = "#34d399";
+            ctx.fillStyle = isDark ? "#34d399" : "#059669";
             ctx.fillText(rankText, 540, 692);
 
             // Stats Boxes
-            drawStatBox(ctx, 130, 780, 390, 200, USER_DATA.total, "TOTAL WORDS", "white");
-            drawStatBox(ctx, 560, 780, 390, 200, USER_DATA.streak + " 🔥", "DAY STREAK", "#f97316");
+            drawStatBox(ctx, 130, 780, 390, 200, USER_DATA.total, "TOTAL WORDS", colors.text, colors);
+            drawStatBox(ctx, 560, 780, 390, 200, USER_DATA.streak + " 🔥", "DAY STREAK", "#f97316", colors);
 
             // Goal
             if (USER_DATA.goalActive) {
                 const goalY = 1050;
                 ctx.font = "bold 30px 'Outfit', Arial";
-                ctx.fillStyle = "#94a3b8"; 
+                ctx.fillStyle = colors.subText; 
                 ctx.textAlign = "left";
                 ctx.fillText("DAILY GOAL", 140, goalY);
-                ctx.fillStyle = "#ffffff";
+                ctx.fillStyle = colors.text;
                 ctx.textAlign = "right";
                 ctx.fillText(`${USER_DATA.goalCurrent} / ${USER_DATA.goalTarget}`, 940, goalY);
 
-                ctx.fillStyle = "#334155";
+                ctx.fillStyle = colors.goalBg;
                 ctx.beginPath();
                 ctx.roundRect(130, goalY + 20, 820, 30, 15);
                 ctx.fill();
@@ -290,7 +295,7 @@
             }
 
             // Footer
-            ctx.fillStyle = "#64748b";
+            ctx.fillStyle = colors.subText;
             ctx.font = "bold 30px 'Outfit', Arial";
             ctx.textAlign = "center";
             ctx.fillText("Sprint Bot by QuillReads", 540, 1280);
@@ -298,9 +303,9 @@
             if (callback) callback(canvas);
         }
 
-        function drawStatBox(ctx, x, y, w, h, value, label, valueColor) {
-            ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-            ctx.strokeStyle = "rgba(255,255,255,0.1)";
+        function drawStatBox(ctx, x, y, w, h, value, label, valueColor, colors) {
+            ctx.fillStyle = colors.statBg;
+            ctx.strokeStyle = colors.statStroke;
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.roundRect(x, y, w, h, 30);
@@ -313,7 +318,7 @@
             ctx.textBaseline = "middle";
             ctx.fillText(value, x + w/2, y + h/2 - 15);
 
-            ctx.fillStyle = "#94a3b8"; 
+            ctx.fillStyle = colors.subText;
             ctx.font = "bold 24px 'Outfit', Arial";
             ctx.fillText(label, x + w/2, y + h/2 + 40);
         }
