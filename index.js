@@ -42,7 +42,9 @@ if (global.gc) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const TIMEZONE = "Africa/Lagos"; 
-const BASE_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`; // Auto-detect URL
+
+// --- UPDATED: Use Custom Domain ---
+const BASE_URL = "https://quillreads.com"; 
 
 const OWNER_NUMBER = '223733486772376@lid'; 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123"; 
@@ -173,17 +175,33 @@ app.get('/', (req, res) => {
     res.redirect('https://quillreads.com/sprint-bot-dashboard');
 });
 
-// --- NEW: Public Profile Card ---
+// --- UPDATED: Robust Profile Lookup ---
 app.get('/profile/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-        // Reconstruct full JID if passed as simple number
-        const jid = userId.includes('@') ? userId : userId + '@s.whatsapp.net';
         
-        const profile = await UserProfile.findOne({ userId: jid });
-        if (!profile) return res.send("<h1>Profile not found</h1>");
+        // FIX: Search for BOTH standard JID and LID to prevent "Not Found" errors
+        const potentialJids = [
+            userId.includes('@') ? userId : userId + '@s.whatsapp.net',
+            userId.includes('@') ? userId : userId + '@lid'
+        ];
 
-        const goal = await PersonalGoal.findOne({ userId: jid, isActive: true });
+        const profile = await UserProfile.findOne({ userId: { $in: potentialJids } });
+        
+        if (!profile) return res.send(`
+            <html>
+            <body style="background:#0f172a; color:white; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh;">
+                <div style="text-align:center;">
+                    <h1 style="font-size:3rem; margin-bottom:10px;">😕</h1>
+                    <h2>Profile Not Found</h2>
+                    <p style="color:#94a3b8;">No data for ID: ${userId}</p>
+                </div>
+            </body>
+            </html>
+        `);
+
+        // Find goal using the exact ID found in the profile
+        const goal = await PersonalGoal.findOne({ userId: profile.userId, isActive: true });
         const rank = getRank(profile.totalWordsAllTime);
         
         const html = `
@@ -193,6 +211,8 @@ app.get('/profile/:userId', async (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>${profile.name}'s Writer Profile</title>
+            <meta property="og:title" content="${profile.name} - ${rank}" />
+            <meta property="og:description" content="Total Words: ${profile.totalWordsAllTime.toLocaleString()} | Streak: ${profile.currentStreak} days" />
             <script src="https://cdn.tailwindcss.com"></script>
             <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
             <style>
@@ -247,6 +267,7 @@ app.get('/profile/:userId', async (req, res) => {
         `;
         res.send(html);
     } catch (e) {
+        console.error(e);
         res.status(500).send("Error loading profile");
     }
 });
@@ -391,15 +412,12 @@ app.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- UPDATED: Search now queries UserProfile (Fixes invisibility glitch) ---
 app.post('/api/admin/search', requireAdmin, async (req, res) => {
     try {
         const { query } = req.body;
         
-        // 1. Query UserProfile instead of DailyStats to ensure we see everyone
         const profiles = await UserProfile.find({ name: { $regex: query, $options: 'i' } }).limit(20);
 
-        // 2. Enrich with Ban Status
         const enrichedUsers = await Promise.all(profiles.map(async (p) => {
             const isBanned = await Blacklist.exists({ userId: p.userId });
             const rank = getRank(p.totalWordsAllTime);
@@ -580,7 +598,7 @@ mongoose.connect(MONGO_URI)
 
     const getTodayDateGMT1 = () => new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
 
-    // --- Streak Manager (Updated with Rank Up Logic) ---
+    // --- Streak Manager ---
     const updateStreak = async (userId, name, wordsToAdd) => {
         const today = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const d = new Date();
@@ -601,7 +619,6 @@ mongoose.connect(MONGO_URI)
             return { profile, status: 'new', rankUp: null };
         }
 
-        // Rank Logic
         const oldRank = getRank(profile.totalWordsAllTime);
         const newTotal = profile.totalWordsAllTime + wordsToAdd;
         const newRank = getRank(newTotal);
@@ -627,7 +644,7 @@ mongoose.connect(MONGO_URI)
         return { profile, status: 'updated', rankUp };
     };
 
-    // --- Challenge Manager (Updated for Tagging) ---
+    // --- Challenge Manager ---
     const updateChallenge = async (groupId, userId, name, wordsToAdd) => {
         const challenge = await GroupChallenge.findOne({ groupId });
         if (!challenge) return; 
@@ -644,10 +661,8 @@ mongoose.connect(MONGO_URI)
             const leaderboard = Object.values(challenge.contributors).sort((a, b) => b.words - a.words);
             const top = leaderboard[0];
 
-            // Mentions Logic
             const mentions = Object.keys(challenge.contributors);
             const taggedContributors = leaderboard.map((c, i) => {
-                // Find ID by name/words match (heuristic) or iterate keys
                 const uid = Object.keys(challenge.contributors).find(key => challenge.contributors[key].name === c.name);
                 const tag = uid ? `@${uid.split('@')[0]}` : c.name;
                 return `${i+1}. ${tag}: ${c.words}`;
@@ -1007,6 +1022,7 @@ mongoose.connect(MONGO_URI)
                     const rank = getRank(profile.totalWordsAllTime);
                     
                     // --- PROFILE CARD LINK ---
+                    // Send the raw number so the web endpoint can try multiple formats
                     const profileLink = `${BASE_URL}/profile/${senderId.split('@')[0]}`;
 
                     let txt = `👤 *WRITER PROFILE*\n` +
