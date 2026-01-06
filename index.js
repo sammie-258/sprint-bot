@@ -7,6 +7,8 @@ const express = require('express');
 const http = require('http'); 
 const os = require('os'); 
 const QR = require('qrcode');
+const fs = require('fs'); // Added for reading HTML file
+const path = require('path');
 require("dotenv").config();
 
 // =======================
@@ -43,8 +45,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const TIMEZONE = "Africa/Lagos"; 
 
-// --- UPDATED: Use Custom Domain ---
-const BASE_URL = "https://quillreads.com"; 
+// --- DOMAIN CONFIGURATION ---
+// IMPORTANT: If you haven't pointed quillreads.com to this server yet, 
+// the link will 404. For now, we use the Render URL if available, else localhost.
+// Once you set up the domain, you can hardcode "https://quillreads.com" here.
+const BASE_URL = process.env.RENDER_EXTERNAL_URL || "https://quillreads.com"; 
 
 const OWNER_NUMBER = '223733486772376@lid'; 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123"; 
@@ -175,7 +180,7 @@ app.get('/', (req, res) => {
     res.redirect('https://quillreads.com/sprint-bot-dashboard');
 });
 
-// --- UPDATED: Robust Profile Lookup ---
+// --- NEW: Profile Card Route (Server-Side Rendering) ---
 app.get('/profile/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -188,87 +193,39 @@ app.get('/profile/:userId', async (req, res) => {
 
         const profile = await UserProfile.findOne({ userId: { $in: potentialJids } });
         
-        if (!profile) return res.send(`
-            <html>
-            <body style="background:#0f172a; color:white; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh;">
-                <div style="text-align:center;">
-                    <h1 style="font-size:3rem; margin-bottom:10px;">😕</h1>
-                    <h2>Profile Not Found</h2>
-                    <p style="color:#94a3b8;">No data for ID: ${userId}</p>
-                </div>
-            </body>
-            </html>
-        `);
+        // Return 404 if genuinely not found
+        if (!profile) return res.status(404).send("Profile not found");
 
-        // Find goal using the exact ID found in the profile
         const goal = await PersonalGoal.findOne({ userId: profile.userId, isActive: true });
         const rank = getRank(profile.totalWordsAllTime);
         
-        const html = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>${profile.name}'s Writer Profile</title>
-            <meta property="og:title" content="${profile.name} - ${rank}" />
-            <meta property="og:description" content="Total Words: ${profile.totalWordsAllTime.toLocaleString()} | Streak: ${profile.currentStreak} days" />
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-            <style>
-                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
-                body { font-family: 'Outfit', sans-serif; background: #0f172a; color: white; }
-                .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
-            </style>
-        </head>
-        <body class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-800 to-black">
-            <div class="glass w-full max-w-md rounded-3xl p-8 relative overflow-hidden shadow-2xl">
-                <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-blue-500"></div>
-                
-                <div class="text-center mb-8">
-                    <div class="w-24 h-24 mx-auto bg-gradient-to-br from-emerald-400 to-blue-600 rounded-full flex items-center justify-center text-4xl font-bold shadow-lg mb-4 border-4 border-slate-800">
-                        ${profile.name.charAt(0).toUpperCase()}
-                    </div>
-                    <h1 class="text-3xl font-bold tracking-tight">${profile.name}</h1>
-                    <div class="inline-block mt-2 px-3 py-1 bg-slate-800 rounded-full text-xs font-bold text-emerald-400 border border-emerald-500/30 uppercase tracking-widest">
-                        ${rank}
-                    </div>
-                </div>
+        // Read the HTML template
+        let template = fs.readFileSync(path.join(__dirname, 'profile.html'), 'utf8');
 
-                <div class="grid grid-cols-2 gap-4 mb-8">
-                    <div class="bg-slate-800/50 p-4 rounded-2xl text-center border border-slate-700">
-                        <div class="text-2xl font-bold text-white">${profile.totalWordsAllTime.toLocaleString()}</div>
-                        <div class="text-xs text-gray-400 uppercase font-bold tracking-wider">Total Words</div>
-                    </div>
-                    <div class="bg-slate-800/50 p-4 rounded-2xl text-center border border-slate-700">
-                        <div class="text-2xl font-bold text-orange-400">${profile.currentStreak} <span class="text-base">days</span></div>
-                        <div class="text-xs text-gray-400 uppercase font-bold tracking-wider">Current Streak</div>
-                    </div>
-                </div>
+        // Inject Data
+        let html = template
+            .replace(/{{NAME}}/g, profile.name)
+            .replace(/{{INITIAL}}/g, profile.name.charAt(0).toUpperCase())
+            .replace(/{{RANK}}/g, rank)
+            .replace(/{{TOTAL}}/g, profile.totalWordsAllTime.toLocaleString())
+            .replace(/{{STREAK}}/g, profile.currentStreak);
 
-                ${goal ? `
-                <div class="mb-8">
-                    <div class="flex justify-between text-sm mb-2 font-bold">
-                        <span class="text-gray-400">Current Goal</span>
-                        <span class="text-white">${goal.current} / ${goal.target}</span>
-                    </div>
-                    <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
-                        <div class="bg-gradient-to-r from-emerald-400 to-blue-500 h-3 rounded-full" style="width: ${Math.min(100, (goal.current/goal.target)*100)}%"></div>
-                    </div>
-                </div>
-                ` : ''}
+        // Inject Goal Data or Hide Section
+        if (goal) {
+            const pct = Math.min(100, (goal.current / goal.target) * 100).toFixed(1);
+            html = html
+                .replace('{{GOAL_DISPLAY}}', 'block')
+                .replace('{{GOAL_CURRENT}}', goal.current.toLocaleString())
+                .replace('{{GOAL_TARGET}}', goal.target.toLocaleString())
+                .replace('{{GOAL_PERCENT}}', pct);
+        } else {
+            html = html.replace('{{GOAL_DISPLAY}}', 'hidden');
+        }
 
-                <div class="text-center">
-                    <p class="text-gray-500 text-xs">Sprint Bot • Writing Companion</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        `;
         res.send(html);
     } catch (e) {
         console.error(e);
-        res.status(500).send("Error loading profile");
+        res.status(500).send("Error generating profile");
     }
 });
 
@@ -412,12 +369,15 @@ app.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// --- UPDATED: Search now queries UserProfile (Fixes invisibility glitch) ---
 app.post('/api/admin/search', requireAdmin, async (req, res) => {
     try {
         const { query } = req.body;
         
+        // 1. Query UserProfile instead of DailyStats to ensure we see everyone
         const profiles = await UserProfile.find({ name: { $regex: query, $options: 'i' } }).limit(20);
 
+        // 2. Enrich with Ban Status
         const enrichedUsers = await Promise.all(profiles.map(async (p) => {
             const isBanned = await Blacklist.exists({ userId: p.userId });
             const rank = getRank(p.totalWordsAllTime);
@@ -598,7 +558,7 @@ mongoose.connect(MONGO_URI)
 
     const getTodayDateGMT1 = () => new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
 
-    // --- Streak Manager ---
+    // --- Streak Manager (Updated with Rank Up Logic) ---
     const updateStreak = async (userId, name, wordsToAdd) => {
         const today = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const d = new Date();
@@ -619,6 +579,7 @@ mongoose.connect(MONGO_URI)
             return { profile, status: 'new', rankUp: null };
         }
 
+        // Rank Logic
         const oldRank = getRank(profile.totalWordsAllTime);
         const newTotal = profile.totalWordsAllTime + wordsToAdd;
         const newRank = getRank(newTotal);
@@ -644,7 +605,7 @@ mongoose.connect(MONGO_URI)
         return { profile, status: 'updated', rankUp };
     };
 
-    // --- Challenge Manager ---
+    // --- Challenge Manager (Updated for Tagging) ---
     const updateChallenge = async (groupId, userId, name, wordsToAdd) => {
         const challenge = await GroupChallenge.findOne({ groupId });
         if (!challenge) return; 
@@ -661,8 +622,10 @@ mongoose.connect(MONGO_URI)
             const leaderboard = Object.values(challenge.contributors).sort((a, b) => b.words - a.words);
             const top = leaderboard[0];
 
+            // Mentions Logic
             const mentions = Object.keys(challenge.contributors);
             const taggedContributors = leaderboard.map((c, i) => {
+                // Find ID by name/words match (heuristic) or iterate keys
                 const uid = Object.keys(challenge.contributors).find(key => challenge.contributors[key].name === c.name);
                 const tag = uid ? `@${uid.split('@')[0]}` : c.name;
                 return `${i+1}. ${tag}: ${c.words}`;
