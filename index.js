@@ -7,7 +7,7 @@ const express = require('express');
 const http = require('http'); 
 const os = require('os'); 
 const QR = require('qrcode');
-const fs = require('fs'); // Added for reading HTML file
+const fs = require('fs'); 
 const path = require('path');
 require("dotenv").config();
 
@@ -46,9 +46,6 @@ const PORT = process.env.PORT || 3000;
 const TIMEZONE = "Africa/Lagos"; 
 
 // --- DOMAIN CONFIGURATION ---
-// IMPORTANT: If you haven't pointed quillreads.com to this server yet, 
-// the link will 404. For now, we use the Render URL if available, else localhost.
-// Once you set up the domain, you can hardcode "https://quillreads.com" here.
 const BASE_URL = process.env.RENDER_EXTERNAL_URL || "https://quillreads.com"; 
 
 const OWNER_NUMBER = '223733486772376@lid'; 
@@ -180,12 +177,11 @@ app.get('/', (req, res) => {
     res.redirect('https://quillreads.com/sprint-bot-dashboard');
 });
 
-// --- NEW: Profile Card Route (Server-Side Rendering) ---
+// --- NEW: Profile Card Route ---
 app.get('/profile/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
         
-        // FIX: Search for BOTH standard JID and LID to prevent "Not Found" errors
         const potentialJids = [
             userId.includes('@') ? userId : userId + '@s.whatsapp.net',
             userId.includes('@') ? userId : userId + '@lid'
@@ -193,14 +189,18 @@ app.get('/profile/:userId', async (req, res) => {
 
         const profile = await UserProfile.findOne({ userId: { $in: potentialJids } });
         
-        // Return 404 if genuinely not found
-        if (!profile) return res.status(404).send("Profile not found");
+        if (!profile) return res.status(404).send(`<h1>Profile Not Found</h1><p>ID: ${userId}</p>`);
 
         const goal = await PersonalGoal.findOne({ userId: profile.userId, isActive: true });
         const rank = getRank(profile.totalWordsAllTime);
         
-        // Read the HTML template
-        let template = fs.readFileSync(path.join(__dirname, 'profile.html'), 'utf8');
+        // --- FIX: Read the file safely ---
+        const templatePath = path.join(__dirname, 'profile.html');
+        if (!fs.existsSync(templatePath)) {
+            return res.status(500).send("<h1>Error: Profile Template Missing</h1><p>Please upload profile.html to the server.</p>");
+        }
+
+        let template = fs.readFileSync(templatePath, 'utf8');
 
         // Inject Data
         let html = template
@@ -369,15 +369,12 @@ app.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- UPDATED: Search now queries UserProfile (Fixes invisibility glitch) ---
 app.post('/api/admin/search', requireAdmin, async (req, res) => {
     try {
         const { query } = req.body;
         
-        // 1. Query UserProfile instead of DailyStats to ensure we see everyone
         const profiles = await UserProfile.find({ name: { $regex: query, $options: 'i' } }).limit(20);
 
-        // 2. Enrich with Ban Status
         const enrichedUsers = await Promise.all(profiles.map(async (p) => {
             const isBanned = await Blacklist.exists({ userId: p.userId });
             const rank = getRank(p.totalWordsAllTime);
@@ -558,7 +555,7 @@ mongoose.connect(MONGO_URI)
 
     const getTodayDateGMT1 = () => new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
 
-    // --- Streak Manager (Updated with Rank Up Logic) ---
+    // --- Streak Manager ---
     const updateStreak = async (userId, name, wordsToAdd) => {
         const today = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const d = new Date();
@@ -579,7 +576,6 @@ mongoose.connect(MONGO_URI)
             return { profile, status: 'new', rankUp: null };
         }
 
-        // Rank Logic
         const oldRank = getRank(profile.totalWordsAllTime);
         const newTotal = profile.totalWordsAllTime + wordsToAdd;
         const newRank = getRank(newTotal);
@@ -605,7 +601,7 @@ mongoose.connect(MONGO_URI)
         return { profile, status: 'updated', rankUp };
     };
 
-    // --- Challenge Manager (Updated for Tagging) ---
+    // --- Challenge Manager ---
     const updateChallenge = async (groupId, userId, name, wordsToAdd) => {
         const challenge = await GroupChallenge.findOne({ groupId });
         if (!challenge) return; 
@@ -622,10 +618,8 @@ mongoose.connect(MONGO_URI)
             const leaderboard = Object.values(challenge.contributors).sort((a, b) => b.words - a.words);
             const top = leaderboard[0];
 
-            // Mentions Logic
             const mentions = Object.keys(challenge.contributors);
             const taggedContributors = leaderboard.map((c, i) => {
-                // Find ID by name/words match (heuristic) or iterate keys
                 const uid = Object.keys(challenge.contributors).find(key => challenge.contributors[key].name === c.name);
                 const tag = uid ? `@${uid.split('@')[0]}` : c.name;
                 return `${i+1}. ${tag}: ${c.words}`;
@@ -711,7 +705,8 @@ mongoose.connect(MONGO_URI)
             browser: ['Sprint Bot', 'Chrome', '120.0'],
             msgRetryCounterMax: 15,
             defaultQueryTimeoutMs: 60000,
-            shouldIgnoreJid: (jid) => jid === 'status@broadcast' || jid.includes('broadcast'), 
+            // --- FIX: Safely check JID to prevent crash ---
+            shouldIgnoreJid: (jid) => !jid || jid === 'status@broadcast' || jid.includes('broadcast'), 
             syncFullHistory: false, 
             generateHighQualityLinkPreview: true,
         });
@@ -985,7 +980,6 @@ mongoose.connect(MONGO_URI)
                     const rank = getRank(profile.totalWordsAllTime);
                     
                     // --- PROFILE CARD LINK ---
-                    // Send the raw number so the web endpoint can try multiple formats
                     const profileLink = `${BASE_URL}/profile/${senderId.split('@')[0]}`;
 
                     let txt = `👤 *WRITER PROFILE*\n` +
