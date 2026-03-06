@@ -1,372 +1,629 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <meta property="og:title" content="{{NAME}} - {{RANK}}">
-    <meta property="og:description" content="🔥 {{STREAK}} Day Streak | 📚 {{TOTAL}} Words Written">
-    <meta property="og:image" content="https://ui-avatars.com/api/?name={{NAME}}&background=0D8ABC&color=fff&size=512">
-    
-    <title>{{NAME}}'s Writer Profile</title>
-    
+    <title>Writer Profile — Sprint Bot</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        glassDark: "rgba(30, 41, 59, 0.7)",
-                        glassLight: "rgba(255, 255, 255, 0.6)",
-                    }
-                }
-            }
-        }
-    </script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
-        body { font-family: 'Outfit', sans-serif; }
-        
-        .dark .glass-panel { 
-            background: rgba(15, 23, 42, 0.6); 
-            backdrop-filter: blur(16px); 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        :root {
+            --accent:  #22d3a0;
+            --accent2: #6366f1;
+            --fire:    #f97316;
+        }
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: #060b12;
+            min-height: 100vh;
+            transition: background .3s;
+        }
+        body.light { background: #eef2f7; }
+
+        /* Mesh background */
+        body::before {
+            content:'';
+            position:fixed; inset:0; z-index:0; pointer-events:none;
+            background:
+                radial-gradient(ellipse 80% 50% at 15% 5%,  rgba(34,211,160,.12) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 85% 85%, rgba(99,102,241,.10) 0%, transparent 55%);
+        }
+        body.light::before {
+            background:
+                radial-gradient(ellipse 80% 50% at 15% 5%,  rgba(13,148,136,.13) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 85% 85%, rgba(99,102,241,.10) 0%, transparent 55%);
         }
 
-        .glass-panel { 
-            background: rgba(255, 255, 255, 0.65); 
-            backdrop-filter: blur(16px); 
-            border: 1px solid rgba(255, 255, 255, 0.6); 
-            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
+        /* Card */
+        .card {
+            position:relative; z-index:1;
+            background: rgba(255,255,255,.04);
+            border: 1px solid rgba(255,255,255,.09);
+            backdrop-filter: blur(24px);
+            border-radius: 28px;
+            overflow: hidden;
+        }
+        body.light .card {
+            background: rgba(255,255,255,.88);
+            border: 1px solid rgba(0,0,0,.07);
         }
 
-        .bg-pattern {
-            background-image: url('https://images.unsplash.com/photo-1519681393798-3828fb4090bb?q=80&w=2940&auto=format&fit=crop');
-            background-size: cover;
-            background-position: center;
+        /* Banner */
+        .banner {
+            background: linear-gradient(135deg,#0d9488 0%,#6366f1 60%,#8b5cf6 100%);
+            height: 108px; position:relative; overflow:hidden;
         }
+        .banner::after {
+            content:'';
+            position:absolute; inset:0;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='1.2' fill='rgba(255,255,255,.2)'/%3E%3C/svg%3E") repeat;
+        }
+
+        /* Avatar */
+        .avatar-wrap {
+            position:absolute; left:50%; bottom:-44px; transform:translateX(-50%);
+            width:88px; height:88px; border-radius:50%;
+            background:linear-gradient(135deg,var(--accent),var(--accent2));
+            padding:3px;
+            box-shadow:0 0 0 4px #060b12, 0 8px 28px rgba(34,211,160,.4);
+        }
+        body.light .avatar-wrap { box-shadow:0 0 0 4px #eef2f7, 0 8px 28px rgba(13,148,136,.3); }
+        .avatar-inner {
+            width:100%; height:100%; border-radius:50%;
+            background:#111c2b;
+            display:flex; align-items:center; justify-content:center;
+            font-family:'Syne',sans-serif; font-size:2rem; font-weight:800;
+            color:var(--accent);
+        }
+        body.light .avatar-inner { background:#dde6f0; color:#0d9488; }
+
+        /* Stat card */
+        .stat-card {
+            background:rgba(255,255,255,.05);
+            border:1px solid rgba(255,255,255,.08);
+            border-radius:16px; padding:13px 8px; text-align:center;
+            transition:transform .2s,box-shadow .2s;
+        }
+        .stat-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.25); }
+        body.light .stat-card { background:rgba(0,0,0,.04); border-color:rgba(0,0,0,.06); }
+
+        /* Rank bar */
+        .rank-track { height:7px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; }
+        body.light .rank-track { background:rgba(0,0,0,.09); }
+        .rank-fill {
+            height:100%; border-radius:99px;
+            background:linear-gradient(90deg,var(--accent),var(--accent2));
+            transition:width 1.3s cubic-bezier(.4,0,.2,1); position:relative;
+        }
+        .rank-fill::after {
+            content:''; position:absolute; right:0; top:0; bottom:0; width:18px;
+            background:linear-gradient(90deg,transparent,rgba(255,255,255,.55));
+            animation:shim 1.6s ease-in-out infinite;
+        }
+        @keyframes shim { 0%,100%{opacity:0} 50%{opacity:1} }
+
+        /* Heatmap cells */
+        .hcell {
+            width:9px; height:9px; border-radius:2px;
+            background:rgba(255,255,255,.07);
+            transition:transform .15s;
+            cursor:default;
+        }
+        .hcell:hover { transform:scale(1.5); }
+        .hcell.on { background:var(--accent); box-shadow:0 0 5px rgba(34,211,160,.5); }
+        body.light .hcell { background:rgba(0,0,0,.09); }
+        body.light .hcell.on { background:#0d9488; }
+
+        /* Badge chips */
+        .bc {
+            display:inline-flex; align-items:center; gap:4px;
+            padding:3px 9px; border-radius:99px; font-size:.68rem; font-weight:600;
+            background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1);
+            cursor:default; transition:transform .15s,background .15s;
+            position:relative;
+        }
+        .bc:hover { transform:translateY(-2px); background:rgba(255,255,255,.13); }
+        body.light .bc { background:rgba(0,0,0,.05); border-color:rgba(0,0,0,.1); }
+        body.light .bc:hover { background:rgba(0,0,0,.09); }
+
+        /* Tooltip */
+        .bc .tip {
+            display:none; position:absolute; bottom:calc(100% + 7px); left:50%; transform:translateX(-50%);
+            background:#1e293b; color:#e2e8f0; font-size:.65rem; white-space:nowrap;
+            padding:4px 8px; border-radius:6px; z-index:99; pointer-events:none;
+        }
+        .bc .tip::after {
+            content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+            border:4px solid transparent; border-top-color:#1e293b;
+        }
+        .bc:hover .tip { display:block; }
+
+        /* Goal bar */
+        .gfill {
+            height:100%; border-radius:99px;
+            background:linear-gradient(90deg,var(--accent),var(--accent2));
+            transition:width 1.4s cubic-bezier(.4,0,.2,1);
+        }
+
+        /* Buttons */
+        .btn-dl {
+            background:linear-gradient(135deg,var(--accent),#0891b2);
+            color:#fff; font-weight:700; border-radius:14px; padding:11px 24px;
+            box-shadow:0 4px 18px rgba(34,211,160,.35);
+            transition:transform .2s,box-shadow .2s;
+        }
+        .btn-dl:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(34,211,160,.5); }
+        .btn-share {
+            background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14);
+            color:#fff; font-weight:700; border-radius:14px; padding:11px 24px;
+            transition:transform .2s,background .2s;
+        }
+        .btn-share:hover { transform:translateY(-2px); background:rgba(255,255,255,.14); }
+        body.light .btn-share { color:#1e293b; background:rgba(0,0,0,.06); border-color:rgba(0,0,0,.1); }
+
+        /* Entrance */
+        .fu { opacity:0; transform:translateY(18px); animation:fu .55s forwards; }
+        @keyframes fu { to{opacity:1;transform:translateY(0);} }
+        .d1{animation-delay:.08s} .d2{animation-delay:.16s} .d3{animation-delay:.25s}
+        .d4{animation-delay:.35s} .d5{animation-delay:.45s} .d6{animation-delay:.55s}
+
+        /* Light text fixes */
+        body.light .t-white { color:#1e293b; }
+        body.light .t-sub   { color:#64748b; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-100 dark:bg-slate-900 text-slate-800 dark:text-white transition-colors duration-300 relative bg-pattern bg-blend-overlay dark:bg-blend-multiply">
+<body>
 
-    <script>
-        const USER_DATA = {
-            name: "{{NAME}}",
-            initial: "{{INITIAL}}",
-            rank: "{{RANK}}",
-            total: "{{TOTAL}}",
-            streak: "{{STREAK}}",
-            dailyWords: "{{DAILY_WORDS}}",
-            goalActive: "{{GOAL_DISPLAY}}" !== "hidden",
-            goalCurrent: "{{GOAL_CURRENT}}",
-            goalTarget: "{{GOAL_TARGET}}",
-            goalPercent: parseFloat("{{GOAL_PERCENT}}") || 0
-        };
-    </script>
+<script>
+const USER_DATA = {
+    name:            "{{NAME}}",
+    initial:         "{{INITIAL}}",
+    rank:            "{{RANK}}",
+    total:           "{{TOTAL}}",
+    streak:          {{STREAK}},
+    dailyWords:      "{{DAILY_WORDS}}",
+    bestSprintWords: "{{BEST_SPRINT_WORDS}}",
+    bestSprintWpm:   {{BEST_SPRINT_WPM}},
+    badges:          {{BADGES_JSON}},
+    activityLog:     "{{ACTIVITY_LOG}}",
+    nextRankName:    "{{NEXT_RANK_NAME}}",
+    nextRankPct:     parseFloat("{{NEXT_RANK_PCT}}") || 0,
+    nextRankThreshold:"{{NEXT_RANK_THRESHOLD}}",
+    goalActive:      "{{GOAL_DISPLAY}}" !== "hidden",
+    goalCurrent:     "{{GOAL_CURRENT}}",
+    goalTarget:      "{{GOAL_TARGET}}",
+    goalPercent:     parseFloat("{{GOAL_PERCENT}}") || 0
+};
 
-    <div class="fixed top-4 right-4 flex gap-2 z-50">
-        <button onclick="toggleTheme()" class="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-lg flex items-center justify-center text-slate-600 dark:text-yellow-400 transition hover:scale-110">
-            <i class="fas fa-sun dark:hidden"></i>
-            <i class="fas fa-moon hidden dark:block"></i>
-        </button>
+const BADGE_DEFS = [
+    {key:'first_log',     icon:'✍️',  label:'First Words',    desc:'Logged your first words'},
+    {key:'streak_7',      icon:'🔥',  label:'7-Day Streak',   desc:'7 consecutive writing days'},
+    {key:'streak_30',     icon:'🌟',  label:'30-Day Streak',  desc:'30 consecutive writing days'},
+    {key:'streak_100',    icon:'💎',  label:'100-Day Streak', desc:'100 consecutive writing days'},
+    {key:'words_10k',     icon:'📝',  label:'10K Club',       desc:'Wrote 10,000 total words'},
+    {key:'words_100k',    icon:'📚',  label:'100K Club',      desc:'Wrote 100,000 total words'},
+    {key:'words_250k',    icon:'🏗️',  label:'250K Club',      desc:'Wrote 250,000 total words'},
+    {key:'words_500k',    icon:'🎓',  label:'500K Club',      desc:'Wrote 500,000 total words'},
+    {key:'novel_god',     icon:'⚡',  label:'Novel God',      desc:'Reached 1,000,000 words'},
+    {key:'challenge_mvp', icon:'🏆',  label:'Challenge MVP',  desc:'Top contributor in a challenge'},
+    {key:'daily_first',   icon:'🥇',  label:'Daily Champ',    desc:'Topped the daily leaderboard'},
+    {key:'duel_win',      icon:'⚔️',  label:'Duelist',        desc:'Won a word duel'},
+    {key:'sprint_500',    icon:'💨',  label:'Speed Writer',   desc:'Wrote 500+ words in one sprint'},
+];
+</script>
+
+<!-- Theme toggle -->
+<div class="fixed top-4 right-4 z-50">
+    <button onclick="toggleTheme()"
+        class="w-10 h-10 rounded-full backdrop-blur-sm flex items-center justify-center transition hover:scale-110"
+        style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18)">
+        <i id="theme-icon" class="fas fa-sun" style="color:#fbbf24"></i>
+    </button>
+</div>
+
+<div class="relative z-10 min-h-screen flex flex-col items-center justify-center py-12 px-4 gap-5">
+
+    <!-- ── Card ── -->
+    <div class="card w-full max-w-sm fu">
+
+        <!-- Banner -->
+        <div class="banner" style="position:relative;">
+            <div class="avatar-wrap">
+                <div class="avatar-inner" id="ui-initial"></div>
+            </div>
+        </div>
+        <div style="height:48px;"></div><!-- spacer for avatar -->
+
+        <!-- Body -->
+        <div class="px-5 pb-5">
+
+            <!-- Name & rank -->
+            <div class="text-center mb-4 fu d1">
+                <h1 id="ui-name" class="t-white"
+                    style="font-family:'Syne',sans-serif;font-size:1.55rem;font-weight:800;color:#f1f5f9;margin:0 0 6px;"></h1>
+                <span id="ui-rank"
+                    style="display:inline-block;padding:3px 14px;border-radius:99px;font-size:.7rem;font-weight:700;letter-spacing:.06em;background:rgba(34,211,160,.14);color:#22d3a0;border:1px solid rgba(34,211,160,.28);"></span>
+            </div>
+
+            <!-- 4 stat grid -->
+            <div class="grid grid-cols-2 gap-3 mb-3 fu d2">
+                <div class="stat-card">
+                    <div id="ui-total"
+                        style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#f1f5f9;" class="t-white"></div>
+                    <div style="font-size:.6rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">ALL-TIME WORDS</div>
+                </div>
+                <div class="stat-card">
+                    <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:4px;color:#f97316;">
+                        <span id="ui-streak"></span>
+                        <i class="fas fa-fire" style="font-size:.85rem;animation:pulse 1.5s infinite;"></i>
+                    </div>
+                    <div style="font-size:.6rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">DAY STREAK</div>
+                </div>
+                <div class="stat-card">
+                    <div id="ui-daily"
+                        style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#f1f5f9;" class="t-white"></div>
+                    <div style="font-size:.6rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">TODAY'S WORDS</div>
+                </div>
+                <div class="stat-card">
+                    <div id="ui-best-val"
+                        style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#818cf8;">—</div>
+                    <div id="ui-best-label"
+                        style="font-size:.6rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">BEST SPRINT</div>
+                </div>
+            </div>
+
+            <!-- Rank progress -->
+            <div class="mb-3 fu d2" id="rank-bar-section">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                    <span style="font-size:.62rem;color:#94a3b8;font-weight:600;" id="rp-pct"></span>
+                    <span style="font-size:.62rem;color:#94a3b8;font-weight:600;" id="rp-next"></span>
+                </div>
+                <div class="rank-track">
+                    <div class="rank-fill" id="rank-fill" style="width:0%"></div>
+                </div>
+                <div style="font-size:.58rem;color:#64748b;margin-top:3px;text-align:right;" id="rp-words-left"></div>
+            </div>
+
+            <!-- Goal bar -->
+            <div id="goal-section" class="hidden mb-3 fu d3">
+                <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+                    <span style="font-size:.62rem;color:#94a3b8;font-weight:600;">Goal Progress</span>
+                    <span id="goal-text"
+                        style="font-family:'DM Mono',monospace;font-size:.62rem;color:#f1f5f9;" class="t-white"></span>
+                </div>
+                <div style="height:7px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;">
+                    <div class="gfill" id="goal-bar" style="width:0%;height:100%;"></div>
+                </div>
+                <div style="font-size:.58rem;color:#64748b;text-align:right;margin-top:3px;" id="goal-pct"></div>
+            </div>
+
+            <!-- Heatmap -->
+            <div class="mb-3 fu d3">
+                <div style="font-size:.6rem;color:#64748b;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">
+                    35-Day Activity
+                </div>
+                <div id="heatmap" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+            </div>
+
+            <!-- Badges -->
+            <div id="badge-section" class="fu d4">
+                <div style="font-size:.6rem;color:#64748b;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">
+                    Badges
+                </div>
+                <div id="badge-wrap" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div style="border-top:1px solid rgba(255,255,255,.07);padding:10px;text-align:center;">
+            <span style="font-size:.62rem;color:#475569;font-weight:600;">
+                <i class="fas fa-robot" style="margin-right:4px;"></i>Sprint Bot by sam_marfe
+            </span>
+        </div>
     </div>
 
-    <div class="glass-panel w-full max-w-sm rounded-3xl overflow-hidden relative transform transition duration-500 hover:scale-[1.01]">
-        
-        <!-- Banner + Avatar -->
-        <div class="h-28 bg-gradient-to-r from-emerald-500 to-blue-600 relative">
-            <div class="absolute -bottom-12 left-1/2 -translate-x-1/2">
-                <div class="w-24 h-24 rounded-full bg-white dark:bg-slate-900 border-4 border-white dark:border-slate-800 flex items-center justify-center text-3xl font-bold shadow-xl text-slate-800 dark:text-white">
-                    <span id="ui-initial"></span>
-                </div>
-            </div>
-        </div>
-
-        <div class="pt-14 pb-8 px-6 text-center">
-            <h1 class="text-3xl font-extrabold mb-1 tracking-tight text-slate-800 dark:text-white" id="ui-name"></h1>
-            
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-200/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-6 shadow-sm">
-                <span id="ui-rank"></span>
-            </div>
-
-            <!-- Stats Grid: now 3 boxes — Total, Streak, Today -->
-            <div class="grid grid-cols-3 gap-3 mb-6">
-                <div class="bg-white/50 dark:bg-slate-800/50 p-3 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm">
-                    <div class="text-lg font-bold text-slate-800 dark:text-white" id="ui-total"></div>
-                    <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">All-Time</div>
-                </div>
-                
-                <div class="bg-white/50 dark:bg-slate-800/50 p-3 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm relative overflow-hidden">
-                    <div class="text-lg font-bold text-orange-500 flex items-center justify-center gap-1">
-                        <span id="ui-streak"></span><i class="fas fa-fire text-sm animate-pulse"></i>
-                    </div>
-                    <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">Streak</div>
-                </div>
-
-                <!-- NEW: Today's Words -->
-                <div class="bg-white/50 dark:bg-slate-800/50 p-3 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm">
-                    <div class="text-lg font-bold text-emerald-500" id="ui-daily"></div>
-                    <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">Today</div>
-                </div>
-            </div>
-
-            <!-- Goal Progress -->
-            <div id="ui-goal-container" class="hidden mb-6">
-                <div class="flex justify-between text-xs mb-2 font-bold px-1">
-                    <span class="text-slate-500 dark:text-slate-400">Daily Goal</span>
-                    <span class="text-slate-800 dark:text-white" id="ui-goal-text"></span>
-                </div>
-                <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner">
-                    <div id="ui-goal-bar" class="bg-gradient-to-r from-emerald-400 to-blue-500 h-full rounded-full transition-all duration-1000 relative" style="width: 0%">
-                        <div class="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-slate-100/50 dark:bg-slate-900/50 p-4 text-center border-t border-slate-200 dark:border-slate-800">
-            <p class="text-xs text-slate-500 font-semibold tracking-wide">
-                <i class="fas fa-robot mr-1"></i> Sprint Bot by sam_marfe
-            </p>
-        </div>
-    </div>
-
-    <div class="mt-8 flex gap-4">
-        <button onclick="downloadImage()" class="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/30 transition transform hover:-translate-y-1 active:scale-95">
-            <i class="fas fa-download"></i> Download
+    <!-- Buttons -->
+    <div class="flex gap-3 fu d5">
+        <button onclick="downloadImage()" class="btn-dl flex items-center gap-2 text-sm">
+            <i class="fas fa-download"></i> Download Card
         </button>
-        <button onclick="shareImage()" class="flex items-center gap-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 transition transform hover:-translate-y-1 active:scale-95">
+        <button onclick="shareImage()" class="btn-share flex items-center gap-2 text-sm">
             <i class="fas fa-share-alt"></i> Share
         </button>
     </div>
 
-    <!-- Canvas height bumped to 1440 to fit the extra stat box -->
-    <canvas id="exportCanvas" width="1080" height="1440" style="display:none;"></canvas>
+</div>
 
-    <script>
-        // --- 1. Populate UI ---
-        function initUI() {
-            document.getElementById('ui-name').innerText = USER_DATA.name;
-            document.getElementById('ui-initial').innerText = USER_DATA.initial;
-            document.getElementById('ui-rank').innerText = "👑 " + USER_DATA.rank;
-            document.getElementById('ui-total').innerText = USER_DATA.total;
-            document.getElementById('ui-streak').innerText = USER_DATA.streak;
-            document.getElementById('ui-daily').innerText = USER_DATA.dailyWords; // NEW
+<!-- Hidden export canvas — tall to fit all new elements -->
+<canvas id="exportCanvas" width="1080" height="1660" style="display:none;"></canvas>
 
-            if (USER_DATA.goalActive) {
-                document.getElementById('ui-goal-container').classList.remove('hidden');
-                document.getElementById('ui-goal-text').innerText = `${USER_DATA.goalCurrent} / ${USER_DATA.goalTarget}`;
-                setTimeout(() => {
-                    document.getElementById('ui-goal-bar').style.width = `${USER_DATA.goalPercent}%`;
-                }, 100);
-            }
+<script>
+// ════════════════════════════════════════════════
+//  INIT UI
+// ════════════════════════════════════════════════
+function initUI() {
+    document.getElementById('ui-initial').textContent = USER_DATA.initial;
+    document.getElementById('ui-name').textContent    = USER_DATA.name;
+    document.getElementById('ui-rank').textContent    = '👑 ' + USER_DATA.rank;
+    document.getElementById('ui-total').textContent   = USER_DATA.total;
+    document.getElementById('ui-streak').textContent  = USER_DATA.streak;
+    document.getElementById('ui-daily').textContent   = USER_DATA.dailyWords;
+
+    // Best sprint
+    if (USER_DATA.bestSprintWpm > 0) {
+        document.getElementById('ui-best-val').textContent   = USER_DATA.bestSprintWpm + ' WPM';
+        document.getElementById('ui-best-label').textContent = USER_DATA.bestSprintWords + ' words';
+    }
+
+    // Rank progress bar
+    if (USER_DATA.nextRankPct < 100) {
+        document.getElementById('rp-pct').textContent  = USER_DATA.nextRankPct + '% to next rank';
+        document.getElementById('rp-next').textContent = USER_DATA.nextRankName;
+        const wordsLeft = (parseInt(USER_DATA.nextRankThreshold.replace(/,/g,'')) || 0)
+                        - (parseInt(USER_DATA.total.replace(/,/g,'')) || 0);
+        if (wordsLeft > 0) document.getElementById('rp-words-left').textContent = wordsLeft.toLocaleString() + ' words to go';
+        setTimeout(() => { document.getElementById('rank-fill').style.width = USER_DATA.nextRankPct + '%'; }, 250);
+    } else {
+        document.getElementById('rank-bar-section').innerHTML =
+            '<div style="text-align:center;font-size:.72rem;font-weight:700;color:#22d3a0;padding:4px 0;">⚡ Maximum Rank — Novel God!</div>';
+    }
+
+    // Goal
+    if (USER_DATA.goalActive) {
+        document.getElementById('goal-section').classList.remove('hidden');
+        document.getElementById('goal-text').textContent = USER_DATA.goalCurrent + ' / ' + USER_DATA.goalTarget;
+        document.getElementById('goal-pct').textContent  = USER_DATA.goalPercent + '%';
+        setTimeout(() => { document.getElementById('goal-bar').style.width = USER_DATA.goalPercent + '%'; }, 350);
+    }
+
+    buildHeatmap();
+    buildBadges();
+}
+
+// ════════════════════════════════════════════════
+//  HEATMAP
+// ════════════════════════════════════════════════
+function buildHeatmap() {
+    const wrap = document.getElementById('heatmap');
+    const log  = USER_DATA.activityLog || '0'.repeat(35);
+    const bits = log.split('').reverse(); // oldest first (left=oldest, right=today)
+    bits.forEach((bit, i) => {
+        const d = document.createElement('div');
+        d.className = 'hcell' + (bit === '1' ? ' on' : '');
+        const daysAgo = 34 - i;
+        d.title = daysAgo === 0 ? 'Today' : `${daysAgo} day${daysAgo !== 1 ? 's' : ''} ago`;
+        wrap.appendChild(d);
+    });
+}
+
+// ════════════════════════════════════════════════
+//  BADGES
+// ════════════════════════════════════════════════
+function buildBadges() {
+    const wrap    = document.getElementById('badge-wrap');
+    const section = document.getElementById('badge-section');
+    const earned  = USER_DATA.badges || [];
+    if (!earned.length) { section.style.display = 'none'; return; }
+    earned.forEach(key => {
+        const def = BADGE_DEFS.find(b => b.key === key);
+        if (!def) return;
+        const el = document.createElement('div');
+        el.className = 'bc';
+        el.innerHTML = `<span>${def.icon}</span><span style="color:#cbd5e1">${def.label}</span><div class="tip">${def.desc}</div>`;
+        wrap.appendChild(el);
+    });
+}
+
+// ════════════════════════════════════════════════
+//  THEME
+// ════════════════════════════════════════════════
+function toggleTheme() {
+    const light = document.body.classList.toggle('light');
+    document.getElementById('theme-icon').className = light ? 'fas fa-moon' : 'fas fa-sun';
+    document.getElementById('theme-icon').style.color = light ? '#334155' : '#fbbf24';
+    localStorage.setItem('sb-theme', light ? 'light' : 'dark');
+}
+if (localStorage.getItem('sb-theme') === 'light') {
+    document.body.classList.add('light');
+    document.getElementById('theme-icon').className = 'fas fa-moon';
+    document.getElementById('theme-icon').style.color = '#334155';
+}
+
+// ════════════════════════════════════════════════
+//  CANVAS EXPORT
+// ════════════════════════════════════════════════
+function rr(ctx, x, y, w, h, r, fill, stroke, lw) {
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
+    if (fill)        { ctx.fillStyle   = fill;   ctx.fill();   }
+    if (stroke && lw){ ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+}
+
+function drawCanvas(cb) {
+    const canvas = document.getElementById('exportCanvas');
+    const ctx    = canvas.getContext('2d');
+    const W = 1080, H = 1660;
+    const light  = document.body.classList.contains('light');
+
+    const p = {
+        bg:      light ? '#eef2f7'                : '#060b12',
+        card:    light ? '#ffffff'                : '#0d1420',
+        cBorder: light ? 'rgba(0,0,0,.07)'        : 'rgba(255,255,255,.08)',
+        text:    light ? '#1e293b'                : '#f1f5f9',
+        sub:     light ? '#64748b'                : '#94a3b8',
+        faint:   light ? 'rgba(0,0,0,.04)'        : 'rgba(255,255,255,.04)',
+        fBorder: light ? 'rgba(0,0,0,.06)'        : 'rgba(255,255,255,.07)',
+        track:   light ? 'rgba(0,0,0,.08)'        : 'rgba(255,255,255,.07)',
+        hOn:     light ? '#0d9488'                : '#22d3a0',
+        hOff:    light ? 'rgba(0,0,0,.08)'        : 'rgba(255,255,255,.07)',
+        accent:  '#22d3a0', accent2: '#6366f1',
+    };
+
+    // BG
+    ctx.fillStyle = p.bg; ctx.fillRect(0,0,W,H);
+    // Glow
+    const gl = ctx.createRadialGradient(200,250,0,200,250,550);
+    gl.addColorStop(0, light ? 'rgba(13,148,136,.12)' : 'rgba(34,211,160,.09)');
+    gl.addColorStop(1, 'transparent');
+    ctx.fillStyle = gl; ctx.fillRect(0,0,W,H);
+
+    // Card
+    const CX=80,CY=90,CW=920,CH=1490,CR=54;
+    rr(ctx,CX,CY,CW,CH,CR,p.card,p.cBorder,1.5);
+
+    // Banner
+    const bg = ctx.createLinearGradient(CX,CY,CX+CW,CY);
+    bg.addColorStop(0,'#0d9488'); bg.addColorStop(.55,'#6366f1'); bg.addColorStop(1,'#8b5cf6');
+    ctx.save(); ctx.beginPath(); ctx.roundRect(CX,CY,CW,230,[CR,CR,0,0]); ctx.clip();
+    ctx.fillStyle = bg; ctx.fillRect(CX,CY,CW,230);
+    // dots
+    for(let x=CX;x<CX+CW;x+=32)for(let y=CY;y<CY+230;y+=32){
+        ctx.beginPath(); ctx.arc(x,y,1.4,0,Math.PI*2);
+        ctx.fillStyle='rgba(255,255,255,.18)'; ctx.fill();
+    }
+    ctx.restore();
+
+    // Avatar
+    const AX=CX+CW/2, AY=CY+230, AR=88;
+    // card backing
+    ctx.beginPath(); ctx.arc(AX,AY,AR+10,0,Math.PI*2); ctx.fillStyle=p.card; ctx.fill();
+    // gradient ring
+    const ag=ctx.createLinearGradient(AX-AR,AY-AR,AX+AR,AY+AR);
+    ag.addColorStop(0,'#22d3a0'); ag.addColorStop(1,'#6366f1');
+    ctx.beginPath(); ctx.arc(AX,AY,AR+4,0,Math.PI*2); ctx.fillStyle=ag; ctx.fill();
+    // inner
+    ctx.beginPath(); ctx.arc(AX,AY,AR,0,Math.PI*2);
+    ctx.fillStyle = light ? '#dde6f0' : '#111c2b'; ctx.fill();
+    ctx.fillStyle = light ? '#0d9488' : '#22d3a0';
+    ctx.font="bold 70px 'Syne',Arial"; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(USER_DATA.initial, AX, AY+4);
+
+    // Name
+    ctx.fillStyle=p.text; ctx.font="bold 66px 'Syne',Arial"; ctx.textBaseline='alphabetic';
+    ctx.fillText(USER_DATA.name, AX, AY+AR+88);
+
+    // Rank pill
+    const rt='👑 '+USER_DATA.rank;
+    ctx.font="600 32px 'DM Sans',Arial";
+    const rw=ctx.measureText(rt).width+56;
+    rr(ctx,AX-rw/2,AY+AR+102,rw,58,29,'rgba(34,211,160,.15)','rgba(34,211,160,.3)',1);
+    ctx.fillStyle=light?'#0d9488':'#22d3a0'; ctx.textBaseline='middle';
+    ctx.fillText(rt, AX, AY+AR+131);
+
+    // ── 4 Stat boxes ──
+    const SY=AY+AR+208, SW=202, SH=154, SGAP=19;
+    const STOT=(4*SW+3*SGAP), SX0=CX+(CW-STOT)/2;
+    const stats=[
+        {v:USER_DATA.total,               lab:'ALL-TIME',   col:p.text},
+        {v:USER_DATA.streak+'🔥',         lab:'STREAK',     col:'#f97316'},
+        {v:USER_DATA.dailyWords,           lab:"TODAY'S",    col:p.text},
+        {v:USER_DATA.bestSprintWpm>0 ? USER_DATA.bestSprintWpm+' WPM':'—', lab:'BEST SPRINT', col:'#818cf8'},
+    ];
+    stats.forEach((s,i)=>{
+        const sx=SX0+i*(SW+SGAP);
+        rr(ctx,sx,SY,SW,SH,20,p.faint,p.fBorder,1);
+        ctx.fillStyle=s.col; ctx.font="bold 42px 'Syne',Arial"; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(s.v, sx+SW/2, SY+SH/2-13);
+        ctx.fillStyle=p.sub; ctx.font="600 19px 'DM Sans',Arial";
+        ctx.fillText(s.lab, sx+SW/2, SY+SH/2+32);
+    });
+
+    let curY = SY+SH+52;
+    const BX=CX+58, BW=CW-116;
+
+    // ── Rank progress ──
+    ctx.fillStyle=p.sub; ctx.font="600 24px 'DM Sans',Arial"; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.fillText('Rank Progress', BX, curY-10);
+    ctx.textAlign='right'; ctx.fillText(USER_DATA.nextRankName, BX+BW, curY-10);
+    rr(ctx,BX,curY,BW,14,7,p.track,'transparent',0);
+    const fw=Math.max(0,USER_DATA.nextRankPct/100*BW);
+    if(fw>0){const fg=ctx.createLinearGradient(BX,0,BX+fw,0);fg.addColorStop(0,'#22d3a0');fg.addColorStop(1,'#6366f1');rr(ctx,BX,curY,fw,14,7,fg,'transparent',0);}
+    ctx.fillStyle=p.sub; ctx.font="500 21px 'DM Mono',monospace"; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillText(USER_DATA.nextRankPct+'%', BX+BW/2, curY+14+26);
+    curY+=14+62;
+
+    // ── Heatmap ──
+    ctx.fillStyle=p.sub; ctx.font="600 24px 'DM Sans',Arial"; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.fillText('35-Day Activity', BX, curY-10);
+    const log=USER_DATA.activityLog||'0'.repeat(35);
+    const bits=log.split('').reverse();
+    const CS=22,CG=8,HTOT=bits.length*CS+(bits.length-1)*CG;
+    let hx=CX+(CW-HTOT)/2;
+    bits.forEach(bit=>{
+        ctx.fillStyle= bit==='1' ? p.hOn : p.hOff;
+        ctx.beginPath(); ctx.roundRect(hx,curY,CS,CS,3); ctx.fill();
+        if(bit==='1'){
+            const glow=ctx.createRadialGradient(hx+CS/2,curY+CS/2,0,hx+CS/2,curY+CS/2,CS);
+            glow.addColorStop(0,'rgba(34,211,160,.35)'); glow.addColorStop(1,'transparent');
+            ctx.fillStyle=glow; ctx.fillRect(hx-4,curY-4,CS+8,CS+8);
+            ctx.fillStyle=p.hOn; ctx.beginPath(); ctx.roundRect(hx,curY,CS,CS,3); ctx.fill();
         }
+        hx+=CS+CG;
+    });
+    curY+=CS+55;
 
-        // --- 2. Theme Logic ---
-        function toggleTheme() {
-            const html = document.documentElement;
-            if (html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-            } else {
-                html.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-            }
-        }
+    // ── Badges ──
+    const earned=USER_DATA.badges||[];
+    if(earned.length){
+        ctx.fillStyle=p.sub; ctx.font="600 24px 'DM Sans',Arial"; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+        ctx.fillText('Badges', BX, curY-10);
+        let bx=BX;
+        earned.forEach(key=>{
+            const def=BADGE_DEFS.find(b=>b.key===key); if(!def)return;
+            ctx.font='46px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText(def.icon, bx+24, curY+24);
+            bx+=56;
+            if(bx+56>BX+BW){bx=BX;curY+=56;}
+        });
+        curY+=56+44;
+    }
 
-        if (localStorage.getItem('theme') === 'light') {
-            document.documentElement.classList.remove('dark');
-        } else {
-            document.documentElement.classList.add('dark');
-        }
-        
-        initUI();
+    // ── Goal bar ──
+    if(USER_DATA.goalActive){
+        ctx.fillStyle=p.sub; ctx.font="600 24px 'DM Sans',Arial"; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+        ctx.fillText('Daily Goal', BX, curY-10);
+        ctx.textAlign='right';
+        ctx.fillText(USER_DATA.goalCurrent+' / '+USER_DATA.goalTarget, BX+BW, curY-10);
+        rr(ctx,BX,curY,BW,13,6,p.track,'transparent',0);
+        const gfw=Math.max(0,USER_DATA.goalPercent/100*BW);
+        if(gfw>0){const gfg=ctx.createLinearGradient(BX,0,BX+gfw,0);gfg.addColorStop(0,'#22d3a0');gfg.addColorStop(1,'#6366f1');rr(ctx,BX,curY,gfw,13,6,gfg,'transparent',0);}
+        curY+=66;
+    }
 
-        // --- 3. Dynamic Canvas Generation ---
-        function drawCanvas(callback) {
-            const canvas = document.getElementById('exportCanvas');
-            const ctx = canvas.getContext('2d');
-            const isDark = document.documentElement.classList.contains('dark');
+    // Footer
+    ctx.fillStyle=p.sub; ctx.font="600 27px 'DM Sans',Arial"; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillText('🤖 Sprint Bot by sam_marfe', W/2, H-52);
 
-            const colors = isDark ? {
-                bgStart: '#0f172a', bgEnd: '#1e293b',
-                cardBg: 'rgba(30, 41, 59, 0.95)', cardStroke: 'rgba(255, 255, 255, 0.1)',
-                text: '#ffffff', subText: '#94a3b8',
-                avatarBg: '#0f172a', avatarStroke: '#1e293b',
-                statBg: 'rgba(255, 255, 255, 0.05)', statStroke: 'rgba(255, 255, 255, 0.1)',
-                goalBg: '#334155'
-            } : {
-                bgStart: '#f8fafc', bgEnd: '#e2e8f0',
-                cardBg: 'rgba(255, 255, 255, 0.95)', cardStroke: 'rgba(0, 0, 0, 0.1)',
-                text: '#1e293b', subText: '#64748b',
-                avatarBg: '#ffffff', avatarStroke: '#e2e8f0',
-                statBg: 'rgba(0, 0, 0, 0.03)', statStroke: 'rgba(0, 0, 0, 0.05)',
-                goalBg: '#cbd5e1'
-            };
-            
-            // Background
-            const bgGrad = ctx.createLinearGradient(0, 0, 0, 1440);
-            bgGrad.addColorStop(0, colors.bgStart);
-            bgGrad.addColorStop(1, colors.bgEnd);
-            ctx.fillStyle = bgGrad;
-            ctx.fillRect(0, 0, 1080, 1440);
+    if(cb) cb(canvas);
+}
 
-            // Card
-            const cardX = 80, cardY = 180, cardW = 920, cardH = 1060, radius = 60;
-            ctx.save();
-            ctx.fillStyle = colors.cardBg;
-            ctx.strokeStyle = colors.cardStroke;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.roundRect(cardX, cardY, cardW, cardH, radius);
-            ctx.fill();
-            ctx.stroke();
-            ctx.clip(); 
-
-            // Banner
-            const banGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY);
-            banGrad.addColorStop(0, '#10b981'); 
-            banGrad.addColorStop(1, '#2563eb'); 
-            ctx.fillStyle = banGrad;
-            ctx.fillRect(cardX, cardY, cardW, 260);
-            ctx.restore();
-
-            // Avatar circle
-            const avX = 540, avY = cardY + 260, avR = 100;
-            ctx.beginPath();
-            ctx.arc(avX, avY, avR, 0, Math.PI * 2);
-            ctx.fillStyle = colors.avatarBg; 
-            ctx.fill();
-            ctx.lineWidth = 10;
-            ctx.strokeStyle = colors.avatarStroke;
-            ctx.stroke();
-
-            // Initial letter
-            ctx.fillStyle = isDark ? "#ffffff" : "#1e293b";
-            ctx.font = "bold 80px 'Outfit', Arial";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(USER_DATA.initial, avX, avY + 5);
-
-            // Name
-            ctx.fillStyle = colors.text;
-            ctx.font = "bold 70px 'Outfit', Arial";
-            ctx.fillText(USER_DATA.name, 540, 630);
-
-            // Rank Badge
-            const rankText = "👑 " + USER_DATA.rank;
-            ctx.font = "bold 35px 'Outfit', Arial";
-            const rankWidth = ctx.measureText(rankText).width + 60;
-            ctx.fillStyle = isDark ? "rgba(51, 65, 85, 0.8)" : "rgba(203, 213, 225, 0.5)";
-            ctx.beginPath();
-            ctx.roundRect(540 - (rankWidth/2), 672, rankWidth, 60, 30);
-            ctx.fill();
-            ctx.fillStyle = isDark ? "#34d399" : "#059669";
-            ctx.fillText(rankText, 540, 704);
-
-            // --- THREE Stat Boxes: Total | Streak | Today ---
-            // Box width adjusted: 3 boxes across 820px with 20px gaps = 260px each
-            const boxY = 800, boxH = 200;
-            drawStatBox(ctx, 130, boxY, 260, boxH, USER_DATA.total,       "TOTAL WORDS", colors.text,   colors);
-            drawStatBox(ctx, 410, boxY, 260, boxH, USER_DATA.streak+" 🔥","DAY STREAK",  "#f97316",     colors);
-            drawStatBox(ctx, 690, boxY, 260, boxH, USER_DATA.dailyWords,  "TODAY",       "#10b981",     colors); // NEW
-
-            // Goal bar
-            if (USER_DATA.goalActive) {
-                const goalY = 1080;
-                ctx.font = "bold 30px 'Outfit', Arial";
-                ctx.fillStyle = colors.subText; 
-                ctx.textAlign = "left";
-                ctx.textBaseline = "alphabetic";
-                ctx.fillText("GOAL", 140, goalY);
-                ctx.fillStyle = colors.text;
-                ctx.textAlign = "right";
-                ctx.fillText(`${USER_DATA.goalCurrent} / ${USER_DATA.goalTarget}`, 940, goalY);
-
-                ctx.fillStyle = colors.goalBg;
-                ctx.beginPath();
-                ctx.roundRect(130, goalY + 20, 820, 30, 15);
-                ctx.fill();
-
-                const maxW = 820;
-                const pct = Math.min(1, USER_DATA.goalPercent / 100);
-                const fillW = maxW * pct;
-                if (fillW > 0) {
-                    const grad = ctx.createLinearGradient(130, 0, 950, 0);
-                    grad.addColorStop(0, '#34d399');
-                    grad.addColorStop(1, '#3b82f6');
-                    ctx.fillStyle = grad;
-                    ctx.beginPath();
-                    ctx.roundRect(130, goalY + 20, fillW, 30, 15);
-                    ctx.fill();
-                }
-            }
-
-            // Footer
-            ctx.fillStyle = colors.subText;
-            ctx.font = "bold 30px 'Outfit', Arial";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "alphabetic";
-            ctx.fillText("🤖 Sprint Bot by sam_marfe", 540, 1370);
-
-            if (callback) callback(canvas);
-        }
-
-        function drawStatBox(ctx, x, y, w, h, value, label, valueColor, colors) {
-            ctx.fillStyle = colors.statBg;
-            ctx.strokeStyle = colors.statStroke;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.roundRect(x, y, w, h, 30);
-            ctx.fill();
-            ctx.stroke();
-
-            ctx.fillStyle = valueColor;
-            ctx.font = "bold 52px 'Outfit', Arial";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(value, x + w/2, y + h/2 - 15);
-
-            ctx.fillStyle = colors.subText;
-            ctx.font = "bold 22px 'Outfit', Arial";
-            ctx.fillText(label, x + w/2, y + h/2 + 38);
-        }
-
-        function downloadImage() {
-            document.fonts.ready.then(() => {
-                drawCanvas((canvas) => {
-                    const link = document.createElement('a');
-                    link.download = `writer-profile-${USER_DATA.name}.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                });
+function downloadImage(){
+    document.fonts.ready.then(()=>{
+        drawCanvas(c=>{
+            const a=document.createElement('a');
+            a.download=`sprint-bot-${USER_DATA.name}.png`;
+            a.href=c.toDataURL('image/png'); a.click();
+        });
+    });
+}
+function shareImage(){
+    document.fonts.ready.then(()=>{
+        drawCanvas(c=>{
+            c.toBlob(async blob=>{
+                const file=new File([blob],'profile.png',{type:'image/png'});
+                if(navigator.canShare&&navigator.canShare({files:[file]})){
+                    try{await navigator.share({files:[file],title:'My Writer Profile',text:`${USER_DATA.name} — ${USER_DATA.rank} | ${USER_DATA.total} words 🔥`});}catch(e){}
+                } else { downloadImage(); }
             });
-        }
+        });
+    });
+}
 
-        function shareImage() {
-            document.fonts.ready.then(() => {
-                drawCanvas((canvas) => {
-                    canvas.toBlob(async (blob) => {
-                        const file = new File([blob], "profile.png", { type: "image/png" });
-                        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                            try {
-                                await navigator.share({
-                                    files: [file],
-                                    title: 'My Writer Stats',
-                                    text: `Check out my writing stats on Sprint Bot! 🚀\nRank: ${USER_DATA.rank}\nTotal: ${USER_DATA.total} words`
-                                });
-                            } catch (err) { console.error("Share failed", err); }
-                        } else {
-                            alert("Sharing not supported on this browser. Try downloading instead!");
-                        }
-                    });
-                });
-            });
-        }
-    </script>
+// Boot
+initUI();
+</script>
 </body>
 </html>
