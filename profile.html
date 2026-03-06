@@ -30,7 +30,6 @@
     <style>
         body { font-family: 'Outfit', sans-serif; }
         
-        /* Dark Mode Glass */
         .dark .glass-panel { 
             background: rgba(15, 23, 42, 0.6); 
             backdrop-filter: blur(16px); 
@@ -38,7 +37,6 @@
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
 
-        /* Light Mode Glass */
         .glass-panel { 
             background: rgba(255, 255, 255, 0.65); 
             backdrop-filter: blur(16px); 
@@ -62,6 +60,7 @@
             rank: "{{RANK}}",
             total: "{{TOTAL}}",
             streak: "{{STREAK}}",
+            dailyWords: "{{DAILY_WORDS}}",
             goalActive: "{{GOAL_DISPLAY}}" !== "hidden",
             goalCurrent: "{{GOAL_CURRENT}}",
             goalTarget: "{{GOAL_TARGET}}",
@@ -78,6 +77,7 @@
 
     <div class="glass-panel w-full max-w-sm rounded-3xl overflow-hidden relative transform transition duration-500 hover:scale-[1.01]">
         
+        <!-- Banner + Avatar -->
         <div class="h-28 bg-gradient-to-r from-emerald-500 to-blue-600 relative">
             <div class="absolute -bottom-12 left-1/2 -translate-x-1/2">
                 <div class="w-24 h-24 rounded-full bg-white dark:bg-slate-900 border-4 border-white dark:border-slate-800 flex items-center justify-center text-3xl font-bold shadow-xl text-slate-800 dark:text-white">
@@ -89,24 +89,32 @@
         <div class="pt-14 pb-8 px-6 text-center">
             <h1 class="text-3xl font-extrabold mb-1 tracking-tight text-slate-800 dark:text-white" id="ui-name"></h1>
             
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-200/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-8 shadow-sm">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-200/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-6 shadow-sm">
                 <span id="ui-rank"></span>
             </div>
 
-            <div class="grid grid-cols-2 gap-4 mb-8">
-                <div class="bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm">
-                    <div class="text-2xl font-bold text-slate-800 dark:text-white" id="ui-total"></div>
-                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">Total Words</div>
+            <!-- Stats Grid: now 3 boxes — Total, Streak, Today -->
+            <div class="grid grid-cols-3 gap-3 mb-6">
+                <div class="bg-white/50 dark:bg-slate-800/50 p-3 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm">
+                    <div class="text-lg font-bold text-slate-800 dark:text-white" id="ui-total"></div>
+                    <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">All-Time</div>
                 </div>
                 
-                <div class="bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm relative overflow-hidden">
-                    <div class="text-2xl font-bold text-orange-500 flex items-center justify-center gap-1">
-                        <span id="ui-streak"></span> <i class="fas fa-fire animate-pulse"></i>
+                <div class="bg-white/50 dark:bg-slate-800/50 p-3 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm relative overflow-hidden">
+                    <div class="text-lg font-bold text-orange-500 flex items-center justify-center gap-1">
+                        <span id="ui-streak"></span><i class="fas fa-fire text-sm animate-pulse"></i>
                     </div>
-                    <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">Day Streak</div>
+                    <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">Streak</div>
+                </div>
+
+                <!-- NEW: Today's Words -->
+                <div class="bg-white/50 dark:bg-slate-800/50 p-3 rounded-2xl border border-white/50 dark:border-slate-700 shadow-sm backdrop-blur-sm">
+                    <div class="text-lg font-bold text-emerald-500" id="ui-daily"></div>
+                    <div class="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mt-1">Today</div>
                 </div>
             </div>
 
+            <!-- Goal Progress -->
             <div id="ui-goal-container" class="hidden mb-6">
                 <div class="flex justify-between text-xs mb-2 font-bold px-1">
                     <span class="text-slate-500 dark:text-slate-400">Daily Goal</span>
@@ -136,7 +144,8 @@
         </button>
     </div>
 
-    <canvas id="exportCanvas" width="1080" height="1350" style="display:none;"></canvas>
+    <!-- Canvas height bumped to 1440 to fit the extra stat box -->
+    <canvas id="exportCanvas" width="1080" height="1440" style="display:none;"></canvas>
 
     <script>
         // --- 1. Populate UI ---
@@ -146,6 +155,7 @@
             document.getElementById('ui-rank').innerText = "👑 " + USER_DATA.rank;
             document.getElementById('ui-total').innerText = USER_DATA.total;
             document.getElementById('ui-streak').innerText = USER_DATA.streak;
+            document.getElementById('ui-daily').innerText = USER_DATA.dailyWords; // NEW
 
             if (USER_DATA.goalActive) {
                 document.getElementById('ui-goal-container').classList.remove('hidden');
@@ -182,7 +192,6 @@
             const ctx = canvas.getContext('2d');
             const isDark = document.documentElement.classList.contains('dark');
 
-            // --- Theme Color Palette ---
             const colors = isDark ? {
                 bgStart: '#0f172a', bgEnd: '#1e293b',
                 cardBg: 'rgba(30, 41, 59, 0.95)', cardStroke: 'rgba(255, 255, 255, 0.1)',
@@ -191,7 +200,7 @@
                 statBg: 'rgba(255, 255, 255, 0.05)', statStroke: 'rgba(255, 255, 255, 0.1)',
                 goalBg: '#334155'
             } : {
-                bgStart: '#f8fafc', bgEnd: '#e2e8f0', // Light slate
+                bgStart: '#f8fafc', bgEnd: '#e2e8f0',
                 cardBg: 'rgba(255, 255, 255, 0.95)', cardStroke: 'rgba(0, 0, 0, 0.1)',
                 text: '#1e293b', subText: '#64748b',
                 avatarBg: '#ffffff', avatarStroke: '#e2e8f0',
@@ -200,14 +209,14 @@
             };
             
             // Background
-            const bgGrad = ctx.createLinearGradient(0, 0, 0, 1350);
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, 1440);
             bgGrad.addColorStop(0, colors.bgStart);
             bgGrad.addColorStop(1, colors.bgEnd);
             ctx.fillStyle = bgGrad;
-            ctx.fillRect(0, 0, 1080, 1350);
+            ctx.fillRect(0, 0, 1080, 1440);
 
             // Card
-            const cardX = 80, cardY = 200, cardW = 920, cardH = 950, radius = 60;
+            const cardX = 80, cardY = 180, cardW = 920, cardH = 1060, radius = 60;
             ctx.save();
             ctx.fillStyle = colors.cardBg;
             ctx.strokeStyle = colors.cardStroke;
@@ -223,11 +232,11 @@
             banGrad.addColorStop(0, '#10b981'); 
             banGrad.addColorStop(1, '#2563eb'); 
             ctx.fillStyle = banGrad;
-            ctx.fillRect(cardX, cardY, cardW, 250);
+            ctx.fillRect(cardX, cardY, cardW, 260);
             ctx.restore();
 
-            // Avatar
-            const avX = 540, avY = cardY + 250, avR = 100;
+            // Avatar circle
+            const avX = 540, avY = cardY + 260, avR = 100;
             ctx.beginPath();
             ctx.arc(avX, avY, avR, 0, Math.PI * 2);
             ctx.fillStyle = colors.avatarBg; 
@@ -236,7 +245,7 @@
             ctx.strokeStyle = colors.avatarStroke;
             ctx.stroke();
 
-            // Initial
+            // Initial letter
             ctx.fillStyle = isDark ? "#ffffff" : "#1e293b";
             ctx.font = "bold 80px 'Outfit', Arial";
             ctx.textAlign = "center";
@@ -246,7 +255,7 @@
             // Name
             ctx.fillStyle = colors.text;
             ctx.font = "bold 70px 'Outfit', Arial";
-            ctx.fillText(USER_DATA.name, 540, 620);
+            ctx.fillText(USER_DATA.name, 540, 630);
 
             // Rank Badge
             const rankText = "👑 " + USER_DATA.rank;
@@ -254,22 +263,26 @@
             const rankWidth = ctx.measureText(rankText).width + 60;
             ctx.fillStyle = isDark ? "rgba(51, 65, 85, 0.8)" : "rgba(203, 213, 225, 0.5)";
             ctx.beginPath();
-            ctx.roundRect(540 - (rankWidth/2), 660, rankWidth, 60, 30);
+            ctx.roundRect(540 - (rankWidth/2), 672, rankWidth, 60, 30);
             ctx.fill();
             ctx.fillStyle = isDark ? "#34d399" : "#059669";
-            ctx.fillText(rankText, 540, 692);
+            ctx.fillText(rankText, 540, 704);
 
-            // Stats Boxes
-            drawStatBox(ctx, 130, 780, 390, 200, USER_DATA.total, "TOTAL WORDS", colors.text, colors);
-            drawStatBox(ctx, 560, 780, 390, 200, USER_DATA.streak + " 🔥", "DAY STREAK", "#f97316", colors);
+            // --- THREE Stat Boxes: Total | Streak | Today ---
+            // Box width adjusted: 3 boxes across 820px with 20px gaps = 260px each
+            const boxY = 800, boxH = 200;
+            drawStatBox(ctx, 130, boxY, 260, boxH, USER_DATA.total,       "TOTAL WORDS", colors.text,   colors);
+            drawStatBox(ctx, 410, boxY, 260, boxH, USER_DATA.streak+" 🔥","DAY STREAK",  "#f97316",     colors);
+            drawStatBox(ctx, 690, boxY, 260, boxH, USER_DATA.dailyWords,  "TODAY",       "#10b981",     colors); // NEW
 
-            // Goal
+            // Goal bar
             if (USER_DATA.goalActive) {
-                const goalY = 1050;
+                const goalY = 1080;
                 ctx.font = "bold 30px 'Outfit', Arial";
                 ctx.fillStyle = colors.subText; 
                 ctx.textAlign = "left";
-                ctx.fillText("DAILY GOAL", 140, goalY);
+                ctx.textBaseline = "alphabetic";
+                ctx.fillText("GOAL", 140, goalY);
                 ctx.fillStyle = colors.text;
                 ctx.textAlign = "right";
                 ctx.fillText(`${USER_DATA.goalCurrent} / ${USER_DATA.goalTarget}`, 940, goalY);
@@ -282,7 +295,6 @@
                 const maxW = 820;
                 const pct = Math.min(1, USER_DATA.goalPercent / 100);
                 const fillW = maxW * pct;
-                
                 if (fillW > 0) {
                     const grad = ctx.createLinearGradient(130, 0, 950, 0);
                     grad.addColorStop(0, '#34d399');
@@ -298,7 +310,8 @@
             ctx.fillStyle = colors.subText;
             ctx.font = "bold 30px 'Outfit', Arial";
             ctx.textAlign = "center";
-            ctx.fillText("🤖 Sprint Bot by sam_marfe", 540, 1280);
+            ctx.textBaseline = "alphabetic";
+            ctx.fillText("🤖 Sprint Bot by sam_marfe", 540, 1370);
 
             if (callback) callback(canvas);
         }
@@ -313,14 +326,14 @@
             ctx.stroke();
 
             ctx.fillStyle = valueColor;
-            ctx.font = "bold 60px 'Outfit', Arial";
+            ctx.font = "bold 52px 'Outfit', Arial";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(value, x + w/2, y + h/2 - 15);
 
             ctx.fillStyle = colors.subText;
-            ctx.font = "bold 24px 'Outfit', Arial";
-            ctx.fillText(label, x + w/2, y + h/2 + 40);
+            ctx.font = "bold 22px 'Outfit', Arial";
+            ctx.fillText(label, x + w/2, y + h/2 + 38);
         }
 
         function downloadImage() {
@@ -339,7 +352,6 @@
                 drawCanvas((canvas) => {
                     canvas.toBlob(async (blob) => {
                         const file = new File([blob], "profile.png", { type: "image/png" });
-                        
                         if (navigator.canShare && navigator.canShare({ files: [file] })) {
                             try {
                                 await navigator.share({
@@ -347,9 +359,7 @@
                                     title: 'My Writer Stats',
                                     text: `Check out my writing stats on Sprint Bot! 🚀\nRank: ${USER_DATA.rank}\nTotal: ${USER_DATA.total} words`
                                 });
-                            } catch (err) {
-                                console.error("Share failed", err);
-                            }
+                            } catch (err) { console.error("Share failed", err); }
                         } else {
                             alert("Sharing not supported on this browser. Try downloading instead!");
                         }
