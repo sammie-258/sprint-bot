@@ -110,6 +110,7 @@ let sock          = null;
 let maintenanceMode = false;
 let groupCache    = {};
 let lastCacheUpdate = 0;
+let lastDailyRunDate = "";
 
 // In-memory stores
 let activeSprints    = {};
@@ -540,25 +541,35 @@ app.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
 app.get('/api/admin/groups', requireAdmin, async (req, res) => {
     if (!sock || !isConnected) return res.json([]);
     try {
-        await updateGroupCache();
+        await updateGroupCache(true); // Force update
         const groups      = await sock.groupFetchAllParticipating();
         const todayStr    = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
         const result = await Promise.all(Object.entries(groups).map(async ([jid, data]) => {
-            const [weekWords, activeWriters, lastSprint] = await Promise.all([
-                DailyStats.aggregate([{ $match: { groupId: jid, timestamp: { $gte: sevenDaysAgo } } }, { $group: { _id: null, total: { $sum: "$words" } } }]),
-                DailyStats.distinct("userId", { groupId: jid, date: todayStr }),
-                SprintRecord.findOne({ groupId: jid }).sort({ timestamp: -1 })
-            ]);
-            const weekTotal = weekWords[0]?.total || 0;
-            const health = weekTotal > 5000 ? 'Active' : weekTotal > 500 ? 'Quiet' : 'Dormant';
-            return {
-                id: jid, name: data.subject || jid,
-                participants: data.participants?.length || 0,
-                weekWords: weekTotal, activeWritersToday: activeWriters.length,
-                lastSprintAt: lastSprint?.timestamp || null, health
-            };
+            try {
+                const [weekWords, activeWriters, lastSprint] = await Promise.all([
+                    DailyStats.aggregate([{ $match: { groupId: jid, timestamp: { $gte: sevenDaysAgo } } }, { $group: { _id: null, total: { $sum: "$words" } } }]),
+                    DailyStats.distinct("userId", { groupId: jid, date: todayStr }),
+                    SprintRecord.findOne({ groupId: jid }).sort({ timestamp: -1 })
+                ]);
+                const weekTotal = weekWords[0]?.total || 0;
+                const health = weekTotal > 5000 ? 'Active' : weekTotal > 500 ? 'Quiet' : 'Dormant';
+                return {
+                    id: jid, name: data.subject || jid,
+                    participants: data.participants?.length || 0,
+                    weekWords: weekTotal, activeWritersToday: activeWriters.length,
+                    lastSprintAt: lastSprint?.timestamp || null, health
+                };
+            } catch (err) {
+                // Return fallback data so the list doesn't crash
+                return {
+                    id: jid, name: data.subject || jid,
+                    participants: data.participants?.length || 0,
+                    weekWords: 0, activeWritersToday: 0,
+                    lastSprintAt: null, health: 'Dormant'
+                };
+            }
         }));
         res.json(result);
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1063,30 +1074,31 @@ mongoose.connect(MONGO_URI).then(async () => {
                 }
             }
 
-            // ── 23:59 MVP ANNOUNCEMENTS ───────────────────────────────────────────
-            if (h === 23 && m === 59) {
-                // Daily MVP at :40
-                if (s >= 40 && s < 45) {
-                    for (const gid of groupIds) {
-                        try {
-                            const top = await DailyStats.aggregate([
-                                { $match: { groupId: gid, date: today } },
-                                { $group: { _id: "$userId", total: { $sum: "$words" }, name: { $first: "$name" } } },
-                                { $sort: { total: -1 } }, { $limit: 3 }
-                            ]);
-                            if (!top.length) continue;
-                            let txt = `🌟 *DAILY MVP — ${today}*\n━━━━━━━━━━━━━━━━\n👑 @${top[0]._id.split('@')[0]}: *${top[0].total.toLocaleString()} words*\n`;
-                            if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()}`).join('\n');
-                            txt += `\n\nKeep writing! See you tomorrow ✍️`;
-                            await sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
-                            const mvpProfile = await UserProfile.findOne({ userId: top[0]._id });
-                            if (mvpProfile) await awardBadge(mvpProfile, 'daily_first', gid);
-                            await new Promise(r => setTimeout(r, 500));
-                        } catch (e) {}
-                    }
+            // ── 23:55+ MVP ANNOUNCEMENTS ───────────────────────────────────────────
+            if (h === 23 && m >= 55 && lastDailyRunDate !== today) {
+                lastDailyRunDate = today; // Prevent duplicate runs
+
+                // Daily MVP
+                for (const gid of groupIds) {
+                    try {
+                        const top = await DailyStats.aggregate([
+                            { $match: { groupId: gid, date: today } },
+                            { $group: { _id: "$userId", total: { $sum: "$words" }, name: { $first: "$name" } } },
+                            { $sort: { total: -1 } }, { $limit: 3 }
+                        ]);
+                        if (!top.length) continue;
+                        let txt = `🌟 *DAILY MVP — ${today}*\n━━━━━━━━━━━━━━━━\n👑 @${top[0]._id.split('@')[0]}: *${top[0].total.toLocaleString()} words*\n`;
+                        if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()} words`).join('\n');
+                        txt += `\n\nKeep writing! See you tomorrow ✍️`;
+                        await sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
+                        const mvpProfile = await UserProfile.findOne({ userId: top[0]._id });
+                        if (mvpProfile) await awardBadge(mvpProfile, 'daily_first', gid);
+                        await new Promise(r => setTimeout(r, 500));
+                    } catch (e) {}
                 }
-                // Weekly MVP on Sunday at :45
-                if (s >= 45 && s < 50 && dayOfWeek === 0) {
+
+                // Weekly MVP on Sunday
+                if (dayOfWeek === 0) {
                     const dates = Array.from({ length: 7 }, (_, i) => { const d = new Date(lagos); d.setDate(d.getDate() - i); return d.toLocaleDateString('en-CA', { timeZone: TIMEZONE }); });
                     for (const gid of groupIds) {
                         try {
@@ -1097,7 +1109,7 @@ mongoose.connect(MONGO_URI).then(async () => {
                             ]);
                             if (!top.length) continue;
                             let txt = `🏆 *WEEKLY MVP*\n━━━━━━━━━━━━━━━━\n👑 @${top[0]._id.split('@')[0]}: *${top[0].total.toLocaleString()} words* this week!\n`;
-                            if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()}`).join('\n');
+                            if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()} words`).join('\n');
                             txt += `\n\nOutstanding week! 🚀`;
                             await sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
                             await new Promise(r => setTimeout(r, 500));
@@ -1118,32 +1130,32 @@ mongoose.connect(MONGO_URI).then(async () => {
                         await wc.save();
                     }
                 }
-                // Monthly MVP on last day at :50
-                if (s >= 50 && s < 55) {
-                    const tomorrow = new Date(lagos); tomorrow.setDate(tomorrow.getDate() + 1);
-                    if (tomorrow.getDate() === 1) {
-                        const year = lagos.getFullYear(), month = lagos.getMonth();
-                        const monthDates = Array.from({ length: lagos.getDate() }, (_, i) => new Date(year, month, i + 1).toLocaleDateString('en-CA', { timeZone: TIMEZONE }));
-                        const monthStr   = lagos.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: TIMEZONE });
-                        for (const gid of groupIds) {
-                            try {
-                                const top = await DailyStats.aggregate([
-                                    { $match: { groupId: gid, date: { $in: monthDates } } },
-                                    { $group: { _id: "$userId", total: { $sum: "$words" }, name: { $first: "$name" } } },
-                                    { $sort: { total: -1 } }, { $limit: 3 }
-                                ]);
-                                if (!top.length) continue;
-                                let txt = `🎖️ *MONTHLY MVP — ${monthStr}*\n━━━━━━━━━━━━━━━━\n👑 @${top[0]._id.split('@')[0]}: *${top[0].total.toLocaleString()} words*!\n`;
-                                if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()}`).join('\n');
-                                txt += `\nOnward to ${new Date(year, month + 1).toLocaleString('en-US', { month: 'long' })}! 📖`;
-                                await sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
-                                await new Promise(r => setTimeout(r, 500));
-                            } catch (e) {}
-                        }
+
+                // Monthly MVP on last day
+                const tomorrow = new Date(lagos); tomorrow.setDate(tomorrow.getDate() + 1);
+                if (tomorrow.getDate() === 1) {
+                    const year = lagos.getFullYear(), month = lagos.getMonth();
+                    const monthDates = Array.from({ length: lagos.getDate() }, (_, i) => new Date(year, month, i + 1).toLocaleDateString('en-CA', { timeZone: TIMEZONE }));
+                    const monthStr   = lagos.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: TIMEZONE });
+                    for (const gid of groupIds) {
+                        try {
+                            const top = await DailyStats.aggregate([
+                                { $match: { groupId: gid, date: { $in: monthDates } } },
+                                { $group: { _id: "$userId", total: { $sum: "$words" }, name: { $first: "$name" } } },
+                                { $sort: { total: -1 } }, { $limit: 3 }
+                            ]);
+                            if (!top.length) continue;
+                            let txt = `🎖️ *MONTHLY MVP — ${monthStr}*\n━━━━━━━━━━━━━━━━\n👑 @${top[0]._id.split('@')[0]}: *${top[0].total.toLocaleString()} words*!\n`;
+                            if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()} words`).join('\n');
+                            txt += `\nOnward to ${new Date(year, month + 1).toLocaleString('en-US', { month: 'long' })}! 📖`;
+                            await sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
+                            await new Promise(r => setTimeout(r, 500));
+                        } catch (e) {}
                     }
                 }
-                // Yearly MVP on Dec 31 at :55
-                if (s >= 55 && lagos.getDate() === 31 && lagos.getMonth() === 11) {
+
+                // Yearly MVP on Dec 31
+                if (lagos.getDate() === 31 && lagos.getMonth() === 11) {
                     const year = lagos.getFullYear();
                     for (const gid of groupIds) {
                         try {
@@ -1154,7 +1166,7 @@ mongoose.connect(MONGO_URI).then(async () => {
                             ]);
                             if (!top.length) continue;
                             let txt = `🎊 *WRITER OF THE YEAR — ${year}*\n━━━━━━━━━━━━━━━━\n👑 @${top[0]._id.split('@')[0]}: *${top[0].total.toLocaleString()} words*!\n`;
-                            if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()}`).join('\n');
+                            if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()} words`).join('\n');
                             txt += `\nSee you in ${year + 1}! 🥂✍️`;
                             await sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
                             await new Promise(r => setTimeout(r, 500));
@@ -1205,7 +1217,7 @@ mongoose.connect(MONGO_URI).then(async () => {
                         const activeDays = weekStats[0]?.days?.length || 0;
                         const freeze    = await StreakFreeze.findOne({ userId });
                         const rank      = getRank(profile.totalWordsAllTime);
-                        const reportTxt = `📊 *YOUR WEEKLY REPORT*\n━━━━━━━━━━━━━━━━\n👤 ${profile.name} | ${rank}\n\n📝 *This Week:* ${thisWeek.toLocaleString()} words\n📅 Active Days: ${activeDays}/7\n${deltaStr}\n\n🔥 Streak: *${profile.currentStreak} days*\n🏅 Best: ${profile.bestStreak} days\n🛡️ Freezes: ${freeze?.freezesAvailable || 0}\n📚 All-Time: ${profile.totalWordsAllTime.toLocaleString()}\n${profile.bestSprintWords > 0 ? `⚡ Best Sprint: ${profile.bestSprintWords.toLocaleString()} @ ${profile.bestSprintWpm} WPM\n` : ''}\nKeep going this week! ✍️`;
+                        const reportTxt = `📊 *YOUR WEEKLY REPORT*\n━━━━━━━━━━━━━━━━\n👤 ${profile.name} | ${rank}\n\n📝 *This Week:* ${thisWeek.toLocaleString()} words\n📅 Active Days: ${activeDays}/7\n${deltaStr}\n\n🔥 Streak: *${profile.currentStreak} days*\n🏅 Best: ${profile.bestStreak} days\n🛡️ Freezes: ${freeze?.freezesAvailable || 0}\n📚 All-Time: ${profile.totalWordsAllTime.toLocaleString()} words\n${profile.bestSprintWords > 0 ? `⚡ Best Sprint: ${profile.bestSprintWords.toLocaleString()} words @ ${profile.bestSprintWpm} WPM\n` : ''}\nKeep going this week! ✍️`;
                         // DM only — never respond to replies
                         const dmJid = userId.replace('@lid', '@s.whatsapp.net');
                         await sock.sendMessage(dmJid, { text: reportTxt });
@@ -1553,37 +1565,53 @@ mongoose.connect(MONGO_URI).then(async () => {
 
                     setTimeout(async () => {
                         const duel = activeDuels[chatId];
-                        if (!duel) return;
-                        delete activeDuels[chatId];
+                        if (!duel) return; // Might have been cancelled
+                        
+                        // Enter Grace Period
+                        duel.isGracePeriod = true;
+                        duel.endsAt = Date.now() + (2 * 60000); // Add 2 minutes to the clock for logging
 
-                        const cW = duel.words[duel.challenger] || 0;
-                        const oW = duel.words[duel.opponent]   || 0;
-                        const draw     = cW === oW;
-                        const winnerId = cW > oW ? duel.challenger : duel.opponent;
-                        const loserId  = cW > oW ? duel.opponent   : duel.challenger;
+                        await sock.sendMessage(chatId, { 
+                            text: `🛑 *DUEL TIME'S UP!*\n\n@${duel.challenger.split('@')[0]} and @${duel.opponent.split('@')[0]}, put your pens down!\n\nYou have *2 minutes* to submit your final words using *!wc [number]*!`, 
+                            mentions: [duel.challenger, duel.opponent] 
+                        });
 
-                        let txt = `⚔️ *DUEL OVER!* ⚔️\n━━━━━━━━━━━━━━━━\n`;
-                        if (draw) {
-                            txt += `🤝 *IT'S A DRAW!*\nBoth: *${cW.toLocaleString()} words*\n\nHonour among wordsmiths! 🙏`;
-                        } else {
-                            txt += `🏆 *WINNER:* @${winnerId.split('@')[0]} — *${Math.max(cW, oW).toLocaleString()} words*\n💀 *LOSER:* @${loserId.split('@')[0]} — ${Math.min(cW, oW).toLocaleString()} words\n\nBetter luck next time! 😤`;
-                            try {
-                                const winProf = await UserProfile.findOne({ userId: winnerId });
-                                if (winProf) await awardBadge(winProf, 'duel_win', chatId);
-                            } catch (e) {}
-                        }
+                        // Final resolution timer
+                        setTimeout(async () => {
+                            const finalDuel = activeDuels[chatId];
+                            if (!finalDuel) return;
+                            delete activeDuels[chatId];
 
-                        // Log words to daily stats for both
-                        for (const [uid, words] of Object.entries(duel.words)) {
-                            if (words > 0) {
-                                const name = uid === duel.challenger ? duel.challengerName : duel.opponentName;
-                                await DailyStats.findOneAndUpdate({ userId: uid, groupId: chatId, date: todayStr }, { name, $inc: { words }, timestamp: new Date() }, { upsert: true });
-                                await updateStreak(uid, name, words);
+                            const cW = finalDuel.words[finalDuel.challenger] || 0;
+                            const oW = finalDuel.words[finalDuel.opponent]   || 0;
+                            const draw     = cW === oW;
+                            const winnerId = cW > oW ? finalDuel.challenger : finalDuel.opponent;
+                            const loserId  = cW > oW ? finalDuel.opponent   : finalDuel.challenger;
+
+                            let txt = `⚔️ *DUEL OVER!* ⚔️\n━━━━━━━━━━━━━━━━\n`;
+                            if (draw) {
+                                txt += `🤝 *IT'S A DRAW!*\nBoth: *${cW.toLocaleString()} words*\n\nHonour among wordsmiths! 🙏`;
+                            } else {
+                                txt += `🏆 *WINNER:* @${winnerId.split('@')[0]} — *${Math.max(cW, oW).toLocaleString()} words*\n💀 *LOSER:* @${loserId.split('@')[0]} — ${Math.min(cW, oW).toLocaleString()} words\n\nBetter luck next time! 😤`;
+                                try {
+                                    const winProf = await UserProfile.findOne({ userId: winnerId });
+                                    if (winProf) await awardBadge(winProf, 'duel_win', chatId);
+                                } catch (e) {}
                             }
-                        }
 
-                        await sock.sendMessage(chatId, { text: txt, mentions: [duel.challenger, duel.opponent] });
-                        pushActivity('duel', `Duel ended in ${groupCache[chatId]?.subject || chatId}`, '⚔️');
+                            // Log words to daily stats for both
+                            for (const [uid, words] of Object.entries(finalDuel.words)) {
+                                if (words > 0) {
+                                    const name = uid === finalDuel.challenger ? finalDuel.challengerName : finalDuel.opponentName;
+                                    await DailyStats.findOneAndUpdate({ userId: uid, groupId: chatId, date: todayStr }, { name, $inc: { words }, timestamp: new Date() }, { upsert: true });
+                                    await updateStreak(uid, name, words);
+                                }
+                            }
+
+                            await sock.sendMessage(chatId, { text: txt, mentions: [finalDuel.challenger, finalDuel.opponent] });
+                            pushActivity('duel', `Duel ended in ${groupCache[chatId]?.subject || chatId}`, '⚔️');
+                        }, 2 * 60000); // 2 minutes later
+                        
                     }, duration * 60000);
                 }
 
@@ -1650,7 +1678,7 @@ mongoose.connect(MONGO_URI).then(async () => {
                     ]);
                     if (!top.length) return sock.sendMessage(chatId, { text: "📉 No data." }, { quoted: msg });
                     let txt = `🌎 *ALL-TIME HALL OF FAME*\n\n`;
-                    top.forEach((w, i) => { txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎖️'} ${w._id}: ${w.total.toLocaleString()}\n`; });
+                    top.forEach((w, i) => { txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎖️'} ${w._id}: ${w.total.toLocaleString()} words\n`; });
                     await sock.sendMessage(chatId, { text: txt });
                 }
 
@@ -1688,8 +1716,8 @@ mongoose.connect(MONGO_URI).then(async () => {
                     txt += `🏆 Best: ${profile.bestStreak} days\n`;
                     txt += `🛡️ Freezes: ${freeze?.freezesAvailable || 0}\n`;
                     txt += `📅 Today: *${dailyWords.toLocaleString()}* words\n`;
-                    txt += `📚 All-Time: ${profile.totalWordsAllTime.toLocaleString()}\n`;
-                    if (profile.bestSprintWords > 0) txt += `⚡ Best Sprint: ${profile.bestSprintWords.toLocaleString()} @ ${profile.bestSprintWpm} WPM\n`;
+                    txt += `📚 All-Time: ${profile.totalWordsAllTime.toLocaleString()} words\n`;
+                    if (profile.bestSprintWords > 0) txt += `⚡ Best Sprint: ${profile.bestSprintWords.toLocaleString()} words @ ${profile.bestSprintWpm} WPM\n`;
                     if (profile.badges?.length) {
                         const icons = profile.badges.map(b => BADGE_DEFS.find(d => d.key === b)?.icon || '🏅').join(' ');
                         txt += `🏅 Badges: ${icons}\n`;
@@ -1766,7 +1794,7 @@ mongoose.connect(MONGO_URI).then(async () => {
                         const s = stats[i];
                         const p = await UserProfile.findOne({ userId: s._id });
                         const fire = (p && p.currentStreak > 2) ? `🔥${toSuperscript(p.currentStreak)}` : "";
-                        txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎖️'} ${s.name} ${fire}: ${s.totalWords.toLocaleString()}\n`;
+                        txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎖️'} ${s.name} ${fire}: ${s.totalWords.toLocaleString()} words\n`;
                     }
                     await sock.sendMessage(chatId, { text: txt });
                 }
@@ -1815,13 +1843,13 @@ mongoose.connect(MONGO_URI).then(async () => {
                         const thisWeek   = weekStats[0]?.total || 0;
                         const activeDays = weekStats[0]?.days?.length || 0;
                         const rank       = getRank(profile?.totalWordsAllTime || 0);
-                        const txt = `📊 *YOUR WEEKLY REPORT*\n━━━━━━━━━━━━━━━━\n👤 ${senderName} | ${rank}\n\n📝 This Week: *${thisWeek.toLocaleString()} words*\n📅 Active Days: ${activeDays}/7\n🔥 Streak: *${profile?.currentStreak || 0} days*\n🏅 Best: ${profile?.bestStreak || 0} days\n🛡️ Freezes: ${freeze?.freezesAvailable || 0}\n📚 All-Time: ${profile?.totalWordsAllTime?.toLocaleString() || 0}\n${profile?.bestSprintWords > 0 ? `⚡ Best Sprint: ${profile.bestSprintWords.toLocaleString()} @ ${profile.bestSprintWpm} WPM\n` : ''}`;
+                        const txt = `📊 *YOUR WEEKLY REPORT*\n━━━━━━━━━━━━━━━━\n👤 ${senderName} | ${rank}\n\n📝 This Week: *${thisWeek.toLocaleString()} words*\n📅 Active Days: ${activeDays}/7\n🔥 Streak: *${profile?.currentStreak || 0} days*\n🏅 Best: ${profile?.bestStreak || 0} days\n🛡️ Freezes: ${freeze?.freezesAvailable || 0}\n📚 All-Time: ${profile?.totalWordsAllTime?.toLocaleString() || 0} words\n${profile?.bestSprintWords > 0 ? `⚡ Best Sprint: ${profile.bestSprintWords.toLocaleString()} words @ ${profile.bestSprintWpm} WPM\n` : ''}`;
                         try {
-                            const dmJid = senderId.replace('@lid', '@s.whatsapp.net');
+                            const dmJid = senderId.includes('@s.whatsapp.net') ? senderId : senderId.replace('@lid', '@s.whatsapp.net');
                             await sock.sendMessage(dmJid, { text: txt });
                             await sock.sendMessage(chatId, { text: `📬 Report sent to your DM, @${senderId.split('@')[0]}!`, mentions: [senderId] }, { quoted: msg });
                         } catch (e) {
-                            await sock.sendMessage(chatId, { text: txt }, { quoted: msg });
+                            await sock.sendMessage(chatId, { text: `⚠️ Couldn't send to your DM (you may need to send me a private message first).\n\n${txt}` }, { quoted: msg });
                         }
                     } catch (e) { console.error(e); }
                 }
@@ -1875,6 +1903,7 @@ mongoose.connect(MONGO_URI).then(async () => {
                 }
 
                 // ── !TIME ───────────────────────────────────────────────────────────
+                // ── !TIME ───────────────────────────────────────────────────────────
                 if (command === "!time") {
                     const sprint = activeSprints[chatId];
                     const duel   = activeDuels[chatId];
@@ -1882,7 +1911,8 @@ mongoose.connect(MONGO_URI).then(async () => {
                     const target = sprint || duel;
                     const r      = target.endsAt - Date.now();
                     if (r <= 0) return sock.sendMessage(chatId, { text: "🛑 Time's up!" }, { quoted: msg });
-                    const label  = sprint ? "Sprint" : "Duel";
+                    
+                    const label  = sprint ? "Sprint" : (duel.isGracePeriod ? "Duel (Grace Period)" : "Duel");
                     return sock.sendMessage(chatId, { text: `⏳ *${label}:* ${Math.floor(r / 60000)}m ${Math.floor((r / 1000) % 60)}s remaining` }, { quoted: msg });
                 }
 

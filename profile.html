@@ -84,7 +84,7 @@
         .stat-card {
             background:rgba(255,255,255,.05);
             border:1px solid rgba(255,255,255,.08);
-            border-radius:16px; padding:13px 8px; text-align:center;
+            border-radius:16px; padding:13px 6px; text-align:center;
             transition:transform .2s,box-shadow .2s;
         }
         .stat-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.25); }
@@ -120,7 +120,7 @@
         /* Badge chips */
         .bc {
             display:inline-flex; align-items:center; gap:4px;
-            padding:3px 9px; border-radius:99px; font-size:.68rem; font-weight:600;
+            padding:4px 10px; border-radius:99px; font-size:.7rem; font-weight:600;
             background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1);
             cursor:default; transition:transform .15s,background .15s;
             position:relative;
@@ -215,7 +215,6 @@ const BADGE_DEFS = [
 ];
 </script>
 
-<!-- Theme toggle -->
 <div class="fixed top-4 right-4 z-50">
     <button onclick="toggleTheme()"
         class="w-10 h-10 rounded-full backdrop-blur-sm flex items-center justify-center transition hover:scale-110"
@@ -226,91 +225,80 @@ const BADGE_DEFS = [
 
 <div class="relative z-10 min-h-screen flex flex-col items-center justify-center py-12 px-4 gap-5">
 
-    <!-- ── Card ── -->
-    <div class="card w-full max-w-sm fu">
+    <div class="card w-full max-w-md fu">
 
-        <!-- Banner -->
         <div class="banner" style="position:relative;">
             <div class="avatar-wrap">
                 <div class="avatar-inner" id="ui-initial"></div>
             </div>
         </div>
-        <div style="height:48px;"></div><!-- spacer for avatar -->
+        <div style="height:48px;"></div><div class="px-6 pb-6">
 
-        <!-- Body -->
-        <div class="px-5 pb-5">
-
-            <!-- Name & rank -->
-            <div class="text-center mb-4 fu d1">
+            <div class="text-center mb-5 fu d1">
                 <h1 id="ui-name" class="t-white"
-                    style="font-family:'Syne',sans-serif;font-size:1.55rem;font-weight:800;color:#f1f5f9;margin:0 0 6px;"></h1>
+                    style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:#f1f5f9;margin:0 0 6px;"></h1>
                 <span id="ui-rank"
-                    style="display:inline-block;padding:3px 14px;border-radius:99px;font-size:.7rem;font-weight:700;letter-spacing:.06em;background:rgba(34,211,160,.14);color:#22d3a0;border:1px solid rgba(34,211,160,.28);"></span>
+                    style="display:inline-block;padding:4px 16px;border-radius:99px;font-size:.75rem;font-weight:700;letter-spacing:.06em;background:rgba(34,211,160,.14);color:#22d3a0;border:1px solid rgba(34,211,160,.28);"></span>
             </div>
 
-            <!-- 4 stat grid -->
-            <div class="grid grid-cols-2 gap-3 mb-3 fu d2">
-                <div class="stat-card">
+            <div class="grid grid-cols-2 gap-3 mb-5 fu d2">
+                <div class="stat-card flex flex-col justify-center">
                     <div id="ui-total"
                         style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#f1f5f9;" class="t-white"></div>
-                    <div style="font-size:.6rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">ALL-TIME WORDS</div>
+                    <div style="font-size:.65rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">ALL-TIME WORDS</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card flex flex-col justify-center">
                     <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:4px;color:#f97316;">
                         <span id="ui-streak"></span>
                         <i class="fas fa-fire" style="font-size:.85rem;animation:pulse 1.5s infinite;"></i>
                     </div>
-                    <div style="font-size:.6rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">DAY STREAK</div>
+                    <div style="font-size:.65rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">DAY STREAK</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card flex flex-col justify-center">
                     <div id="ui-daily"
                         style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#f1f5f9;" class="t-white"></div>
-                    <div style="font-size:.6rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">TODAY'S WORDS</div>
+                    <div style="font-size:.65rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">TODAY'S WORDS</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card flex flex-col justify-center">
                     <div id="ui-best-val"
                         style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#818cf8;">—</div>
-                    <div id="ui-best-label"
-                        style="font-size:.6rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">BEST SPRINT</div>
+                    <div style="font-size:.65rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">BEST SPRINT</div>
+                    <div id="ui-best-label" style="font-size:.55rem;color:#64748b;margin-top:2px;"></div>
                 </div>
             </div>
 
-            <!-- Rank progress -->
-            <div class="mb-3 fu d2" id="rank-bar-section">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-                    <span style="font-size:.62rem;color:#94a3b8;font-weight:600;" id="rp-pct"></span>
-                    <span style="font-size:.62rem;color:#94a3b8;font-weight:600;" id="rp-next"></span>
+            <div class="mb-5 fu d2" id="rank-bar-section">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <span style="font-size:.65rem;color:#94a3b8;font-weight:600;" id="rp-pct"></span>
+                    <span style="font-size:.65rem;color:#94a3b8;font-weight:600;" id="rp-next"></span>
                 </div>
                 <div class="rank-track">
                     <div class="rank-fill" id="rank-fill" style="width:0%"></div>
                 </div>
-                <div style="font-size:.58rem;color:#64748b;margin-top:3px;text-align:right;" id="rp-words-left"></div>
+                <div style="font-size:.6rem;color:#64748b;margin-top:4px;text-align:right;" id="rp-words-left"></div>
             </div>
 
-            <!-- Goal bar -->
-            <div id="goal-section" class="hidden mb-3 fu d3">
-                <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-                    <span style="font-size:.62rem;color:#94a3b8;font-weight:600;">Goal Progress</span>
+            <div id="goal-section" class="hidden mb-5 fu d3">
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                    <span style="font-size:.65rem;color:#94a3b8;font-weight:600;">Goal Progress</span>
                     <span id="goal-text"
-                        style="font-family:'DM Mono',monospace;font-size:.62rem;color:#f1f5f9;" class="t-white"></span>
+                        style="font-family:'DM Mono',monospace;font-size:.65rem;color:#f1f5f9;" class="t-white"></span>
                 </div>
                 <div style="height:7px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;">
                     <div class="gfill" id="goal-bar" style="width:0%;height:100%;"></div>
                 </div>
-                <div style="font-size:.58rem;color:#64748b;text-align:right;margin-top:3px;" id="goal-pct"></div>
+                <div style="font-size:.6rem;color:#64748b;text-align:right;margin-top:4px;" id="goal-pct"></div>
             </div>
 
-            <!-- Heatmap -->
-            <div class="mb-3 fu d3">
-                <div style="font-size:.6rem;color:#64748b;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">
+            <div class="mb-5 fu d3">
+                <div style="font-size:.65rem;color:#64748b;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;">
                     35-Day Activity
                 </div>
-                <div id="heatmap" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+                <div id="heatmap" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
             </div>
 
-            <!-- Badges -->
             <div id="badge-section" class="fu d4">
-                <div style="font-size:.6rem;color:#64748b;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">
+                <div style="font-size:.65rem;color:#64748b;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;">
                     Badges
                 </div>
                 <div id="badge-wrap" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
@@ -318,16 +306,14 @@ const BADGE_DEFS = [
 
         </div>
 
-        <!-- Footer -->
-        <div style="border-top:1px solid rgba(255,255,255,.07);padding:10px;text-align:center;">
-            <span style="font-size:.62rem;color:#475569;font-weight:600;">
-                <i class="fas fa-robot" style="margin-right:4px;"></i>Sprint Bot by sam_marfe
+        <div style="border-top:1px solid rgba(255,255,255,.07);padding:12px;text-align:center;">
+            <span style="font-size:.65rem;color:#475569;font-weight:600;">
+                <i class="fas fa-robot" style="margin-right:4px;"></i>Sprint Bot
             </span>
         </div>
     </div>
 
-    <!-- Buttons -->
-    <div class="flex gap-3 fu d5">
+    <div class="flex gap-4 fu d5">
         <button onclick="downloadImage()" class="btn-dl flex items-center gap-2 text-sm">
             <i class="fas fa-download"></i> Download Card
         </button>
@@ -338,7 +324,6 @@ const BADGE_DEFS = [
 
 </div>
 
-<!-- Hidden export canvas — tall to fit all new elements -->
 <canvas id="exportCanvas" width="1080" height="1660" style="display:none;"></canvas>
 
 <script>
@@ -357,6 +342,8 @@ function initUI() {
     if (USER_DATA.bestSprintWpm > 0) {
         document.getElementById('ui-best-val').textContent   = USER_DATA.bestSprintWpm + ' WPM';
         document.getElementById('ui-best-label').textContent = USER_DATA.bestSprintWords + ' words';
+    } else {
+        document.getElementById('ui-best-label').style.display = 'none';
     }
 
     // Rank progress bar
@@ -369,7 +356,7 @@ function initUI() {
         setTimeout(() => { document.getElementById('rank-fill').style.width = USER_DATA.nextRankPct + '%'; }, 250);
     } else {
         document.getElementById('rank-bar-section').innerHTML =
-            '<div style="text-align:center;font-size:.72rem;font-weight:700;color:#22d3a0;padding:4px 0;">⚡ Maximum Rank — Novel God!</div>';
+            '<div style="text-align:center;font-size:.75rem;font-weight:700;color:#22d3a0;padding:6px 0;">⚡ Maximum Rank — Novel God!</div>';
     }
 
     // Goal
@@ -390,7 +377,7 @@ function initUI() {
 function buildHeatmap() {
     const wrap = document.getElementById('heatmap');
     const log  = USER_DATA.activityLog || '0'.repeat(35);
-    const bits = log.split('').reverse(); // oldest first (left=oldest, right=today)
+    const bits = log.split('').reverse(); 
     bits.forEach((bit, i) => {
         const d = document.createElement('div');
         d.className = 'hcell' + (bit === '1' ? ' on' : '');
@@ -434,7 +421,7 @@ if (localStorage.getItem('sb-theme') === 'light') {
 }
 
 // ════════════════════════════════════════════════
-//  CANVAS EXPORT
+//  CANVAS EXPORT (COMPLETELY RE-ENGINEERED)
 // ════════════════════════════════════════════════
 function rr(ctx, x, y, w, h, r, fill, stroke, lw) {
     ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
@@ -462,140 +449,184 @@ function drawCanvas(cb) {
         accent:  '#22d3a0', accent2: '#6366f1',
     };
 
-    // BG
+    // Fill Background
     ctx.fillStyle = p.bg; ctx.fillRect(0,0,W,H);
-    // Glow
+    
+    // Background Glow
     const gl = ctx.createRadialGradient(200,250,0,200,250,550);
     gl.addColorStop(0, light ? 'rgba(13,148,136,.12)' : 'rgba(34,211,160,.09)');
     gl.addColorStop(1, 'transparent');
     ctx.fillStyle = gl; ctx.fillRect(0,0,W,H);
 
-    // Card
-    const CX=80,CY=90,CW=920,CH=1490,CR=54;
-    rr(ctx,CX,CY,CW,CH,CR,p.card,p.cBorder,1.5);
+    // Card Container
+    const CX=80, CY=90, CW=920, CH=1490, CR=54;
+    rr(ctx, CX, CY, CW, CH, CR, p.card, p.cBorder, 1.5);
 
     // Banner
-    const bg = ctx.createLinearGradient(CX,CY,CX+CW,CY);
+    const bannerHeight = 230;
+    const bg = ctx.createLinearGradient(CX, CY, CX+CW, CY);
     bg.addColorStop(0,'#0d9488'); bg.addColorStop(.55,'#6366f1'); bg.addColorStop(1,'#8b5cf6');
-    ctx.save(); ctx.beginPath(); ctx.roundRect(CX,CY,CW,230,[CR,CR,0,0]); ctx.clip();
-    ctx.fillStyle = bg; ctx.fillRect(CX,CY,CW,230);
-    // dots
-    for(let x=CX;x<CX+CW;x+=32)for(let y=CY;y<CY+230;y+=32){
-        ctx.beginPath(); ctx.arc(x,y,1.4,0,Math.PI*2);
-        ctx.fillStyle='rgba(255,255,255,.18)'; ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.roundRect(CX, CY, CW, bannerHeight, [CR,CR,0,0]); ctx.clip();
+    ctx.fillStyle = bg; ctx.fillRect(CX, CY, CW, bannerHeight);
+    
+    // Banner Polka Dots
+    for(let x=CX; x<CX+CW; x+=32) {
+        for(let y=CY; y<CY+bannerHeight; y+=32) {
+            ctx.beginPath(); ctx.arc(x, y, 1.4, 0, Math.PI*2);
+            ctx.fillStyle='rgba(255,255,255,.18)'; ctx.fill();
+        }
     }
     ctx.restore();
 
     // Avatar
-    const AX=CX+CW/2, AY=CY+230, AR=88;
-    // card backing
-    ctx.beginPath(); ctx.arc(AX,AY,AR+10,0,Math.PI*2); ctx.fillStyle=p.card; ctx.fill();
-    // gradient ring
-    const ag=ctx.createLinearGradient(AX-AR,AY-AR,AX+AR,AY+AR);
+    const AX = CX + CW/2, AY = CY + bannerHeight, AR = 88;
+    ctx.beginPath(); ctx.arc(AX, AY, AR+10, 0, Math.PI*2); ctx.fillStyle=p.card; ctx.fill();
+    
+    const ag=ctx.createLinearGradient(AX-AR, AY-AR, AX+AR, AY+AR);
     ag.addColorStop(0,'#22d3a0'); ag.addColorStop(1,'#6366f1');
-    ctx.beginPath(); ctx.arc(AX,AY,AR+4,0,Math.PI*2); ctx.fillStyle=ag; ctx.fill();
-    // inner
-    ctx.beginPath(); ctx.arc(AX,AY,AR,0,Math.PI*2);
+    ctx.beginPath(); ctx.arc(AX, AY, AR+4, 0, Math.PI*2); ctx.fillStyle=ag; ctx.fill();
+    
+    ctx.beginPath(); ctx.arc(AX, AY, AR, 0, Math.PI*2);
     ctx.fillStyle = light ? '#dde6f0' : '#111c2b'; ctx.fill();
+    
     ctx.fillStyle = light ? '#0d9488' : '#22d3a0';
     ctx.font="bold 70px 'Syne',Arial"; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(USER_DATA.initial, AX, AY+4);
 
-    // Name
-    ctx.fillStyle=p.text; ctx.font="bold 66px 'Syne',Arial"; ctx.textBaseline='alphabetic';
-    ctx.fillText(USER_DATA.name, AX, AY+AR+88);
+    // Flow Anchor (Current Y Coordinate)
+    let curY = AY + AR + 70;
 
-    // Rank pill
-    const rt='👑 '+USER_DATA.rank;
-    ctx.font="600 32px 'DM Sans',Arial";
-    const rw=ctx.measureText(rt).width+56;
-    rr(ctx,AX-rw/2,AY+AR+102,rw,58,29,'rgba(34,211,160,.15)','rgba(34,211,160,.3)',1);
-    ctx.fillStyle=light?'#0d9488':'#22d3a0'; ctx.textBaseline='middle';
-    ctx.fillText(rt, AX, AY+AR+131);
+    // Name
+    ctx.fillStyle=p.text; ctx.font="bold 66px 'Syne',Arial"; ctx.textBaseline='middle';
+    ctx.fillText(USER_DATA.name, AX, curY);
+    curY += 75;
+
+    // Rank Pill
+    const rt = '👑 ' + USER_DATA.rank;
+    ctx.font = "600 32px 'DM Sans',Arial";
+    const rw = ctx.measureText(rt).width + 56;
+    rr(ctx, AX - rw/2, curY, rw, 58, 29, 'rgba(34,211,160,.15)', 'rgba(34,211,160,.3)', 1);
+    ctx.fillStyle = light ? '#0d9488' : '#22d3a0'; ctx.textBaseline = 'middle';
+    ctx.fillText(rt, AX, curY + 29);
+    curY += 110;
 
     // ── 4 Stat boxes ──
-    const SY=AY+AR+208, SW=202, SH=154, SGAP=19;
-    const STOT=(4*SW+3*SGAP), SX0=CX+(CW-STOT)/2;
-    const stats=[
-        {v:USER_DATA.total,               lab:'ALL-TIME',   col:p.text},
-        {v:USER_DATA.streak+'🔥',         lab:'STREAK',     col:'#f97316'},
-        {v:USER_DATA.dailyWords,           lab:"TODAY'S",    col:p.text},
-        {v:USER_DATA.bestSprintWpm>0 ? USER_DATA.bestSprintWpm+' WPM':'—', lab:'BEST SPRINT', col:'#818cf8'},
+    const SW = 202, SH = 154, SGAP = 19;
+    const STOT = (4*SW + 3*SGAP);
+    const SX0 = CX + (CW - STOT)/2; // perfectly centers grid
+    
+    const stats = [
+        { v: USER_DATA.total,               lab: 'ALL-TIME',   col: p.text },
+        { v: USER_DATA.streak + '🔥',       lab: 'STREAK',     col: '#f97316' },
+        { v: USER_DATA.dailyWords,          lab: "TODAY'S",    col: p.text },
+        { v: USER_DATA.bestSprintWpm > 0 ? USER_DATA.bestSprintWpm + ' WPM' : '—', lab: 'BEST SPRINT', col: '#818cf8' },
     ];
-    stats.forEach((s,i)=>{
-        const sx=SX0+i*(SW+SGAP);
-        rr(ctx,sx,SY,SW,SH,20,p.faint,p.fBorder,1);
-        ctx.fillStyle=s.col; ctx.font="bold 42px 'Syne',Arial"; ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText(s.v, sx+SW/2, SY+SH/2-13);
-        ctx.fillStyle=p.sub; ctx.font="600 19px 'DM Sans',Arial";
-        ctx.fillText(s.lab, sx+SW/2, SY+SH/2+32);
+    
+    stats.forEach((s, i) => {
+        const sx = SX0 + i*(SW + SGAP);
+        rr(ctx, sx, curY, SW, SH, 20, p.faint, p.fBorder, 1);
+        ctx.fillStyle = s.col; ctx.font = "bold 42px 'Syne',Arial"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(s.v, sx + SW/2, curY + SH/2 - 13);
+        ctx.fillStyle = p.sub; ctx.font = "600 19px 'DM Sans',Arial";
+        ctx.fillText(s.lab, sx + SW/2, curY + SH/2 + 32);
     });
+    curY += SH + 70;
 
-    let curY = SY+SH+52;
-    const BX=CX+58, BW=CW-116;
+    // Content Box Settings
+    const BX = CX + 58, BW = CW - 116;
 
-    // ── Rank progress ──
-    ctx.fillStyle=p.sub; ctx.font="600 24px 'DM Sans',Arial"; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-    ctx.fillText('Rank Progress', BX, curY-10);
-    ctx.textAlign='right'; ctx.fillText(USER_DATA.nextRankName, BX+BW, curY-10);
-    rr(ctx,BX,curY,BW,14,7,p.track,'transparent',0);
-    const fw=Math.max(0,USER_DATA.nextRankPct/100*BW);
-    if(fw>0){const fg=ctx.createLinearGradient(BX,0,BX+fw,0);fg.addColorStop(0,'#22d3a0');fg.addColorStop(1,'#6366f1');rr(ctx,BX,curY,fw,14,7,fg,'transparent',0);}
-    ctx.fillStyle=p.sub; ctx.font="500 21px 'DM Mono',monospace"; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-    ctx.fillText(USER_DATA.nextRankPct+'%', BX+BW/2, curY+14+26);
-    curY+=14+62;
-
-    // ── Heatmap ──
-    ctx.fillStyle=p.sub; ctx.font="600 24px 'DM Sans',Arial"; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-    ctx.fillText('35-Day Activity', BX, curY-10);
-    const log=USER_DATA.activityLog||'0'.repeat(35);
-    const bits=log.split('').reverse();
-    const CS=22,CG=8,HTOT=bits.length*CS+(bits.length-1)*CG;
-    let hx=CX+(CW-HTOT)/2;
-    bits.forEach(bit=>{
-        ctx.fillStyle= bit==='1' ? p.hOn : p.hOff;
-        ctx.beginPath(); ctx.roundRect(hx,curY,CS,CS,3); ctx.fill();
-        if(bit==='1'){
-            const glow=ctx.createRadialGradient(hx+CS/2,curY+CS/2,0,hx+CS/2,curY+CS/2,CS);
-            glow.addColorStop(0,'rgba(34,211,160,.35)'); glow.addColorStop(1,'transparent');
-            ctx.fillStyle=glow; ctx.fillRect(hx-4,curY-4,CS+8,CS+8);
-            ctx.fillStyle=p.hOn; ctx.beginPath(); ctx.roundRect(hx,curY,CS,CS,3); ctx.fill();
+    // ── Rank Progress ──
+    if (USER_DATA.nextRankPct < 100) {
+        ctx.fillStyle = p.sub; ctx.font = "600 24px 'DM Sans',Arial"; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        ctx.fillText('Rank Progress', BX, curY - 14);
+        ctx.textAlign = 'right'; ctx.fillText(USER_DATA.nextRankName, BX + BW, curY - 14);
+        
+        rr(ctx, BX, curY, BW, 14, 7, p.track, 'transparent', 0);
+        const fw = Math.max(0, USER_DATA.nextRankPct / 100 * BW);
+        if(fw > 0) {
+            const fg = ctx.createLinearGradient(BX, 0, BX + fw, 0);
+            fg.addColorStop(0, '#22d3a0'); fg.addColorStop(1, '#6366f1');
+            rr(ctx, BX, curY, fw, 14, 7, fg, 'transparent', 0);
         }
-        hx+=CS+CG;
-    });
-    curY+=CS+55;
-
-    // ── Badges ──
-    const earned=USER_DATA.badges||[];
-    if(earned.length){
-        ctx.fillStyle=p.sub; ctx.font="600 24px 'DM Sans',Arial"; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-        ctx.fillText('Badges', BX, curY-10);
-        let bx=BX;
-        earned.forEach(key=>{
-            const def=BADGE_DEFS.find(b=>b.key===key); if(!def)return;
-            ctx.font='46px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-            ctx.fillText(def.icon, bx+24, curY+24);
-            bx+=56;
-            if(bx+56>BX+BW){bx=BX;curY+=56;}
-        });
-        curY+=56+44;
+        
+        ctx.fillStyle = p.sub; ctx.font = "500 21px 'DM Mono',monospace"; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        ctx.fillText(USER_DATA.nextRankPct + '%', BX + BW/2, curY + 14 + 30);
+        curY += 85;
+    } else {
+        ctx.fillStyle = '#22d3a0'; ctx.font = "bold 26px 'DM Sans',Arial"; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        ctx.fillText('⚡ Maximum Rank — Novel God!', CX + CW/2, curY);
+        curY += 60;
     }
 
-    // ── Goal bar ──
-    if(USER_DATA.goalActive){
-        ctx.fillStyle=p.sub; ctx.font="600 24px 'DM Sans',Arial"; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-        ctx.fillText('Daily Goal', BX, curY-10);
-        ctx.textAlign='right';
-        ctx.fillText(USER_DATA.goalCurrent+' / '+USER_DATA.goalTarget, BX+BW, curY-10);
-        rr(ctx,BX,curY,BW,13,6,p.track,'transparent',0);
-        const gfw=Math.max(0,USER_DATA.goalPercent/100*BW);
-        if(gfw>0){const gfg=ctx.createLinearGradient(BX,0,BX+gfw,0);gfg.addColorStop(0,'#22d3a0');gfg.addColorStop(1,'#6366f1');rr(ctx,BX,curY,gfw,13,6,gfg,'transparent',0);}
-        curY+=66;
+    // ── Daily Goal ──
+    if(USER_DATA.goalActive) {
+        ctx.fillStyle = p.sub; ctx.font = "600 24px 'DM Sans',Arial"; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        ctx.fillText('Daily Goal', BX, curY - 14);
+        ctx.textAlign = 'right';
+        ctx.fillText(USER_DATA.goalCurrent + ' / ' + USER_DATA.goalTarget, BX + BW, curY - 14);
+        
+        rr(ctx, BX, curY, BW, 13, 6, p.track, 'transparent', 0);
+        const gfw = Math.max(0, USER_DATA.goalPercent / 100 * BW);
+        if(gfw > 0) {
+            const gfg = ctx.createLinearGradient(BX, 0, BX + gfw, 0);
+            gfg.addColorStop(0, '#22d3a0'); gfg.addColorStop(1, '#6366f1');
+            rr(ctx, BX, curY, gfw, 13, 6, gfg, 'transparent', 0);
+        }
+        curY += 75;
+    }
+
+    // ── Heatmap ──
+    ctx.fillStyle = p.sub; ctx.font = "600 24px 'DM Sans',Arial"; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('35-Day Activity', BX, curY - 14);
+    
+    const log = USER_DATA.activityLog || '0'.repeat(35);
+    const bits = log.split('').reverse();
+    // Re-calculated cell sizes so 35 elements perfectly fit inside the 920px container without overflowing
+    const CS = 18, CG = 6, HTOT = bits.length * CS + (bits.length - 1) * CG;
+    let hx = CX + (CW - HTOT)/2;
+    
+    bits.forEach(bit => {
+        ctx.fillStyle = bit === '1' ? p.hOn : p.hOff;
+        ctx.beginPath(); ctx.roundRect(hx, curY, CS, CS, 3); ctx.fill();
+        
+        if(bit === '1') {
+            const glow = ctx.createRadialGradient(hx + CS/2, curY + CS/2, 0, hx + CS/2, curY + CS/2, CS);
+            glow.addColorStop(0, 'rgba(34,211,160,.35)'); glow.addColorStop(1, 'transparent');
+            ctx.fillStyle = glow; ctx.fillRect(hx - 4, curY - 4, CS + 8, CS + 8);
+            ctx.fillStyle = p.hOn; ctx.beginPath(); ctx.roundRect(hx, curY, CS, CS, 3); ctx.fill();
+        }
+        hx += CS + CG;
+    });
+    curY += CS + 75;
+
+    // ── Badges ──
+    const earned = USER_DATA.badges || [];
+    if(earned.length) {
+        ctx.fillStyle = p.sub; ctx.font = "600 24px 'DM Sans',Arial"; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        ctx.fillText('Badges', BX, curY - 14);
+        
+        let bx = BX;
+        let badgeRowHeight = 56;
+        
+        earned.forEach(key => {
+            const def = BADGE_DEFS.find(b => b.key === key); if(!def) return;
+            
+            ctx.font = '46px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(def.icon, bx + 24, curY + 24);
+            
+            bx += 58;
+            // Wrap to next row
+            if(bx + 56 > BX + BW) { 
+                bx = BX; 
+                curY += badgeRowHeight; 
+            }
+        });
+        curY += badgeRowHeight + 20;
     }
 
     // Footer
-    ctx.fillStyle=p.sub; ctx.font="600 27px 'DM Sans',Arial"; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-    ctx.fillText('🤖 Sprint Bot by sam_marfe', W/2, H-52);
+    ctx.fillStyle = p.sub; ctx.font = "600 27px 'DM Sans',Arial"; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('🤖 Sprint Bot', W/2, H - 52);
 
     if(cb) cb(canvas);
 }
