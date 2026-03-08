@@ -1397,7 +1397,6 @@ mongoose.connect(MONGO_URI).then(async () => {
 
 ⚙️ *Utils*
 *!log 500* → Add words manually
-*!report* → Get your weekly digest (DM)
 *!feedback [msg]* → Send a suggestion
 *!schedule 20 in 60* → Plan a sprint
 *!unschedule* → Cancel plans`
