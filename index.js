@@ -115,7 +115,7 @@ let lastDailyRunDate = "";
 // In-memory stores
 let activeSprints    = {};
 let activePomodoros  = {};
-let activeDuels      = {}; // chatId -> { challenger, opponent, duration, endsAt, words:{uid:n}, challengerName, opponentName }
+let activeDuels      = {}; // chatId -> { challenger, opponent, duration, endsAt, words:{uid:n}, challengerName, opponentName, isGracePeriod }
 
 // Rolling 20-event activity log for admin overview
 const recentActivity = [];
@@ -1000,8 +1000,10 @@ mongoose.connect(MONGO_URI).then(async () => {
             const s         = lagos.getSeconds();
             const today     = getTodayDateGMT1();
             const dayOfWeek = lagos.getDay(); // 0 = Sunday
-            const groups    = await sock.groupFetchAllParticipating();
-            const groupIds  = Object.keys(groups);
+            
+            // ── FIX: Use cached groups instead of fetching from WhatsApp every 5 seconds ──
+            await updateGroupCache();
+            const groupIds  = Object.keys(groupCache);
 
             // ── 23:00 STREAK REMINDER ─────────────────────────────────────────────
             if (h === 23 && m === 0 && s < 10) {
@@ -1555,7 +1557,8 @@ mongoose.connect(MONGO_URI).then(async () => {
                     activeDuels[chatId] = {
                         challenger: senderId, opponent: opponentId, duration, endsAt,
                         words: { [senderId]: 0, [opponentId]: 0 },
-                        challengerName: senderName, opponentName: opponentId.split('@')[0]
+                        challengerName: senderName, opponentName: opponentId.split('@')[0],
+                        isGracePeriod: false
                     };
 
                     await sock.sendMessage(chatId, {
@@ -1903,7 +1906,6 @@ mongoose.connect(MONGO_URI).then(async () => {
                 }
 
                 // ── !TIME ───────────────────────────────────────────────────────────
-                // ── !TIME ───────────────────────────────────────────────────────────
                 if (command === "!time") {
                     const sprint = activeSprints[chatId];
                     const duel   = activeDuels[chatId];
@@ -1911,7 +1913,6 @@ mongoose.connect(MONGO_URI).then(async () => {
                     const target = sprint || duel;
                     const r      = target.endsAt - Date.now();
                     if (r <= 0) return sock.sendMessage(chatId, { text: "🛑 Time's up!" }, { quoted: msg });
-                    
                     const label  = sprint ? "Sprint" : (duel.isGracePeriod ? "Duel (Grace Period)" : "Duel");
                     return sock.sendMessage(chatId, { text: `⏳ *${label}:* ${Math.floor(r / 60000)}m ${Math.floor((r / 1000) % 60)}s remaining` }, { quoted: msg });
                 }
