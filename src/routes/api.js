@@ -26,7 +26,7 @@ const requireAdmin = (req, res, next) => {
 };
 
 module.exports = function(appState) {
-    const { updateGroupCache, pushActivity } = appState;
+    const { updateGroupCache } = appState;
     const router = express.Router();
     
 
@@ -290,8 +290,15 @@ router.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
     try {
         const { message, image } = req.body;
         if (!message && !image) return res.status(400).json({ error: "Need text or image" });
+        if (!appState.sock || !appState.isConnected) {
+            console.log("❌ Broadcast failed: Bot not connected");
+            return res.status(503).json({ error: "Bot not connected" });
+        }
+
         const groups = await appState.sock.groupFetchAllParticipating();
         let count = 0;
+        console.log(`📣 Starting broadcast to ${Object.keys(groups).length} groups...`);
+
         for (const gid of Object.keys(groups)) {
             try {
                 if (image) {
@@ -301,11 +308,18 @@ router.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
                     await appState.sock.sendMessage(gid, { text: message });
                 }
                 count++;
+                // Small delay to prevent rate limits
                 await new Promise(r => setTimeout(r, 500));
-            } catch (e) {}
+            } catch (e) {
+                console.log(`⚠️ Failed to send to ${gid}:`, e.message);
+            }
         }
+        console.log(`✅ Broadcast complete. Sent to ${count} groups.`);
         res.json({ success: true, count });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) { 
+        console.error("❌ Broadcast error:", e);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
 // Groups: enriched with health data

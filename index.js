@@ -132,6 +132,7 @@ app.use('/', apiRoutes({
     get activeDuels() { return activeDuels; },
     get activePomodoros() { return activePomodoros; },
     get recentActivity() { return recentActivity; },
+    pushActivity,
     updateGroupCache
 }));
 
