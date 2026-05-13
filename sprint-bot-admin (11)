@@ -954,6 +954,7 @@
 
         // --- Scheduled Broadcasts ---
         let schedBroadcastImageBase64 = null;
+        let broadcastImageBase64 = null;
         async function loadScheduledBroadcasts() {
             const listEl = document.getElementById('broadcast-queue-list');
             listEl.innerHTML = '<tr><td colspan="3" class="text-center py-10 opacity-40"><i class="fas fa-spinner fa-spin text-2xl"></i></td></tr>';
@@ -1395,13 +1396,27 @@
         async function sendBroadcast() {
             const msg = document.getElementById('broadcast-text').value;
             if (!msg && !broadcastImageBase64) return showToast("Enter text or image", "error");
-            showConfirm("Send this to ALL groups instantly?", async () => {
+            const btn = document.querySelector('#broadcast-modal button.btn-clay-primary');
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Sending...';
+            try {
                 const res = await api('/api/admin/broadcast', { message: msg, image: broadcastImageBase64 });
                 if (res && res.success) {
-                    showToast(`Sent to ${res.count} groups!`); document.getElementById('broadcast-modal').classList.add('hidden');
-                    document.getElementById('broadcast-text').value = ""; removeBroadcastImage();
-                } else { showToast("Failed to send", "error"); }
-            });
+                    showToast(`✅ Sent to ${res.count} groups!`);
+                    document.getElementById('broadcast-modal').classList.add('hidden');
+                    document.getElementById('broadcast-text').value = '';
+                    removeBroadcastImage();
+                } else {
+                    const errMsg = res?.error || 'Unknown error';
+                    showToast(`Failed: ${errMsg}`, "error");
+                }
+            } catch(e) {
+                showToast('Request failed', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
         }
 
         // --- Utils ---
