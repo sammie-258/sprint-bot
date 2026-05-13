@@ -10,10 +10,7 @@ const StreakFreeze = require('../models/StreakFreeze');
 const { getRank, getMaxFreezes } = require('../utils/helpers');
 
 module.exports = function(appState) {
-    const { 
-        sock, isConnected, groupCache, getTodayDateGMT1, awardBadge, 
-        startSprintSession, TIMEZONE, pushActivity
-    } = appState;
+    const { getTodayDateGMT1, awardBadge, startSprintSession, TIMEZONE, pushActivity } = appState;
     let lastDailyRunDate = "";
 
     //   SCHEDULERS
@@ -21,13 +18,13 @@ module.exports = function(appState) {
 
     // Scheduled sprints checker
     setInterval(async () => {
-        if (!isConnected) return;
+        if (!appState.isConnected) return;
         try {
             const due = await ScheduledSprint.find({ startTime: { $lte: new Date() } });
             for (const sprint of due) {
                 const started = await startSprintSession(sprint.groupId, sprint.duration);
                 if (started) {
-                    await sock.sendMessage(sprint.groupId, { text: `(Scheduled by @${sprint.createdBy.split('@')[0]})`, mentions: [sprint.createdBy] });
+                    await appState.sock.sendMessage(sprint.groupId, { text: `(Scheduled by @${sprint.createdBy.split('@')[0]})`, mentions: [sprint.createdBy] });
                 }
                 await ScheduledSprint.deleteOne({ _id: sprint._id });
             }
@@ -36,18 +33,18 @@ module.exports = function(appState) {
 
     // Scheduled broadcasts checker
     setInterval(async () => {
-        if (!isConnected) return;
+        if (!appState.isConnected) return;
         try {
             const due = await ScheduledBroadcast.find({ sent: false, sendAt: { $lte: new Date() } });
             for (const broadcast of due) {
-                const groups = await sock.groupFetchAllParticipating();
+                const groups = await appState.sock.groupFetchAllParticipating();
                 for (const gid of Object.keys(groups)) {
                     try {
                         if (broadcast.image) {
                             const buffer = Buffer.from(broadcast.image.split(",")[1], 'base64');
-                            await sock.sendMessage(gid, { image: buffer, caption: broadcast.message || "" });
+                            await appState.sock.sendMessage(gid, { image: buffer, caption: broadcast.message || "" });
                         } else {
-                            await sock.sendMessage(gid, { text: broadcast.message });
+                            await appState.sock.sendMessage(gid, { text: broadcast.message });
                         }
                         await new Promise(r => setTimeout(r, 500));
                     } catch (e) {}
@@ -61,7 +58,7 @@ module.exports = function(appState) {
 
     // Nightly master scheduler (fires every 5s, acts on specific times)
     setInterval(async () => {
-        if (!isConnected) return;
+        if (!appState.isConnected) return;
         try {
             const now       = new Date();
             const lagos     = new Date(now.toLocaleString('en-US', { timeZone: TIMEZONE }));
@@ -88,7 +85,7 @@ module.exports = function(appState) {
                     try {
                         const recent = await DailyStats.findOne({ userId: profile.userId }).sort({ timestamp: -1 });
                         if (!recent?.groupId || !groupIds.includes(recent.groupId)) continue;
-                        await sock.sendMessage(recent.groupId, {
+                        await appState.sock.sendMessage(recent.groupId, {
                             text: `⚠️ *Streak Alert!*\n\n@${profile.userId.split('@')[0]}, your streak is at risk! 🔥\n\nYou have ~1 hour before the day resets.\nType *!log 1* or start a *!sprint* to keep it alive!`,
                             mentions: [profile.userId]
                         });
@@ -118,8 +115,8 @@ module.exports = function(appState) {
                                     await freeze.save();
                                     try {
                                         const recent = await DailyStats.findOne({ userId: profile.userId }).sort({ timestamp: -1 });
-                                        if (recent?.groupId && groupCache[recent.groupId]) {
-                                            await sock.sendMessage(recent.groupId, {
+                                        if (recent?.groupId && appState.groupCache[recent.groupId]) {
+                                            await appState.sock.sendMessage(recent.groupId, {
                                                 text: `🛡️ *STREAK FREEZE EARNED!*\n\n@${profile.userId.split('@')[0]} hit a *${profile.currentStreak}-day streak milestone!*\nYou now have *${freeze.freezesAvailable}/${maxFreezes}* freeze${freeze.freezesAvailable !== 1 ? 's' : ''}.\n\nUse *!streak freeze* on a missed day to protect your streak.`,
                                                 mentions: [profile.userId]
                                             });
@@ -138,8 +135,8 @@ module.exports = function(appState) {
                             await profile.save();
                             try {
                                 const recent = await DailyStats.findOne({ userId: profile.userId }).sort({ timestamp: -1 });
-                                if (recent?.groupId && groupCache[recent.groupId]) {
-                                    await sock.sendMessage(recent.groupId, {
+                                if (recent?.groupId && appState.groupCache[recent.groupId]) {
+                                    await appState.sock.sendMessage(recent.groupId, {
                                         text: `🛡️ *FREEZE AUTO-USED!*\n\n@${profile.userId.split('@')[0]}, a freeze protected your *${profile.currentStreak}-day streak!*\n${freeze.freezesAvailable} freeze${freeze.freezesAvailable !== 1 ? 's' : ''} remaining.`,
                                         mentions: [profile.userId]
                                     });
@@ -166,7 +163,7 @@ module.exports = function(appState) {
                         let txt = `🌟 *DAILY MVP — ${today}*\n━━━━━━━━━━━━━━━━\n👑 @${top[0]._id.split('@')[0]}: *${top[0].total.toLocaleString()} words*\n`;
                         if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()} words`).join('\n');
                         txt += `\n\nKeep writing! See you tomorrow ✍️`;
-                        await sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
+                        await appState.sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
                         const mvpProfile = await UserProfile.findOne({ userId: top[0]._id });
                         if (mvpProfile) await awardBadge(mvpProfile, 'daily_first', gid);
                         await new Promise(r => setTimeout(r, 500));
@@ -187,7 +184,7 @@ module.exports = function(appState) {
                             let txt = `🏆 *WEEKLY MVP*\n━━━━━━━━━━━━━━━━\n👑 @${top[0]._id.split('@')[0]}: *${top[0].total.toLocaleString()} words* this week!\n`;
                             if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()} words`).join('\n');
                             txt += `\n\nOutstanding week! 🚀`;
-                            await sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
+                            await appState.sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
                             await new Promise(r => setTimeout(r, 500));
                         } catch (e) {}
                     }
@@ -197,7 +194,7 @@ module.exports = function(appState) {
                         if (wc.current < wc.target) {
                             const pct = Math.round((wc.current / wc.target) * 100);
                             try {
-                                await sock.sendMessage(wc.groupId, {
+                                await appState.sock.sendMessage(wc.groupId, {
                                     text: `😤 *WEEKLY BOSS SURVIVED!*\n━━━━━━━━━━━━━━━━\n👹 Boss needed *${wc.target.toLocaleString()}* words.\nYou reached *${wc.current.toLocaleString()}* (${pct}%).\n\nThe boss returns Monday — STRONGER. 💀`
                                 });
                             } catch (e) {}
@@ -224,7 +221,7 @@ module.exports = function(appState) {
                             let txt = `🎖️ *MONTHLY MVP — ${monthStr}*\n━━━━━━━━━━━━━━━━\n👑 @${top[0]._id.split('@')[0]}: *${top[0].total.toLocaleString()} words*!\n`;
                             if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()} words`).join('\n');
                             txt += `\nOnward to ${new Date(year, month + 1).toLocaleString('en-US', { month: 'long' })}! 📖`;
-                            await sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
+                            await appState.sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
                             await new Promise(r => setTimeout(r, 500));
                         } catch (e) {}
                     }
@@ -244,7 +241,7 @@ module.exports = function(appState) {
                             let txt = `🎊 *WRITER OF THE YEAR — ${year}*\n━━━━━━━━━━━━━━━━\n👑 @${top[0]._id.split('@')[0]}: *${top[0].total.toLocaleString()} words*!\n`;
                             if (top.length > 1) txt += top.slice(1).map((w, i) => `${i === 0 ? '🥈' : '🥉'} @${w._id.split('@')[0]}: ${w.total.toLocaleString()} words`).join('\n');
                             txt += `\nSee you in ${year + 1}! 🥂✍️`;
-                            await sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
+                            await appState.sock.sendMessage(gid, { text: txt, mentions: top.map(w => w._id) });
                             await new Promise(r => setTimeout(r, 500));
                         } catch (e) {}
                     }
@@ -262,7 +259,7 @@ module.exports = function(appState) {
                         const target      = Math.max(1000, Math.round((lastStat[0]?.total || 0) * 1.1));
                         const weekEnd     = new Date(lagos); weekEnd.setDate(weekEnd.getDate() + 7);
                         await WeeklyChallenge.create({ groupId: gid, target, current: 0, contributors: {}, weekStart: new Date(lagos), weekEnd });
-                        await sock.sendMessage(gid, {
+                        await appState.sock.sendMessage(gid, {
                             text: `⚔️ *WEEKLY BOSS SPAWNED!* ⚔️\n━━━━━━━━━━━━━━━━\n👹 This week's target: *${target.toLocaleString()} words*\n📅 You have 7 days to defeat it!\n\nEvery *!log* and sprint counts. Let's go! 🔥`
                         });
                     } catch (e) {}

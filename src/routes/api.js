@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const QR = require('qrcode');
+const os = require('os');
 
 const UserProfile = require('../models/UserProfile');
 const PersonalGoal = require('../models/PersonalGoal');
@@ -25,7 +26,7 @@ const requireAdmin = (req, res, next) => {
 };
 
 module.exports = function(appState) {
-    const { sock, isConnected, qrCodeData, maintenanceMode, groupCache, activeSprints, activePomodoros, activeDuels, pushActivity, updateGroupCache } = appState;
+    const { updateGroupCache, pushActivity } = appState;
     const router = express.Router();
     
 
@@ -36,7 +37,7 @@ router.get('/profile/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
         const potentialJids = [
-            userId.includes('@') ? userId : userId + '@s.whatsrouter.net',
+            userId.includes('@') ? userId : userId + '@s.whatsapp.net',
             userId.includes('@') ? userId : userId + '@lid'
         ];
         const profile = await UserProfile.findOne({ userId: { $in: potentialJids } });
@@ -52,7 +53,7 @@ router.get('/profile/:userId', async (req, res) => {
         ]);
         const dailyWords = todayAgg[0]?.total || 0;
 
-        const templatePath = path.join(__dirname, 'profile.html');
+        const templatePath = path.join(__dirname, '../../profile.html');
         if (!fs.existsSync(templatePath)) return res.status(500).send("<h1>Profile Template Missing</h1>");
         let html = fs.readFileSync(templatePath, 'utf8');
 
@@ -93,7 +94,7 @@ router.get('/profile/:userId', async (req, res) => {
 router.get('/api/stats', async (req, res) => {
     try {
         let qrImage = null;
-        if (!isConnected && qrCodeData) qrImage = await QR.toDataURL(qrCodeData);
+        if (!appState.isConnected && appState.qrCodeData) qrImage = await QR.toDataURL(appState.qrCodeData);
 
         const dbGroups = await GroupMeta.find({});
         const groupMap = {};
@@ -119,22 +120,22 @@ router.get('/api/stats', async (req, res) => {
         const hotGroup = hotGroupRaw[0] ? { name: groupMap[hotGroupRaw[0]._id] || hotGroupRaw[0]._id, words: hotGroupRaw[0].total } : null;
 
         res.json({
-            isConnected, qrCode: qrImage,
+            isConnected: appState.isConnected, qrCode: qrImage,
             topWriters:   topWriters.map(w => ({ name: w._id, words: w.total })),
             todayWriters: todayWriters.map(w => ({ name: w._id, words: w.total })),
             topGroups:    topGroups.map(g => ({ name: groupMap[g._id] || g._id, words: g.total })),
             totalWords:   totalWordsAgg[0]?.total || 0,
             totalWriters: totalWriters.length,
             totalGroups:  allGroupIds.filter(id => id !== "Manual_Correction").length,
-            activeSprintsCount: Object.keys(activeSprints).length,
+            activeSprintsCount: Object.keys(appState.activeSprints).length,
             chartData: { labels: chartDataRaw.map(d => d._id), data: chartDataRaw.map(d => d.total) },
             todayPulse: { words: todayWordAgg[0]?.total || 0, writers: todayActiveUsers.length, hotGroup },
-            recentActivity: recentActivity.slice(0, 10)
+            recentActivity: appState.recentActivity.slice(0, 10)
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Admin: system info (includes recentActivity + feedback unread count)
+// Admin: system info (includes appState.recentActivity + feedback unread count)
 router.get('/api/admin/system', requireAdmin, async (req, res) => {
     try {
         const memory = process.memoryUsage();
@@ -144,27 +145,27 @@ router.get('/api/admin/system', requireAdmin, async (req, res) => {
             memory:    Math.round(memory.heapUsed / 1024 / 1024),
             platform:  os.platform() + " " + os.release(),
             cpu:       os.cpus()[0].model,
-            maintenance: maintenanceMode,
-            activeSprintsCount:    Object.keys(activeSprints).length,
-            activeDuelsCount:      Object.keys(activeDuels).length,
-            activePomodorosCount:  Object.keys(activePomodoros).length,
+            maintenance: appState.maintenanceMode,
+            activeSprintsCount:    Object.keys(appState.activeSprints).length,
+            activeDuelsCount:      Object.keys(appState.activeDuels).length,
+            activePomodorosCount:  Object.keys(appState.activePomodoros).length,
             unreadFeedback,
-            recentActivity
+            recentActivity: appState.recentActivity
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.post('/api/admin/maintenance', requireAdmin, (req, res) => {
-    maintenanceMode = req.body.status;
-    res.json({ success: true, status: maintenanceMode });
+    appState.maintenanceMode = req.body.status;
+    res.json({ success: true, status: appState.maintenanceMode });
 });
 
 router.get('/api/admin/sprints', requireAdmin, async (req, res) => {
     try {
         await updateGroupCache();
-        const sprints = Object.entries(activeSprints).map(([chatId, sprint]) => ({
+        const sprints = Object.entries(appState.activeSprints).map(([chatId, sprint]) => ({
             id: chatId,
-            name: groupCache[chatId]?.subject || chatId,
+            name: appState.groupCache[chatId]?.subject || chatId,
             timeLeft: Math.ceil(Math.max(0, sprint.endsAt - Date.now()) / 60000),
             participants: Object.keys(sprint.participants).length,
             participantList: Object.entries(sprint.participants).map(([uid, d]) => ({ uid: uid.split('@')[0], words: d.words || 0 }))
@@ -175,10 +176,10 @@ router.get('/api/admin/sprints', requireAdmin, async (req, res) => {
 
 router.post('/api/admin/sprints/stop', requireAdmin, async (req, res) => {
     const { chatId } = req.body;
-    if (activeSprints[chatId]) {
-        delete activeSprints[chatId];
+    if (appState.activeSprints[chatId]) {
+        delete appState.activeSprints[chatId];
         await ActiveSprint.deleteOne({ groupId: chatId });
-        try { if (sock && isConnected) await sock.sendMessage(chatId, { text: "🛑 *ADMIN STOP*: Sprint cancelled by Admin." }); } catch(e) {}
+        try { if (appState.sock && appState.isConnected) await appState.sock.sendMessage(chatId, { text: "🛑 *ADMIN STOP*: Sprint cancelled by Admin." }); } catch(e) {}
         return res.json({ success: true });
     }
     res.status(404).json({ error: "Sprint not found" });
@@ -190,7 +191,7 @@ router.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
         const sprints = await ScheduledSprint.find({ startTime: { $gt: new Date() } }).sort({ startTime: 1 });
         res.json(sprints.map(s => ({
             id: s._id,
-            groupName: groupCache[s.groupId]?.subject || s.groupId,
+            groupName: appState.groupCache[s.groupId]?.subject || s.groupId,
             startTime: s.startTime, duration: s.duration,
             createdBy: s.createdBy.split('@')[0]
         })));
@@ -289,15 +290,15 @@ router.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
     try {
         const { message, image } = req.body;
         if (!message && !image) return res.status(400).json({ error: "Need text or image" });
-        const groups = await sock.groupFetchAllParticipating();
+        const groups = await appState.sock.groupFetchAllParticipating();
         let count = 0;
         for (const gid of Object.keys(groups)) {
             try {
                 if (image) {
                     const buffer = Buffer.from(image.split(",")[1], 'base64');
-                    await sock.sendMessage(gid, { image: buffer, caption: message || "" });
+                    await appState.sock.sendMessage(gid, { image: buffer, caption: message || "" });
                 } else {
-                    await sock.sendMessage(gid, { text: message });
+                    await appState.sock.sendMessage(gid, { text: message });
                 }
                 count++;
                 await new Promise(r => setTimeout(r, 500));
@@ -347,9 +348,9 @@ router.get('/api/admin/groups', requireAdmin, async (req, res) => {
 router.post('/api/admin/groups/leave', requireAdmin, async (req, res) => {
     try {
         const { chatId } = req.body;
-        if (sock && isConnected) {
-            await sock.sendMessage(chatId, { text: "👋 Bot leaving via Admin Console." });
-            await sock.groupLeave(chatId);
+        if (appState.sock && appState.isConnected) {
+            await appState.sock.sendMessage(chatId, { text: "👋 Bot leaving via Admin Console." });
+            await appState.sock.groupLeave(chatId);
         }
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -358,10 +359,10 @@ router.post('/api/admin/groups/leave', requireAdmin, async (req, res) => {
 router.post('/api/admin/groups/accept', requireAdmin, async (req, res) => {
     const { inviteCode } = req.body;
     if (!inviteCode) return res.status(400).json({ error: "Provide invite code." });
-    if (!sock || !isConnected) return res.status(503).json({ error: "Bot not connected." });
+    if (!appState.sock || !appState.isConnected) return res.status(503).json({ error: "Bot not connected." });
     try {
-        const code    = inviteCode.includes('chat.whatsrouter.com/') ? inviteCode.split('chat.whatsrouter.com/').pop().trim() : inviteCode.trim();
-        const groupId = await sock.groupAcceptInvite(code);
+        const code    = inviteCode.includes('chat.whatsapp.com/') ? inviteCode.split('chat.whatsapp.com/').pop().trim() : inviteCode.trim();
+        const groupId = await appState.sock.groupAcceptInvite(code);
         res.json({ success: true, groupId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
