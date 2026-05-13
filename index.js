@@ -76,8 +76,6 @@ const BADGE_DEFS = [
     { key: 'sprint_500',    icon: '💨',  label: 'Speed Writer',   desc: 'Wrote 500+ words in one sprint' },
 ];
 
-if (global.gc) setInterval(() => global.gc(), 30000);
-
 // =======================
 //   CONFIG & SERVER SETUP
 // =======================
@@ -144,14 +142,18 @@ const checkRateLimit = (userId) => {
 };
 
 const updateGroupCache = async (force = false) => {
-    if (!force && Date.now() - lastCacheUpdate < 5 * 60 * 1000) return;
+    if (!force) return;
     if (sock && isConnected) {
         try {
             const groups = await sock.groupFetchAllParticipating();
             for (const [jid, data] of Object.entries(groups)) {
-                groupCache[jid] = { subject: data.subject, size: data.participants?.length || 0 };
+                await GroupMeta.updateOne(
+                    { groupId: jid },
+                    { $set: { subject: data.subject, size: data.participants?.length || 0, lastActive: Date.now() } },
+                    { upsert: true }
+                );
             }
-            lastCacheUpdate = Date.now();
+            console.log(`✅ Synced ${Object.keys(groups).length} groups to DB.`);
         } catch (e) { console.log("⚠️ Cache update paused:", e.message); }
     }
 };
@@ -159,6 +161,14 @@ const updateGroupCache = async (force = false) => {
 // =======================
 //   DATABASE SCHEMAS
 // =======================
+const groupMetaSchema = new mongoose.Schema({
+    groupId: String,
+    subject: String,
+    size: Number,
+    lastActive: { type: Date, default: Date.now }
+});
+const GroupMeta = mongoose.model("GroupMeta", groupMetaSchema);
+
 const dailyStatsSchema = new mongoose.Schema({
     userId: String, name: String, groupId: String, date: String,
     words: { type: Number, default: 0 }, timestamp: { type: Date, default: Date.now }
@@ -327,7 +337,10 @@ app.get('/api/stats', async (req, res) => {
     try {
         let qrImage = null;
         if (!isConnected && qrCodeData) qrImage = await QR.toDataURL(qrCodeData);
-        await updateGroupCache();
+
+        const dbGroups = await GroupMeta.find({});
+        const groupMap = {};
+        dbGroups.forEach(g => groupMap[g.groupId] = g.subject);
 
         const todayStr       = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const sevenDaysAgo   = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -346,13 +359,13 @@ app.get('/api/stats', async (req, res) => {
             DailyStats.distinct("groupId"),
         ]);
 
-        const hotGroup = hotGroupRaw[0] ? { name: groupCache[hotGroupRaw[0]._id]?.subject || hotGroupRaw[0]._id, words: hotGroupRaw[0].total } : null;
+        const hotGroup = hotGroupRaw[0] ? { name: groupMap[hotGroupRaw[0]._id] || hotGroupRaw[0]._id, words: hotGroupRaw[0].total } : null;
 
         res.json({
             isConnected, qrCode: qrImage,
             topWriters:   topWriters.map(w => ({ name: w._id, words: w.total })),
             todayWriters: todayWriters.map(w => ({ name: w._id, words: w.total })),
-            topGroups:    topGroups.map(g => ({ name: groupCache[g._id]?.subject || g._id, words: g.total })),
+            topGroups:    topGroups.map(g => ({ name: groupMap[g._id] || g._id, words: g.total })),
             totalWords:   totalWordsAgg[0]?.total || 0,
             totalWriters: totalWriters.length,
             totalGroups:  allGroupIds.filter(id => id !== "Manual_Correction").length,
@@ -539,14 +552,13 @@ app.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
 
 // Groups: enriched with health data
 app.get('/api/admin/groups', requireAdmin, async (req, res) => {
-    if (!sock || !isConnected) return res.json([]);
     try {
-        await updateGroupCache(true); // Force update
-        const groups      = await sock.groupFetchAllParticipating();
+        const groups = await GroupMeta.find({});
         const todayStr    = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
         const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-        const result = await Promise.all(Object.entries(groups).map(async ([jid, data]) => {
+        const result = await Promise.all(groups.map(async (data) => {
+            const jid = data.groupId;
             try {
                 const [weekWords, activeWriters, lastSprint] = await Promise.all([
                     DailyStats.aggregate([{ $match: { groupId: jid, timestamp: { $gte: sevenDaysAgo } } }, { $group: { _id: null, total: { $sum: "$words" } } }]),
@@ -557,7 +569,7 @@ app.get('/api/admin/groups', requireAdmin, async (req, res) => {
                 const health = weekTotal > 5000 ? 'Active' : weekTotal > 500 ? 'Quiet' : 'Dormant';
                 return {
                     id: jid, name: data.subject || jid,
-                    participants: data.participants?.length || 0,
+                    participants: data.size || 0,
                     weekWords: weekTotal, activeWritersToday: activeWriters.length,
                     lastSprintAt: lastSprint?.timestamp || null, health
                 };
@@ -565,7 +577,7 @@ app.get('/api/admin/groups', requireAdmin, async (req, res) => {
                 // Return fallback data so the list doesn't crash
                 return {
                     id: jid, name: data.subject || jid,
-                    participants: data.participants?.length || 0,
+                    participants: data.size || 0,
                     weekWords: 0, activeWritersToday: 0,
                     lastSprintAt: null, health: 'Dormant'
                 };
@@ -1001,9 +1013,9 @@ mongoose.connect(MONGO_URI).then(async () => {
             const today     = getTodayDateGMT1();
             const dayOfWeek = lagos.getDay(); // 0 = Sunday
             
-            // ── FIX: Use cached groups instead of fetching from WhatsApp every 5 seconds ──
-            await updateGroupCache();
-            const groupIds  = Object.keys(groupCache);
+            // Use groups from DB
+            const groupsFromDB = await GroupMeta.find({}, 'groupId');
+            const groupIds  = groupsFromDB.map(g => g.groupId);
 
             // ── 23:00 STREAK REMINDER ─────────────────────────────────────────────
             if (h === 23 && m === 0 && s < 10) {
@@ -1013,7 +1025,7 @@ mongoose.connect(MONGO_URI).then(async () => {
                 for (const profile of atRisk) {
                     try {
                         const recent = await DailyStats.findOne({ userId: profile.userId }).sort({ timestamp: -1 });
-                        if (!recent?.groupId || !groupCache[recent.groupId]) continue;
+                        if (!recent?.groupId || !groupIds.includes(recent.groupId)) continue;
                         await sock.sendMessage(recent.groupId, {
                             text: `⚠️ *Streak Alert!*\n\n@${profile.userId.split('@')[0]}, your *${profile.currentStreak}-day streak* is at risk! 🔥\n\nYou have ~1 hour before the day resets.\nType *!log 1* or start a *!sprint* to keep it alive!`,
                             mentions: [profile.userId]
@@ -1195,38 +1207,7 @@ mongoose.connect(MONGO_URI).then(async () => {
                 }
             }
 
-            // ── Sunday 20:00 — Auto weekly report DMs ────────────────────────────
-            if (h === 20 && m === 0 && s < 10 && dayOfWeek === 0) {
-                const sevenDaysAgo = new Date(lagos); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                const activeUsers  = await DailyStats.distinct("userId", { timestamp: { $gte: sevenDaysAgo } });
-                for (const userId of activeUsers) {
-                    try {
-                        const profile  = await UserProfile.findOne({ userId });
-                        if (!profile) continue;
-                        const weekStats = await DailyStats.aggregate([
-                            { $match: { userId, timestamp: { $gte: sevenDaysAgo } } },
-                            { $group: { _id: null, total: { $sum: "$words" }, days: { $addToSet: "$date" } } }
-                        ]);
-                        const prevStart   = new Date(sevenDaysAgo.getTime() - 7 * 86400000);
-                        const lastStats   = await DailyStats.aggregate([
-                            { $match: { userId, timestamp: { $gte: prevStart, $lt: sevenDaysAgo } } },
-                            { $group: { _id: null, total: { $sum: "$words" } } }
-                        ]);
-                        const thisWeek  = weekStats[0]?.total || 0;
-                        const lastWeek  = lastStats[0]?.total  || 0;
-                        const delta     = thisWeek - lastWeek;
-                        const deltaStr  = delta >= 0 ? `+${delta.toLocaleString()} vs last week 📈` : `${delta.toLocaleString()} vs last week 📉`;
-                        const activeDays = weekStats[0]?.days?.length || 0;
-                        const freeze    = await StreakFreeze.findOne({ userId });
-                        const rank      = getRank(profile.totalWordsAllTime);
-                        const reportTxt = `📊 *YOUR WEEKLY REPORT*\n━━━━━━━━━━━━━━━━\n👤 ${profile.name} | ${rank}\n\n📝 *This Week:* ${thisWeek.toLocaleString()} words\n📅 Active Days: ${activeDays}/7\n${deltaStr}\n\n🔥 Streak: *${profile.currentStreak} days*\n🏅 Best: ${profile.bestStreak} days\n🛡️ Freezes: ${freeze?.freezesAvailable || 0}\n📚 All-Time: ${profile.totalWordsAllTime.toLocaleString()} words\n${profile.bestSprintWords > 0 ? `⚡ Best Sprint: ${profile.bestSprintWords.toLocaleString()} words @ ${profile.bestSprintWpm} WPM\n` : ''}\nKeep going this week! ✍️`;
-                        // DM only — never respond to replies
-                        const dmJid = userId.replace('@lid', '@s.whatsapp.net');
-                        await sock.sendMessage(dmJid, { text: reportTxt });
-                        await new Promise(r => setTimeout(r, 1500));
-                    } catch (e) { /* silently skip JIDs that don't accept DMs */ }
-                }
-            }
+            // Auto weekly report DMs removed to prevent account restriction.
 
         } catch (e) { console.error("Nightly scheduler error:", e); }
     }, 5000);
@@ -1275,7 +1256,11 @@ mongoose.connect(MONGO_URI).then(async () => {
                     await sock.sendMessage(group.id, {
                         text: `👋 *Hey writers! Sprint Bot just joined the room!*\n\nI help you track writing sprints, word counts, streaks, and group challenges. Here's how to get started:\n\n📖 *!help* — Full command list\n✍️ *!log 500* — Log your words right now\n🏃 *!sprint 20* — Start a 20-minute sprint\n📊 *!wc 500* — Submit your word count during a sprint\n🎯 *!goal set 1000* — Set a personal writing target\n\nLet's write! 🚀`
                     });
-                    groupCache[group.id] = { subject: group.subject, size: group.participants?.length || 0 };
+                    await GroupMeta.updateOne(
+                        { groupId: group.id },
+                        { $set: { subject: group.subject, size: group.participants?.length || 0, lastActive: Date.now() } },
+                        { upsert: true }
+                    );
                     pushActivity('join', `Joined group: ${group.subject}`, '👥');
                 } catch (e) { console.error("Welcome msg error:", e); }
             }
