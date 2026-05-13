@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SYSTEM INTERFACE — Sprint Bot Admin</title>
+    <title>SHADOW SYSTEM — Sprint Bot Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script>
         tailwind.config = {
@@ -28,10 +29,6 @@
                             green: '#22d3a0',
                             red: '#f43f5e'
                         }
-                    },
-                    boxShadow: {
-                        'neon-blue': '0 0 15px rgba(56, 189, 248, 0.2)',
-                        'neon-purple': '0 0 15px rgba(168, 85, 247, 0.2)',
                     }
                 }
             }
@@ -39,115 +36,63 @@
     </script>
 
     <style>
-        :root {
-            --accent: #38bdf8;
-            --accent-glow: rgba(56, 189, 248, 0.25);
-        }
-        body {
-            background-color: #020617;
-            color: #e2e8f0;
-            overflow-x: hidden;
-            -webkit-tap-highlight-color: transparent;
-        }
+        :root { --accent: #38bdf8; }
+        body { background-color: #020617; color: #e2e8f0; overflow: hidden; }
         .system-panel {
             background: rgba(10, 18, 32, 0.8);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(56, 189, 248, 0.1);
             position: relative;
-            overflow: hidden;
         }
         .system-panel::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            opacity: 0.5;
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.5;
         }
-        .nav-item {
-            position: relative;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .nav-item.active {
-            color: #38bdf8;
-            background: rgba(56, 189, 248, 0.05);
-        }
+        .nav-item { position: relative; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .nav-item.active { color: #38bdf8; background: rgba(56, 189, 248, 0.05); }
         .nav-item.active::before {
-            content: '';
-            position: absolute;
-            left: 0; top: 0; bottom: auto;
-            width: 2px;
-            background: #38bdf8;
-            box-shadow: 0 0 10px #38bdf8;
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+            background: #38bdf8; box-shadow: 0 0 10px #38bdf8;
         }
         @media (max-width: 768px) {
-            .nav-item.active::before {
-                left: 0; right: 0; top: 0; bottom: auto;
-                width: auto; height: 2px;
-            }
+            .nav-item.active::before { left: 0; right: 0; top: 0; bottom: auto; width: auto; height: 2px; }
         }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .input-system {
-            background: rgba(2, 6, 23, 0.6);
-            border: 1px solid rgba(56, 189, 248, 0.2);
-            color: white;
-            transition: all 0.2s;
+            background: rgba(2, 6, 23, 0.6); border: 1px solid rgba(56, 189, 248, 0.2); color: white;
         }
-        .input-system:focus {
-            border-color: #38bdf8;
-            box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
-            outline: none;
-        }
-        .btn-system {
-            transition: all 0.2s;
-            position: relative;
-            overflow: hidden;
-        }
-        .btn-system:active { transform: scale(0.95); }
-        .glow-blue { box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); }
-        .glow-purple { box-shadow: 0 0 15px rgba(168, 85, 247, 0.3); }
+        .input-system:focus { border-color: #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); outline: none; }
         
-        @keyframes scanline {
-            0% { transform: translateY(-100%); }
-            100% { transform: translateY(100%); }
-        }
+        .drawer { transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .drawer.open { transform: translateX(0); }
+        
         .scanline {
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to bottom, transparent 50%, rgba(56, 189, 248, 0.02) 50%);
-            background-size: 100% 4px;
-            pointer-events: none;
-            z-index: 10;
+            position: absolute; inset: 0; pointer-events: none; z-index: 10;
+            background: linear-gradient(to bottom, transparent 50%, rgba(56, 189, 248, 0.02) 50%); background-size: 100% 4px;
         }
     </style>
 </head>
-<body class="font-sans antialiased">
+<body class="font-sans antialiased h-screen w-screen flex">
     <div class="scanline"></div>
 
     <!-- Auth Modal -->
     <div id="auth-modal" class="fixed inset-0 bg-void/95 z-[100] flex items-center justify-center p-4">
-        <div class="system-panel p-8 w-full max-w-md animate-in fade-in zoom-in duration-300">
+        <div class="system-panel p-8 w-full max-w-md">
             <div class="text-center mb-8">
-                <div class="w-16 h-16 border-2 border-neon-blue rounded-full flex items-center justify-center mx-auto mb-4 glow-blue">
+                <div class="w-16 h-16 border-2 border-neon-blue rounded-full flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-shield-halved text-2xl text-neon-blue"></i>
                 </div>
                 <h1 class="font-heading font-bold text-2xl tracking-tighter">SYSTEM AUTHENTICATION</h1>
-                <p class="text-slate-500 text-sm mt-1">Verify Shadow Monarch credentials</p>
             </div>
-            <div class="space-y-4">
-                <input type="password" id="admin-pass" placeholder="ENTER ACCESS KEY" 
-                    class="input-system w-full px-6 py-4 rounded-xl font-mono text-center tracking-[0.5em]">
-                <button onclick="login()" class="w-full py-4 bg-neon-blue text-void font-heading font-black rounded-xl hover:bg-white transition-colors duration-300">
-                    ACCESS SYSTEM
-                </button>
-            </div>
+            <input type="password" id="admin-pass" placeholder="ENTER ACCESS KEY" class="input-system w-full px-6 py-4 rounded-xl font-mono text-center tracking-[0.5em] mb-4">
+            <button onclick="login()" class="w-full py-4 bg-neon-blue text-void font-heading font-black rounded-xl">ACCESS SYSTEM</button>
         </div>
     </div>
 
-    <div id="app" class="hidden min-h-screen flex flex-col md:flex-row">
+    <div id="app" class="hidden flex-1 flex flex-col md:flex-row overflow-hidden">
         
-        <!-- Sidebar (Desktop) / Bottom Nav (Mobile) -->
-        <nav class="fixed bottom-0 left-0 right-0 md:relative md:w-64 bg-panel border-t md:border-t-0 md:border-r border-white/5 z-50 flex md:flex-col justify-around md:justify-start px-2 py-2 md:px-0 md:py-8 no-scrollbar overflow-x-auto">
+        <!-- Sidebar -->
+        <nav class="fixed bottom-0 left-0 right-0 md:relative md:w-64 bg-panel border-t md:border-t-0 md:border-r border-white/5 z-50 flex md:flex-col justify-around md:justify-start overflow-x-auto no-scrollbar py-2 md:py-8">
             <div class="hidden md:flex items-center gap-3 px-6 mb-12">
                 <div class="w-10 h-10 bg-neon-blue rounded flex items-center justify-center text-void">
                     <i class="fas fa-bolt-lightning text-xl"></i>
@@ -159,35 +104,30 @@
             </div>
 
             <div class="flex md:flex-col gap-1 w-full px-2">
-                <button onclick="switchTab('overview')" id="nav-overview" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl flex-1 md:flex-none">
-                    <i class="fas fa-chart-line text-lg"></i>
-                    <span class="text-[10px] md:text-sm font-bold md:font-semibold uppercase tracking-wider md:tracking-normal">Status</span>
+                <button onclick="switchTab('overview')" id="nav-overview" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-chart-line"></i> <span class="text-[9px] md:text-sm font-bold uppercase md:tracking-normal">Status</span>
                 </button>
-                <button onclick="switchTab('sprints')" id="nav-sprints" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl flex-1 md:flex-none">
-                    <i class="fas fa-clock text-lg"></i>
-                    <span class="text-[10px] md:text-sm font-bold md:font-semibold uppercase tracking-wider md:tracking-normal">Sprints</span>
+                <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-chart-pie"></i> <span class="text-[9px] md:text-sm font-bold uppercase md:tracking-normal">Analysis</span>
                 </button>
-                <button onclick="switchTab('broadcast')" id="nav-broadcast" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl flex-1 md:flex-none">
-                    <i class="fas fa-tower-broadcast text-lg"></i>
-                    <span class="text-[10px] md:text-sm font-bold md:font-semibold uppercase tracking-wider md:tracking-normal">Blast</span>
+                <button onclick="switchTab('live')" id="nav-live" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-tv"></i> <span class="text-[9px] md:text-sm font-bold uppercase md:tracking-normal">Live</span>
                 </button>
-                <button onclick="switchTab('writers')" id="nav-writers" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl flex-1 md:flex-none">
-                    <i class="fas fa-users-viewfinder text-lg"></i>
-                    <span class="text-[10px] md:text-sm font-bold md:font-semibold uppercase tracking-wider md:tracking-normal">Writers</span>
+                <button onclick="switchTab('sprints')" id="nav-sprints" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-stopwatch"></i> <span class="text-[9px] md:text-sm font-bold uppercase md:tracking-normal">Sprints</span>
                 </button>
-                <button onclick="switchTab('system')" id="nav-system" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl flex-1 md:flex-none">
-                    <i class="fas fa-microchip text-lg"></i>
-                    <span class="text-[10px] md:text-sm font-bold md:font-semibold uppercase tracking-wider md:tracking-normal">System</span>
+                <button onclick="switchTab('writers')" id="nav-writers" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-users"></i> <span class="text-[9px] md:text-sm font-bold uppercase md:tracking-normal">Writers</span>
+                </button>
+                <button onclick="switchTab('groups')" id="nav-groups" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-hashtag"></i> <span class="text-[9px] md:text-sm font-bold uppercase md:tracking-normal">Groups</span>
+                </button>
+                <button onclick="switchTab('broadcast')" id="nav-broadcast" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-tower-broadcast"></i> <span class="text-[9px] md:text-sm font-bold uppercase md:tracking-normal">Blast</span>
                 </button>
             </div>
 
             <div class="hidden md:block mt-auto px-6 space-y-4">
-                <div class="p-4 rounded-xl bg-white/5 border border-white/10">
-                    <div class="text-[10px] text-slate-500 font-bold uppercase mb-2">Connected Device</div>
-                    <div class="text-xs font-semibold flex items-center gap-2" id="device-info">
-                        <span class="w-2 h-2 rounded-full bg-neon-green"></span> WhatsApp Bot
-                    </div>
-                </div>
                 <button onclick="logout()" class="w-full flex items-center gap-4 px-4 py-3 text-neon-red hover:bg-neon-red/10 rounded-xl transition-all">
                     <i class="fas fa-power-off"></i> <span class="font-bold text-sm">LOGOUT</span>
                 </button>
@@ -195,232 +135,267 @@
         </nav>
 
         <!-- Main Content -->
-        <main class="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto max-h-screen">
-            
-            <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <header class="flex items-center justify-between p-4 md:p-8 border-b border-white/5 shrink-0">
                 <div>
-                    <h2 id="view-title" class="font-heading font-black text-3xl tracking-tighter uppercase italic">Overview</h2>
-                    <p id="view-desc" class="text-slate-500 text-sm">Real-time system telemetry</p>
+                    <h2 id="view-title" class="font-heading font-black text-2xl tracking-tighter uppercase italic">Status</h2>
                 </div>
                 <div class="flex items-center gap-3">
-                    <button onclick="refreshData()" class="w-10 h-10 system-panel rounded-full flex items-center justify-center hover:text-neon-blue transition-colors">
-                        <i class="fas fa-rotate"></i>
-                    </button>
-                    <div class="px-4 py-2 system-panel rounded-xl flex items-center gap-2 text-xs font-bold">
-                        <span class="w-2 h-2 rounded-full animate-pulse bg-neon-blue"></span> LIVE STATS
+                    <div class="px-4 py-2 system-panel rounded-xl flex items-center gap-2 text-[10px] font-bold">
+                        <span class="w-2 h-2 rounded-full animate-pulse bg-neon-blue"></span> SYSTEM LIVE
                     </div>
                 </div>
             </header>
 
-            <!-- VIEWS -->
-            
-            <!-- OVERVIEW -->
-            <div id="view-overview" class="space-y-6">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="system-panel p-6 rounded-2xl group hover:border-neon-blue transition-all">
-                        <div class="text-xs font-bold text-slate-500 uppercase mb-4 flex justify-between">
-                            Total Words <i class="fas fa-pen-nib group-hover:text-neon-blue"></i>
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 no-scrollbar">
+                
+                <!-- OVERVIEW -->
+                <div id="view-overview" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="system-panel p-8 rounded-2xl flex flex-col items-center text-center">
+                            <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">Connection</h3>
+                            <div id="conn-display" class="flex flex-col items-center">
+                                <i class="fas fa-circle-notch fa-spin text-neon-blue text-4xl mb-4"></i>
+                                <span class="font-bold">Syncing...</span>
+                            </div>
                         </div>
-                        <div class="text-3xl font-mono font-bold" id="stat-total-words">0</div>
+                        <div class="md:col-span-2 system-panel p-8 rounded-2xl">
+                            <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">System Telemetry</h3>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div class="bg-white/5 p-4 rounded-xl text-center">
+                                    <div class="text-[9px] text-slate-500 font-bold mb-1">UPTIME</div>
+                                    <div id="sys-uptime" class="font-mono text-sm">...</div>
+                                </div>
+                                <div class="bg-white/5 p-4 rounded-xl text-center">
+                                    <div class="text-[9px] text-slate-500 font-bold mb-1">MEMORY</div>
+                                    <div id="sys-mem" class="font-mono text-sm">...</div>
+                                </div>
+                                <div class="bg-white/5 p-4 rounded-xl text-center">
+                                    <div class="text-[9px] text-slate-500 font-bold mb-1">PLATFORM</div>
+                                    <div id="sys-platform" class="font-mono text-[10px]">...</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="system-panel p-6 rounded-2xl group hover:border-neon-purple transition-all">
-                        <div class="text-xs font-bold text-slate-500 uppercase mb-4 flex justify-between">
-                            Writers <i class="fas fa-user-edit group-hover:text-neon-purple"></i>
+                    <div class="system-panel p-6 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold">Maintenance Mode</h3>
+                            <p class="text-xs text-slate-500">Lock global commands</p>
                         </div>
-                        <div class="text-3xl font-mono font-bold" id="stat-total-writers">0</div>
-                    </div>
-                    <div class="system-panel p-6 rounded-2xl group hover:border-neon-green transition-all">
-                        <div class="text-xs font-bold text-slate-500 uppercase mb-4 flex justify-between">
-                            Groups <i class="fas fa-users-rectangle group-hover:text-neon-green"></i>
+                        <div class="flex items-center gap-4">
+                            <span id="maint-status" class="text-xs font-bold px-4 py-2 rounded-xl bg-neon-green/10 text-neon-green">OFF</span>
+                            <button onclick="toggleMaintenance()" id="maint-btn" class="bg-white/5 px-6 py-2 rounded-xl text-sm font-bold border border-white/10">Enable</button>
                         </div>
-                        <div class="text-3xl font-mono font-bold" id="stat-total-groups">0</div>
-                    </div>
-                    <div class="system-panel p-6 rounded-2xl group hover:border-neon-red transition-all">
-                        <div class="text-xs font-bold text-slate-500 uppercase mb-4 flex justify-between">
-                            Active Sprints <i class="fas fa-fire group-hover:text-neon-red"></i>
-                        </div>
-                        <div class="text-3xl font-mono font-bold" id="stat-active-sprints">0</div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2 system-panel p-6 rounded-2xl">
-                        <h3 class="font-heading font-bold text-lg mb-6 flex items-center gap-2">
-                            <i class="fas fa-wave-square text-neon-blue"></i> RECENT ACTIVITY
-                        </h3>
-                        <div id="activity-feed" class="space-y-4 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
-                            <!-- Activity items -->
+                <!-- ANALYTICS -->
+                <div id="view-analytics" class="hidden space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="system-panel p-8 rounded-2xl text-center">
+                            <h3 class="text-[10px] text-slate-500 font-bold mb-2">RETENTION</h3>
+                            <div id="ana-retention" class="text-4xl font-black text-neon-blue">0%</div>
+                        </div>
+                        <div class="system-panel p-8 rounded-2xl text-center">
+                            <h3 class="text-[10px] text-slate-500 font-bold mb-2">ACTIVE (7D)</h3>
+                            <div id="ana-active-7" class="text-4xl font-black text-neon-green">0</div>
+                        </div>
+                        <div class="system-panel p-8 rounded-2xl text-center">
+                            <h3 class="text-[10px] text-slate-500 font-bold mb-2">PREVIOUS (7D)</h3>
+                            <div id="ana-active-prev" class="text-4xl font-black text-slate-600">0</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="system-panel p-6 rounded-2xl">
+                            <h3 class="font-bold text-sm mb-4 italic">Word Velocity (30D)</h3>
+                            <div class="h-64"><canvas id="chart-velocity"></canvas></div>
+                        </div>
+                        <div class="system-panel p-6 rounded-2xl">
+                            <h3 class="font-bold text-sm mb-4 italic">Active Hours</h3>
+                            <div class="h-64"><canvas id="chart-hours"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="system-panel p-6 rounded-2xl">
+                            <h3 class="font-bold text-sm mb-4 text-neon-green italic">Top Growers</h3>
+                            <div class="overflow-x-auto"><table class="w-full text-xs"><tbody id="ana-growers"></tbody></table></div>
+                        </div>
+                        <div class="system-panel p-6 rounded-2xl">
+                            <h3 class="font-bold text-sm mb-4 text-neon-purple italic">Group Density</h3>
+                            <div class="overflow-x-auto"><table class="w-full text-xs"><tbody id="ana-groups"></tbody></table></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LIVE -->
+                <div id="view-live" class="hidden space-y-6">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="system-panel p-6 rounded-2xl text-center">
+                            <div class="text-[9px] font-bold text-slate-500 mb-1">TOTAL WORDS</div>
+                            <div id="live-words" class="text-xl font-mono font-bold">0</div>
+                        </div>
+                        <div class="system-panel p-6 rounded-2xl text-center">
+                            <div class="text-[9px] font-bold text-slate-500 mb-1">WRITERS</div>
+                            <div id="live-writers" class="text-xl font-mono font-bold">0</div>
+                        </div>
+                        <div class="system-panel p-6 rounded-2xl text-center">
+                            <div class="text-[9px] font-bold text-slate-500 mb-1">GROUPS</div>
+                            <div id="live-groups" class="text-xl font-mono font-bold">0</div>
+                        </div>
+                        <div class="system-panel p-6 rounded-2xl text-center">
+                            <div class="text-[9px] font-bold text-slate-500 mb-1">SPRINTS</div>
+                            <div id="live-active-sprints" class="text-xl font-mono font-bold text-neon-blue">0</div>
                         </div>
                     </div>
                     <div class="system-panel p-6 rounded-2xl">
-                        <h3 class="font-heading font-bold text-lg mb-6 flex items-center gap-2">
-                            <i class="fas fa-crown text-neon-purple"></i> DAILY MVPs
-                        </h3>
-                        <div id="daily-mvps" class="space-y-4">
-                            <!-- MVP items -->
+                        <h3 class="font-bold text-sm mb-4 italic">Global Pulse</h3>
+                        <div class="h-72"><canvas id="chart-pulse"></canvas></div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="system-panel p-6 rounded-2xl">
+                            <h3 class="text-xs font-black text-neon-blue mb-4 uppercase italic">Hall of Fame</h3>
+                            <div class="space-y-2" id="live-all-time"></div>
+                        </div>
+                        <div class="system-panel p-6 rounded-2xl">
+                            <h3 class="text-xs font-black text-neon-green mb-4 uppercase italic">Today's Elite</h3>
+                            <div class="space-y-2" id="live-today"></div>
+                        </div>
+                        <div class="system-panel p-6 rounded-2xl">
+                            <h3 class="text-xs font-black text-neon-purple mb-4 uppercase italic">Active Groups</h3>
+                            <div class="space-y-2" id="live-groups-list"></div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- SPRINTS -->
-            <div id="view-sprints" class="hidden space-y-8">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <h3 class="font-heading font-bold text-lg mb-6 flex items-center gap-2">
-                            <i class="fas fa-bolt text-neon-blue"></i> ACTIVE NOW
-                        </h3>
-                        <div id="sprints-active-list" class="space-y-4">
-                            <!-- Active sprints -->
-                        </div>
+                <!-- SPRINTS -->
+                <div id="view-sprints" class="hidden space-y-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="font-black italic text-lg text-neon-blue">ACTIVE MISSIONS</h3>
+                        <button onclick="loadSprints()" class="bg-white/5 px-4 py-2 rounded-xl text-xs font-bold border border-white/10"><i class="fas fa-sync-alt"></i></button>
                     </div>
-                    <div>
-                        <h3 class="font-heading font-bold text-lg mb-6 flex items-center gap-2 text-slate-500">
-                            <i class="fas fa-calendar-alt"></i> SCHEDULED
-                        </h3>
-                        <div id="sprints-scheduled-list" class="space-y-4">
-                            <!-- Scheduled sprints -->
-                        </div>
-                    </div>
+                    <div id="sprints-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
                 </div>
-            </div>
 
-            <!-- BROADCAST -->
-            <div id="view-broadcast" class="hidden space-y-6">
-                <div class="system-panel p-8 rounded-2xl max-w-4xl mx-auto">
+                <!-- WRITERS -->
+                <div id="view-writers" class="hidden space-y-6">
+                    <div class="flex flex-col md:flex-row gap-4 mb-8">
+                        <div class="relative flex-1">
+                            <i class="fas fa-search absolute left-4 top-4 text-slate-500"></i>
+                            <input type="text" id="writer-search" onkeyup="searchWriters(this.value)" class="input-system w-full pl-12 pr-4 py-4 rounded-xl font-medium" placeholder="Search writers...">
+                        </div>
+                        <div class="flex gap-2">
+                            <select id="writer-sort" onchange="loadWritersGrid()" class="input-system px-4 py-4 rounded-xl font-bold text-sm">
+                                <option value="recent">Recent Active</option>
+                                <option value="words">Highest Words</option>
+                                <option value="name">Name (A-Z)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="writers-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                </div>
+
+                <!-- GROUPS -->
+                <div id="view-groups" class="hidden space-y-6">
+                    <div class="flex justify-between items-center mb-8">
+                        <h3 class="font-black italic text-lg text-neon-green">GROUP DOMAINS</h3>
+                        <button onclick="openJoinGroup()" class="bg-neon-green text-void px-6 py-2 rounded-xl font-bold text-sm">Join Group</button>
+                    </div>
+                    <div id="groups-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+                </div>
+
+                <!-- BROADCAST (BLAST) -->
+                <div id="view-broadcast" class="hidden space-y-6">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div class="space-y-6">
-                            <h3 class="font-heading font-bold text-xl mb-4 flex items-center gap-3">
-                                <i class="fas fa-paper-plane text-neon-blue"></i> NEW BROADCAST
-                            </h3>
-                            
-                            <textarea id="bc-message" rows="5" class="input-system w-full p-4 rounded-xl text-sm leading-relaxed" placeholder="Enter transmission message..."></textarea>
-                            
-                            <div class="relative group">
-                                <input type="file" id="bc-image" class="hidden" onchange="previewBCImage(event)">
-                                <label for="bc-image" id="bc-preview-label" class="flex flex-col items-center justify-center p-8 border-2 border-dashed border-white/10 rounded-xl cursor-pointer hover:border-neon-blue transition-all">
-                                    <i class="fas fa-image text-3xl text-slate-600 mb-2"></i>
-                                    <span class="text-xs font-bold text-slate-500">ATTACH IMAGE (OPTIONAL)</span>
-                                </label>
-                                <div id="bc-preview-container" class="hidden relative rounded-xl overflow-hidden">
-                                    <img id="bc-preview-img" class="w-full h-48 object-cover">
-                                    <button onclick="removeBCImage()" class="absolute top-2 right-2 w-8 h-8 bg-neon-red/80 rounded-full flex items-center justify-center"><i class="fas fa-times"></i></button>
-                                </div>
+                        <div class="system-panel p-8 rounded-2xl h-fit">
+                            <h3 class="font-black italic text-lg text-neon-blue mb-6">INSTANT TRANSMISSION</h3>
+                            <textarea id="bc-msg" rows="6" class="input-system w-full p-4 rounded-xl mb-6 text-sm" placeholder="Enter broadcast message..."></textarea>
+                            <div id="bc-preview-cont" class="hidden mb-6 relative"><img id="bc-preview-img" class="w-full h-40 object-cover rounded-xl"><button onclick="removeBCImage()" class="absolute top-2 right-2 bg-neon-red w-8 h-8 rounded-full flex items-center justify-center"><i class="fas fa-times"></i></button></div>
+                            <div class="flex justify-between items-center gap-4">
+                                <input type="file" id="bc-file" class="hidden" onchange="previewBCImage(event)">
+                                <label for="bc-file" class="flex-1 bg-white/5 border border-white/10 py-3 rounded-xl text-center text-xs font-bold cursor-pointer">ATTACH IMAGE</label>
+                                <button onclick="sendBroadcast()" class="flex-[1.5] bg-neon-blue text-void py-3 rounded-xl font-black italic">TRANSMIT</button>
                             </div>
-
-                            <button id="btn-transmit" onclick="transmitBroadcast()" class="w-full py-4 bg-neon-blue text-void font-heading font-black rounded-xl glow-blue flex items-center justify-center gap-3">
-                                <i class="fas fa-radio"></i> INITIATE TRANSMISSION
-                            </button>
                         </div>
-
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between mb-2">
-                                <h4 class="text-xs font-black text-slate-500 uppercase tracking-widest">Target Groups</h4>
-                                <label class="flex items-center gap-2 cursor-pointer group">
-                                    <span class="text-[10px] font-bold text-slate-500 group-hover:text-neon-blue">SELECT ALL</span>
-                                    <input type="checkbox" id="bc-select-all" onchange="toggleSelectAllGroups(this.checked)" class="sr-only peer">
-                                    <div class="w-4 h-4 border border-neon-blue rounded peer-checked:bg-neon-blue flex items-center justify-center transition-all">
-                                        <i class="fas fa-check text-[10px] text-void opacity-0 peer-checked:opacity-100"></i>
-                                    </div>
-                                </label>
+                        <div class="system-panel p-8 rounded-2xl flex flex-col">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-xs font-black text-slate-500 uppercase">Target Nodes</h3>
+                                <label class="text-[10px] font-bold text-neon-blue cursor-pointer"><input type="checkbox" id="bc-select-all" onchange="toggleSelectAllGroups(this.checked)" class="hidden"> SELECT ALL</label>
                             </div>
-                            <div class="relative mb-4">
-                                <i class="fas fa-search absolute left-3 top-3 text-slate-500 text-xs"></i>
-                                <input type="text" onkeyup="filterGroups(this.value)" class="input-system w-full pl-8 pr-4 py-2 rounded-lg text-xs" placeholder="Search groups...">
-                            </div>
-                            <div id="bc-groups-list" class="space-y-2 max-h-[350px] overflow-y-auto pr-2 no-scrollbar">
-                                <!-- Group items with checkboxes -->
-                            </div>
+                            <div class="relative mb-4"><i class="fas fa-search absolute left-3 top-3 text-slate-500 text-xs"></i><input type="text" onkeyup="filterBCGroups(this.value)" class="input-system w-full pl-8 pr-4 py-2 rounded-lg text-xs" placeholder="Search nodes..."></div>
+                            <div id="bc-groups-list" class="flex-1 space-y-2 overflow-y-auto no-scrollbar max-h-[400px]"></div>
                         </div>
                     </div>
                 </div>
+
             </div>
-
-            <!-- WRITERS -->
-            <div id="view-writers" class="hidden space-y-6">
-                <div class="flex flex-col sm:flex-row gap-4 mb-8">
-                    <div class="relative flex-1">
-                        <i class="fas fa-search absolute left-4 top-4 text-slate-500"></i>
-                        <input type="text" id="writer-search" onkeyup="searchWriters(this.value)" class="input-system w-full pl-12 pr-4 py-4 rounded-xl font-medium" placeholder="Search writers by name or ID...">
-                    </div>
-                </div>
-
-                <div id="writers-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Writer cards -->
-                </div>
-            </div>
-
-            <!-- SYSTEM -->
-            <div id="view-system" class="hidden space-y-8">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                    <div class="system-panel p-8 rounded-2xl flex flex-col items-center text-center">
-                        <h3 class="font-heading font-black text-xl mb-6 tracking-tighter uppercase italic text-neon-blue">Bot Connection</h3>
-                        <div id="qr-container" class="bg-white p-4 rounded-xl mb-6 hidden">
-                            <img id="qr-image" class="w-48 h-48">
-                        </div>
-                        <div id="connection-status" class="flex flex-col items-center">
-                            <div class="w-20 h-20 rounded-full border-2 border-neon-green flex items-center justify-center text-neon-green mb-4 glow-green">
-                                <i class="fas fa-link text-3xl"></i>
-                            </div>
-                            <span class="text-xl font-bold mb-2">SYSTEM ONLINE</span>
-                            <p class="text-slate-500 text-sm">Bot is successfully linked to WhatsApp</p>
-                        </div>
-                    </div>
-
-                    <div class="system-panel p-8 rounded-2xl">
-                        <h3 class="font-heading font-black text-xl mb-6 tracking-tighter uppercase italic text-neon-purple">System Control</h3>
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
-                                <div>
-                                    <div class="font-bold">Maintenance Mode</div>
-                                    <div class="text-xs text-slate-500">Disable all bot commands</div>
-                                </div>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="maintenance-toggle" onchange="toggleMaintenance(this.checked)" class="sr-only peer">
-                                    <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-neon-purple"></div>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
         </main>
     </div>
 
-    <!-- Modals -->
-    <div id="confirm-modal" class="hidden fixed inset-0 bg-void/90 z-[110] flex items-center justify-center p-4">
-        <div class="system-panel p-8 w-full max-w-sm text-center">
-            <h3 class="font-heading font-bold text-xl mb-2" id="confirm-title">SYSTEM PROMPT</h3>
-            <p class="text-slate-500 text-sm mb-8" id="confirm-msg">Confirm requested action?</p>
-            <div class="flex gap-3">
-                <button onclick="closeConfirm()" class="flex-1 py-3 bg-white/5 border border-white/10 rounded-xl font-bold text-sm">CANCEL</button>
-                <button id="confirm-yes-btn" class="flex-1 py-3 bg-neon-purple text-void font-heading font-black rounded-xl">CONFIRM</button>
+    <!-- WRITER DRAWER -->
+    <div id="drawer-overlay" class="fixed inset-0 bg-void/80 z-[60] hidden" onclick="closeDrawer()"></div>
+    <div id="writer-drawer" class="fixed inset-y-0 right-0 w-full md:w-[450px] bg-panel border-l border-white/5 z-[70] drawer overflow-y-auto no-scrollbar">
+        <div class="p-8 space-y-8">
+            <div class="flex justify-between items-start">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-2xl bg-neon-blue text-void flex items-center justify-center text-2xl font-black italic" id="dr-avatar">?</div>
+                    <div>
+                        <h3 class="text-2xl font-black italic tracking-tighter" id="dr-name">...</h3>
+                        <p class="text-[10px] font-mono text-slate-500" id="dr-id">...</p>
+                    </div>
+                </div>
+                <button onclick="closeDrawer()" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-white/5 p-4 rounded-xl text-center">
+                    <div class="text-xl font-mono font-bold" id="dr-streak">0</div>
+                    <div class="text-[9px] font-bold text-slate-500">STREAK</div>
+                </div>
+                <div class="bg-white/5 p-4 rounded-xl text-center">
+                    <div class="text-xl font-mono font-bold" id="dr-best">0</div>
+                    <div class="text-[9px] font-bold text-slate-500">BEST</div>
+                </div>
+                <div class="bg-white/5 p-4 rounded-xl text-center">
+                    <div class="text-xl font-mono font-bold text-neon-blue" id="dr-total">0</div>
+                    <div class="text-[9px] font-bold text-slate-500">TOTAL</div>
+                </div>
+            </div>
+
+            <div class="system-panel p-6 rounded-2xl">
+                <h4 class="text-xs font-black italic mb-4 text-neon-blue">ACTIVITY SCAN</h4>
+                <div class="h-40"><canvas id="chart-drawer"></canvas></div>
+            </div>
+
+            <div class="space-y-4">
+                <h4 class="text-xs font-black italic text-slate-500">SYSTEM COMMANDS</h4>
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="openFreezeGrant()" class="bg-neon-blue/10 border border-neon-blue/20 py-4 rounded-xl text-neon-blue text-xs font-black italic">GRANT FREEZE</button>
+                    <button id="dr-ban-btn" class="bg-neon-red/10 border border-neon-red/20 py-4 rounded-xl text-neon-red text-xs font-black italic">BLOCK NODE</button>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="dr-rename" class="input-system flex-1 px-4 py-3 rounded-xl text-sm" placeholder="New display name">
+                    <button onclick="renameWriter()" class="bg-white/5 border border-white/10 px-6 rounded-xl font-bold text-xs">RENAME</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Freeze Modal -->
-    <div id="freeze-modal" class="hidden fixed inset-0 bg-void/90 z-[110] flex items-center justify-center p-4">
-        <div class="system-panel p-8 w-full max-w-sm">
-            <h3 class="font-heading font-bold text-xl mb-2">GRANT FREEZE</h3>
-            <p class="text-slate-500 text-xs mb-6">User: <span id="freeze-user-name" class="text-neon-blue font-bold"></span></p>
-            <input type="number" id="freeze-amount" value="1" min="1" max="10" class="input-system w-full px-4 py-3 rounded-xl font-mono text-xl mb-4">
-            <button id="btn-grant-freeze" class="w-full py-4 bg-neon-blue text-void font-heading font-black rounded-xl">GRANT SHIELD</button>
-            <button onclick="document.getElementById('freeze-modal').classList.add('hidden')" class="w-full py-3 text-slate-500 font-bold text-sm">CANCEL</button>
-        </div>
+    <!-- MODALS -->
+    <div id="modal-container" class="fixed inset-0 bg-void/90 z-[110] hidden flex items-center justify-center p-4">
+        <div class="system-panel p-8 w-full max-w-sm rounded-2xl" id="modal-content"></div>
     </div>
 
     <script>
         const API_URL = 'https://sprint-bot-9bll.onrender.com';
         let token = localStorage.getItem('admin_key');
         let currentTab = 'overview';
+        let charts = {};
         let allGroups = [];
-        let bcImageBase64 = null;
+        let selectedWriterId = null;
 
         function login() {
             const pass = document.getElementById('admin-pass').value;
-            if (!pass) return showToast("Enter Access Key", "error");
+            if (!pass) return;
             token = pass;
             localStorage.setItem('admin_key', pass);
             location.reload();
@@ -443,138 +418,227 @@
             document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
             document.getElementById(`nav-${tab}`).classList.add('active');
             document.getElementById(`view-${tab}`).classList.remove('hidden');
+            document.getElementById('view-title').textContent = tab;
             currentTab = tab;
             loadTabData();
         }
 
         function loadTabData() {
             if (currentTab === 'overview') loadOverview();
+            if (currentTab === 'analytics') loadAnalytics();
+            if (currentTab === 'live') loadLive();
             if (currentTab === 'sprints') loadSprints();
-            if (currentTab === 'broadcast') loadGroupsForBroadcast();
-            if (currentTab === 'writers') loadWriters();
-            if (currentTab === 'system') loadSystemInfo();
+            if (currentTab === 'writers') loadWritersGrid();
+            if (currentTab === 'groups') loadGroups();
+            if (currentTab === 'broadcast') loadBCGroups();
         }
 
-        function refreshData() { loadTabData(); showToast("System Data Refreshed"); }
-
         async function loadOverview() {
-            const data = await api('/api/stats', null, 'GET');
-            if (!data) return;
-            document.getElementById('stat-total-words').textContent = data.totalWords.toLocaleString();
-            document.getElementById('stat-total-writers').textContent = data.totalWriters;
-            document.getElementById('stat-total-groups').textContent = data.totalGroups;
-            document.getElementById('stat-active-sprints').textContent = data.activeSprintsCount;
+            const stats = await api('/api/stats', null, 'GET');
+            const conn = document.getElementById('conn-display');
+            if (stats?.isConnected) {
+                conn.innerHTML = `<i class="fas fa-link text-neon-green text-4xl mb-4"></i><span class="font-bold text-neon-green">CONNECTED</span>`;
+            } else if (stats?.qrCode) {
+                conn.innerHTML = `<img src="${stats.qrCode}" class="w-32 h-32 mb-2 p-2 bg-white rounded-lg"><span class="text-[10px] text-slate-500">SCAN TO LINK</span>`;
+            }
+            document.getElementById('sys-uptime').textContent = stats?.uptime || '...';
+            document.getElementById('sys-mem').textContent = stats?.memoryUsage || '...';
+            document.getElementById('sys-platform').textContent = stats?.platform || '...';
+            
+            const maint = stats?.maintenance;
+            const mBtn = document.getElementById('maint-btn');
+            const mStat = document.getElementById('maint-status');
+            mStat.textContent = maint ? 'ON' : 'OFF';
+            mStat.className = `text-xs font-bold px-4 py-2 rounded-xl ${maint ? 'bg-neon-red/10 text-neon-red' : 'bg-neon-green/10 text-neon-green'}`;
+            mBtn.textContent = maint ? 'Disable' : 'Enable';
+        }
 
-            const feed = document.getElementById('activity-feed');
-            feed.innerHTML = data.recentActivity.map(a => `
-                <div class="flex items-start gap-4 p-4 rounded-xl hover:bg-white/5">
-                    <div class="text-lg">${a.icon || '📝'}</div>
-                    <div><div class="text-sm font-semibold">${a.text}</div><div class="text-[10px] text-slate-500">${new Date(a.timestamp).toLocaleTimeString()}</div></div>
+        async function loadAnalytics() {
+            const data = await api('/api/admin/analytics', null, 'GET');
+            if (!data) return;
+            document.getElementById('ana-retention').textContent = `${data.retention || 0}%`;
+            document.getElementById('ana-active-7').textContent = data.activeLast7Days;
+            document.getElementById('ana-active-prev').textContent = data.activePrev7Days;
+
+            renderAnalyticsCharts(data);
+            
+            document.getElementById('ana-growers').innerHTML = data.topGrowers.map(g => `
+                <tr class="border-b border-white/5">
+                    <td class="py-3 font-bold">${g.name}</td>
+                    <td class="py-3 text-right font-mono">${g.words.toLocaleString()}</td>
+                    <td class="py-3 text-right text-neon-green">+${g.growth}%</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('ana-groups').innerHTML = data.groupDensity.map(g => `
+                <tr class="border-b border-white/5">
+                    <td class="py-3 font-bold">${g.name}</td>
+                    <td class="py-3 text-right text-slate-500">${g.count} users</td>
+                    <td class="py-3 text-right font-mono text-neon-purple">${g.words.toLocaleString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadLive() {
+            const data = await api('/api/stats', null, 'GET');
+            document.getElementById('live-words').textContent = data.totalWords.toLocaleString();
+            document.getElementById('live-writers').textContent = data.totalWriters;
+            document.getElementById('live-groups').textContent = data.totalGroups;
+            document.getElementById('live-active-sprints').textContent = data.activeSprintsCount;
+
+            renderPulseChart(data.last7DaysActivity);
+
+            document.getElementById('live-all-time').innerHTML = data.topAllTime.slice(0, 5).map(u => `
+                <div class="flex justify-between items-center p-3 bg-white/5 rounded-xl">
+                    <span class="text-xs font-bold truncate pr-4">${u.name}</span>
+                    <span class="font-mono text-[10px] text-neon-blue">${u.totalWords.toLocaleString()}</span>
+                </div>
+            `).join('');
+            
+            document.getElementById('live-today').innerHTML = data.todayWriters.slice(0, 5).map(u => `
+                <div class="flex justify-between items-center p-3 bg-white/5 rounded-xl border-l-2 border-neon-green">
+                    <span class="text-xs font-bold truncate pr-4">${u.name}</span>
+                    <span class="font-mono text-[10px] text-neon-green">${u.words.toLocaleString()}</span>
                 </div>
             `).join('');
         }
 
         async function loadSprints() {
             const data = await api('/api/admin/sprints', null, 'GET');
-            document.getElementById('sprints-active-list').innerHTML = data?.map(s => `
-                <div class="system-panel p-5 rounded-2xl flex justify-between items-center">
-                    <div><div class="font-bold text-sm">${s.name}</div><div class="text-[10px] text-neon-blue font-bold">${s.timeLeft}M LEFT</div></div>
-                    <button onclick="stopSprint('${s.id}')" class="w-10 h-10 rounded-xl bg-neon-red/10 text-neon-red"><i class="fas fa-stop"></i></button>
+            document.getElementById('sprints-grid').innerHTML = data?.map(s => `
+                <div class="system-panel p-6 rounded-2xl flex justify-between items-center">
+                    <div>
+                        <div class="font-black italic text-sm text-neon-blue mb-1">${s.name}</div>
+                        <div class="text-[10px] font-bold text-slate-500 uppercase">${s.groupName}</div>
+                        <div class="mt-3 flex items-center gap-4">
+                            <span class="text-xs font-mono font-bold">${s.words.toLocaleString()} words</span>
+                            <span class="text-[9px] font-black text-neon-purple">${s.timeLeft}M REMAINING</span>
+                        </div>
+                    </div>
+                    <button onclick="stopSprint('${s.id}')" class="w-12 h-12 rounded-xl bg-neon-red/10 text-neon-red"><i class="fas fa-stop"></i></button>
                 </div>
-            `).join('') || '<p class="text-center py-12 text-slate-500">No active sprints</p>';
+            `).join('') || '<p class="col-span-full text-center py-20 text-slate-500 italic">No active missions found.</p>';
         }
 
-        async function loadGroupsForBroadcast() {
+        async function loadWritersGrid() {
+            const query = document.getElementById('writer-search').value;
+            const sort = document.getElementById('writer-sort').value;
+            const data = await api('/api/admin/search', { query, sort });
+            document.getElementById('writers-grid').innerHTML = data?.map(u => `
+                <div class="system-panel p-6 rounded-2xl group cursor-pointer" onclick="openWriterDrawer('${u.userId}')">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-12 h-12 rounded-xl bg-void border border-white/5 flex items-center justify-center font-black text-neon-blue italic">${u.name.charAt(0)}</div>
+                        <div class="min-w-0"><div class="font-bold text-sm truncate">${u.name}</div><div class="text-[9px] font-mono text-slate-500">${u.userId.split('@')[0]}</div></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-white/5 p-3 rounded-xl text-center"><div class="text-[9px] font-bold text-slate-500 uppercase mb-1">Total</div><div class="text-xs font-mono font-bold">${(u.trueTotal || u.totalWords).toLocaleString()}</div></div>
+                        <div class="bg-white/5 p-3 rounded-xl text-center"><div class="text-[9px] font-bold text-slate-500 uppercase mb-1">Streak</div><div class="text-xs font-mono font-bold text-neon-green">${u.currentStreak || 0}🔥</div></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function loadGroups() {
             const data = await api('/api/admin/groups', null, 'GET');
-            if (!data) return;
-            allGroups = data.sort((a, b) => b.todayWords - a.todayWords);
-            renderGroupsList();
+            document.getElementById('groups-grid').innerHTML = data?.map(g => `
+                <div class="system-panel p-6 rounded-2xl">
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="min-w-0"><div class="font-bold text-sm truncate">${g.subject}</div><div class="text-[10px] text-slate-500 font-mono mt-1">${g.participantsCount} members</div></div>
+                        <span class="w-3 h-3 rounded-full ${g.isDead ? 'bg-slate-700' : 'bg-neon-green'}"></span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="testComms('${g.groupId}')" class="flex-1 py-2 bg-white/5 border border-white/10 rounded-lg text-[10px] font-black uppercase">Test Comms</button>
+                        <button onclick="confirmLeaveGroup('${g.groupId}')" class="px-4 py-2 bg-neon-red/10 text-neon-red rounded-lg text-[10px] font-black uppercase"><i class="fas fa-sign-out-alt"></i></button>
+                    </div>
+                </div>
+            `).join('');
         }
 
-        function renderGroupsList(filter = '') {
+        async function loadBCGroups() {
+            const data = await api('/api/admin/groups', null, 'GET');
+            allGroups = data || [];
+            renderBCGroups();
+        }
+
+        function renderBCGroups(filter = '') {
             const list = document.getElementById('bc-groups-list');
             list.innerHTML = allGroups.filter(g => g.subject.toLowerCase().includes(filter.toLowerCase())).map(g => `
-                <label class="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 cursor-pointer">
+                <label class="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 cursor-pointer">
                     <div class="flex items-center gap-3 min-w-0">
-                        <input type="checkbox" name="target-group" value="${g.groupId}" class="sr-only peer">
-                        <div class="w-5 h-5 border-2 border-white/10 rounded peer-checked:bg-neon-blue peer-checked:border-neon-blue flex items-center justify-center">
-                            <i class="fas fa-check text-[10px] text-void opacity-0 peer-checked:opacity-100"></i>
-                        </div>
-                        <div class="truncate text-xs font-bold">${g.subject}</div>
+                        <input type="checkbox" name="bc-target" value="${g.groupId}" class="sr-only peer">
+                        <div class="w-5 h-5 border-2 border-white/10 rounded peer-checked:bg-neon-blue peer-checked:border-neon-blue flex items-center justify-center"><i class="fas fa-check text-[10px] text-void opacity-0 peer-checked:opacity-100"></i></div>
+                        <span class="text-xs font-bold truncate">${g.subject}</span>
                     </div>
                 </label>
             `).join('');
         }
 
-        function filterGroups(val) { renderGroupsList(val); }
-        function toggleSelectAllGroups(checked) { document.querySelectorAll('input[name="target-group"]').forEach(cb => cb.checked = checked); }
-
-        function previewBCImage(e) {
-            const reader = new FileReader();
-            reader.onload = ev => {
-                bcImageBase64 = ev.target.result;
-                document.getElementById('bc-preview-img').src = bcImageBase64;
-                document.getElementById('bc-preview-label').classList.add('hidden');
-                document.getElementById('bc-preview-container').classList.remove('hidden');
-            };
-            reader.readAsDataURL(e.target.files[0]);
+        async function openWriterDrawer(id) {
+            selectedWriterId = id;
+            const u = await api('/api/admin/search', { query: id, exact: true });
+            if (!u) return;
+            document.getElementById('dr-name').textContent = u.name;
+            document.getElementById('dr-id').textContent = u.userId;
+            document.getElementById('dr-avatar').textContent = u.name.charAt(0);
+            document.getElementById('dr-streak').textContent = u.currentStreak || 0;
+            document.getElementById('dr-best').textContent = u.bestDaily || 0;
+            document.getElementById('dr-total').textContent = (u.trueTotal || u.totalWords).toLocaleString();
+            document.getElementById('drawer-overlay').classList.remove('hidden');
+            document.getElementById('writer-drawer').classList.add('open');
+            renderDrawerChart(u.last7Days);
         }
 
-        function removeBCImage() {
-            bcImageBase64 = null;
-            document.getElementById('bc-preview-label').classList.remove('hidden');
-            document.getElementById('bc-preview-container').classList.add('hidden');
+        function closeDrawer() { document.getElementById('drawer-overlay').classList.add('hidden'); document.getElementById('writer-drawer').classList.remove('open'); }
+
+        async function sendBroadcast() {
+            const msg = document.getElementById('bc-msg').value;
+            const targets = Array.from(document.querySelectorAll('input[name="bc-target"]:checked')).map(cb => cb.value);
+            const img = document.getElementById('bc-preview-img').src;
+            if (!msg && !img) return showToast("Empty Transmission", "error");
+            const res = await api('/api/admin/broadcast', { message: msg, image: img.startsWith('data') ? img : null, targetGroups: targets });
+            if (res?.success) { showToast(`Blast successful to ${res.count} nodes`); document.getElementById('bc-msg').value = ''; removeBCImage(); }
         }
 
-        async function transmitBroadcast() {
-            const msg = document.getElementById('bc-message').value;
-            const selected = Array.from(document.querySelectorAll('input[name="target-group"]:checked')).map(cb => cb.value);
-            if (!msg && !bcImageBase64) return showToast("Enter message or image", "error");
-            const res = await api('/api/admin/broadcast', { message: msg, image: bcImageBase64, targetGroups: selected });
-            if (res && res.success) { showToast(`Delivered to ${res.count} groups`); document.getElementById('bc-message').value = ''; removeBCImage(); }
-        }
-
-        async function loadWriters(query = '') {
-            const data = await api('/api/admin/search', { query });
-            document.getElementById('writers-grid').innerHTML = data?.map(u => `
-                <div class="system-panel p-6 rounded-2xl">
-                    <div class="font-bold text-sm mb-4">${u.name}</div>
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div class="p-3 bg-white/5 rounded-xl text-center"><div class="text-[9px] text-slate-500 font-bold">Total</div><div class="text-xs font-mono font-bold">${(u.trueTotal || u.totalWords).toLocaleString()}</div></div>
-                        <div class="p-3 bg-white/5 rounded-xl text-center"><div class="text-[9px] text-slate-500 font-bold">Streak</div><div class="text-xs font-mono font-bold text-neon-green">${u.currentStreak || 0}🔥</div></div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="openFreezeModal('${u.userId}', '${u.name}')" class="flex-1 py-2 bg-neon-blue/10 text-neon-blue text-[10px] font-black rounded-lg">FREEZE</button>
-                        <button onclick="toggleBan('${u.userId}', ${u.isBanned})" class="px-4 py-2 ${u.isBanned ? 'bg-neon-green/10 text-neon-green' : 'bg-neon-red/10 text-neon-red'} text-[10px] font-black rounded-lg">${u.isBanned ? 'UNBAN' : 'BAN'}</button>
-                    </div>
+        function openFreezeGrant() {
+            showModal(`
+                <h3 class="font-black italic text-lg mb-6 text-neon-blue">GRANT FREEZE</h3>
+                <input type="number" id="mod-freeze-val" value="1" min="1" class="input-system w-full p-4 rounded-xl mb-6 font-mono text-center text-xl">
+                <div class="flex gap-4">
+                    <button onclick="closeModal()" class="flex-1 py-3 bg-white/5 rounded-xl font-bold text-xs">CANCEL</button>
+                    <button onclick="grantFreeze()" class="flex-1 py-3 bg-neon-blue text-void rounded-xl font-black italic">CONFIRM</button>
                 </div>
-            `).join('') || '<p class="text-center py-20 text-slate-500 text-sm col-span-full">Searching...</p>';
+            `);
         }
 
-        function searchWriters(val) { clearTimeout(window.searchTimer); window.searchTimer = setTimeout(() => loadWriters(val), 500); }
-
-        async function loadSystemInfo() {
-            const data = await api('/api/stats', null, 'GET');
-            if (data.qrCode) { document.getElementById('qr-image').src = data.qrCode; document.getElementById('qr-container').classList.remove('hidden'); document.getElementById('connection-status').classList.add('hidden'); }
-            else { document.getElementById('qr-container').classList.add('hidden'); document.getElementById('connection-status').classList.remove('hidden'); }
+        async function grantFreeze() {
+            const amount = document.getElementById('mod-freeze-val').value;
+            const res = await api('/api/admin/writers/freeze', { userId: selectedWriterId, amount });
+            if (res?.success) { showToast(`Granted ${amount} freezes`); closeModal(); }
         }
 
-        function openFreezeModal(uid, name) { document.getElementById('freeze-user-name').textContent = name; document.getElementById('freeze-modal').classList.remove('hidden'); document.getElementById('btn-grant-freeze').onclick = () => grantFreeze(uid); }
-
-        async function grantFreeze(userId) {
-            const amount = document.getElementById('freeze-amount').value;
-            const res = await api('/api/admin/writers/freeze', { userId, amount });
-            if (res && res.success) { showToast(`Granted ${amount} freeze(s)`); document.getElementById('freeze-modal').classList.add('hidden'); loadWriters(); }
+        function renderPulseChart(data) {
+            const ctx = document.getElementById('chart-pulse').getContext('2d');
+            if (charts.pulse) charts.pulse.destroy();
+            charts.pulse = new Chart(ctx, { type: 'line', data: { labels: data.map(d => d.date), datasets: [{ label: 'Words', data: data.map(d => d.words), borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false } } } } });
         }
 
-        function showToast(msg, type = 'success') {
-            const t = document.createElement('div');
-            t.className = `fixed top-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl border font-bold text-xs z-[200] ${type==='success'?'bg-panel border-neon-blue text-neon-blue':'bg-void border-neon-red text-neon-red'}`;
-            t.textContent = msg; document.body.appendChild(t);
-            setTimeout(() => t.remove(), 3000);
+        function renderAnalyticsCharts(data) {
+            const ctxV = document.getElementById('chart-velocity').getContext('2d');
+            if (charts.velocity) charts.velocity.destroy();
+            charts.velocity = new Chart(ctxV, { type: 'bar', data: { labels: data.velocity.map(d => d.label), datasets: [{ data: data.velocity.map(d => d.value), backgroundColor: '#38bdf8' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
         }
 
-        function closeConfirm() { document.getElementById('confirm-modal').classList.add('hidden'); }
+        function renderDrawerChart(data) {
+            const ctx = document.getElementById('chart-drawer').getContext('2d');
+            if (charts.drawer) charts.drawer.destroy();
+            charts.drawer = new Chart(ctx, { type: 'line', data: { labels: data.map(d => d.date), datasets: [{ data: data.map(d => d.words), borderColor: '#38bdf8', tension: 0.3 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } });
+        }
+
+        function showModal(html) { document.getElementById('modal-content').innerHTML = html; document.getElementById('modal-container').classList.remove('hidden'); }
+        function closeModal() { document.getElementById('modal-container').classList.add('hidden'); }
+        function showToast(msg, type = 'success') { const t = document.createElement('div'); t.className = `fixed top-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl border font-bold text-xs z-[200] ${type==='success'?'bg-panel border-neon-blue text-neon-blue':'bg-void border-neon-red text-neon-red'}`; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3000); }
+        function previewBCImage(e) { const reader = new FileReader(); reader.onload = ev => { document.getElementById('bc-preview-img').src = ev.target.result; document.getElementById('bc-preview-cont').classList.remove('hidden'); }; reader.readAsDataURL(e.target.files[0]); }
+        function removeBCImage() { document.getElementById('bc-preview-cont').classList.add('hidden'); document.getElementById('bc-preview-img').src = ''; }
 
         if (token) { document.getElementById('auth-modal').classList.add('hidden'); document.getElementById('app').classList.remove('hidden'); switchTab('overview'); }
     </script>
