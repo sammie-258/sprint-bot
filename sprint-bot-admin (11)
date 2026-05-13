@@ -14,16 +14,8 @@
             darkMode: 'class',
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        heading: ['Space Grotesk', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'monospace'],
-                    },
-                    colors: {
-                        void: '#020617',
-                        haze: 'rgba(10, 18, 32, 0.7)',
-                        neon: { blue: '#38bdf8', purple: '#a855f7', green: '#22d3a0', red: '#f43f5e' }
-                    }
+                    fontFamily: { sans: ['Inter', 'sans-serif'], heading: ['Space Grotesk', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                    colors: { void: '#020617', haze: 'rgba(10, 18, 32, 0.7)', neon: { blue: '#38bdf8', purple: '#a855f7', green: '#22d3a0', red: '#f43f5e' } }
                 }
             }
         }
@@ -32,66 +24,20 @@
     <style>
         :root { --accent: #38bdf8; --accent-glow: rgba(56, 189, 248, 0.4); }
         body { background-color: #020617; color: #f8fafc; overflow: hidden; font-family: 'Inter', sans-serif; }
-        
-        /* HUD ELEMENTS */
-        .hud-border {
-            background: rgba(10, 18, 32, 0.6);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(56, 189, 248, 0.2);
-            box-shadow: inset 0 0 15px rgba(56, 189, 248, 0.05);
-            position: relative;
-        }
-        .hud-border::before {
-            content: ''; position: absolute; top: -1px; left: 10%; right: 10%; height: 1px;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
-        }
-        .hud-corner {
-            position: absolute; width: 8px; height: 8px; border: 2px solid var(--accent);
-        }
+        .hud-border { background: rgba(10, 18, 32, 0.6); backdrop-filter: blur(16px); border: 1px solid rgba(56, 189, 248, 0.2); box-shadow: inset 0 0 15px rgba(56, 189, 248, 0.05); position: relative; }
+        .hud-border::before { content: ''; position: absolute; top: -1px; left: 10%; right: 10%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); }
+        .hud-corner { position: absolute; width: 8px; height: 8px; border: 2px solid var(--accent); }
         .hud-corner-tl { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
         .hud-corner-br { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
-
-        /* SKEWED DESIGN */
         .skew-box { clip-path: polygon(0 0, 95% 0, 100% 20%, 100% 100%, 5% 100%, 0 80%); }
-        
-        .nav-item {
-            clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .nav-item.active {
-            background: linear-gradient(90deg, var(--accent-glow), transparent);
-            color: #38bdf8; border-left: 3px solid #38bdf8;
-        }
-
-        /* GLITCH & ANIMATION */
-        @keyframes glitch {
-            0% { transform: translate(0); }
-            20% { transform: translate(-2px, 1px); }
-            40% { transform: translate(-2px, -1px); }
-            60% { transform: translate(2px, 1px); }
-            80% { transform: translate(2px, -1px); }
-            100% { transform: translate(0); }
-        }
-        .glitch-text:hover { animation: glitch 0.2s infinite; }
-        
-        .scanline {
-            position: absolute; inset: 0; pointer-events: none; z-index: 50;
-            background: linear-gradient(to bottom, transparent 50%, rgba(56, 189, 248, 0.03) 50%);
-            background-size: 100% 4px; opacity: 0.5;
-        }
-        
+        .nav-item { clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%); transition: all 0.3s; }
+        .nav-item.active { background: linear-gradient(90deg, var(--accent-glow), transparent); color: #38bdf8; border-left: 3px solid #38bdf8; }
+        .scanline { position: absolute; inset: 0; pointer-events: none; z-index: 50; background: linear-gradient(to bottom, transparent 50%, rgba(56, 189, 248, 0.03) 50%); background-size: 100% 4px; opacity: 0.5; }
         .xp-bar { height: 4px; background: rgba(255,255,255,0.05); position: relative; overflow: hidden; }
         .xp-fill { position: absolute; top: 0; left: 0; height: 100%; background: #38bdf8; box-shadow: 0 0 10px #38bdf8; }
-
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        
-        /* SYSTEM NOTIFICATION */
-        .sys-toast {
-            background: rgba(2, 6, 23, 0.9); border-left: 4px solid #38bdf8;
-            backdrop-filter: blur(10px); animation: slideIn 0.3s ease-out forwards;
-        }
+        .sys-toast { background: rgba(2, 6, 23, 0.9); border-left: 4px solid #38bdf8; backdrop-filter: blur(10px); animation: slideIn 0.3s ease-out forwards; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
         .drawer { transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
         .drawer.open { transform: translateX(0); }
     </style>
@@ -102,263 +48,120 @@
     <!-- Auth Modal -->
     <div id="auth-modal" class="fixed inset-0 bg-void/98 z-[200] flex items-center justify-center p-4">
         <div class="hud-border p-10 w-full max-w-md skew-box">
-            <div class="hud-corner hud-corner-tl"></div>
-            <div class="hud-corner hud-corner-br"></div>
+            <div class="hud-corner hud-corner-tl"></div><div class="hud-corner hud-corner-br"></div>
             <div class="text-center mb-10">
-                <div class="inline-block px-4 py-1 border border-neon-blue text-neon-blue text-[10px] font-bold tracking-[0.4em] mb-4">AUTHENTICATION REQUIRED</div>
+                <div class="inline-block px-4 py-1 border border-neon-blue text-neon-blue text-[10px] font-bold tracking-[0.4em] mb-4 uppercase">Identity Verification</div>
                 <h1 class="font-heading font-black text-3xl tracking-tighter italic">SHADOW SYSTEM</h1>
             </div>
-            <input type="password" id="admin-pass" placeholder="ENTER ACCESS KEY" class="w-full bg-white/5 border border-white/10 px-6 py-4 rounded-lg font-mono text-center tracking-[0.5em] mb-6 focus:border-neon-blue outline-none transition-all">
+            <input type="password" id="admin-pass" placeholder="ENTER ACCESS KEY" class="w-full bg-white/5 border border-white/10 px-6 py-4 rounded font-mono text-center tracking-[0.5em] mb-6 focus:border-neon-blue outline-none transition-all">
             <button onclick="login()" class="w-full py-4 bg-neon-blue text-void font-heading font-black italic tracking-widest hover:bg-white transition-all">INITIALIZE</button>
         </div>
     </div>
 
     <div id="app" class="hidden flex-1 flex flex-col md:flex-row overflow-hidden">
-        
-        <!-- Side HUD Nav -->
         <nav class="md:w-64 bg-void/50 border-r border-white/5 flex flex-col z-50 p-4 shrink-0 overflow-y-auto no-scrollbar">
             <div class="flex items-center gap-3 mb-12 px-2">
-                <div class="w-10 h-10 border border-neon-blue flex items-center justify-center text-neon-blue animate-pulse">
-                    <i class="fas fa-ghost"></i>
-                </div>
-                <div>
-                    <div class="font-heading font-black text-lg leading-none italic">SYSTEM</div>
-                    <div class="text-[9px] text-neon-blue font-bold tracking-[0.3em]">VERSION 4.2</div>
-                </div>
+                <div class="w-10 h-10 border border-neon-blue flex items-center justify-center text-neon-blue animate-pulse"><i class="fas fa-ghost"></i></div>
+                <div><div class="font-heading font-black text-lg leading-none italic">SYSTEM</div><div class="text-[9px] text-neon-blue font-bold tracking-[0.3em]">VERSION 4.2</div></div>
             </div>
-
             <div class="space-y-1 mb-8">
                 <div class="text-[9px] font-black text-slate-600 mb-2 px-4 tracking-[0.2em]">CORE MODULES</div>
-                <button onclick="switchTab('overview')" id="nav-overview" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all">
-                    <i class="fas fa-terminal text-xs"></i> STATUS
-                </button>
-                <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all">
-                    <i class="fas fa-brain text-xs"></i> ANALYSIS
-                </button>
-                <button onclick="switchTab('live')" id="nav-live" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all">
-                    <i class="fas fa-eye text-xs"></i> LIVE HUD
-                </button>
+                <button onclick="switchTab('overview')" id="nav-overview" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all"><i class="fas fa-terminal text-xs"></i> STATUS</button>
+                <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all"><i class="fas fa-brain text-xs"></i> ANALYSIS</button>
+                <button onclick="switchTab('live')" id="nav-live" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all"><i class="fas fa-eye text-xs"></i> LIVE HUD</button>
             </div>
-
             <div class="space-y-1 mb-8">
                 <div class="text-[9px] font-black text-slate-600 mb-2 px-4 tracking-[0.2em]">MANAGEMENT</div>
-                <button onclick="switchTab('sprints')" id="nav-sprints" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all">
-                    <i class="fas fa-bolt text-xs"></i> MISSIONS
-                </button>
-                <button onclick="switchTab('writers')" id="nav-writers" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all">
-                    <i class="fas fa-fingerprint text-xs"></i> WRITERS
-                </button>
-                <button onclick="switchTab('groups')" id="nav-groups" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all">
-                    <i class="fas fa-network-wired text-xs"></i> NODES
-                </button>
+                <button onclick="switchTab('sprints')" id="nav-sprints" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all"><i class="fas fa-bolt text-xs"></i> MISSIONS</button>
+                <button onclick="switchTab('writers')" id="nav-writers" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all"><i class="fas fa-fingerprint text-xs"></i> WRITERS</button>
+                <button onclick="switchTab('groups')" id="nav-groups" class="nav-item w-full flex items-center gap-4 px-6 py-3 text-sm font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-all"><i class="fas fa-network-wired text-xs"></i> NODES</button>
             </div>
-
-            <button onclick="switchTab('broadcast')" id="nav-broadcast" class="mt-auto bg-neon-blue/5 border border-neon-blue/20 p-4 rounded text-neon-blue flex items-center justify-between hover:bg-neon-blue/20 transition-all">
-                <span class="text-xs font-black italic">INSTANT BLAST</span>
-                <i class="fas fa-radio animate-pulse"></i>
-            </button>
+            <button onclick="switchTab('broadcast')" id="nav-broadcast" class="mt-auto bg-neon-blue/5 border border-neon-blue/20 p-4 rounded text-neon-blue flex items-center justify-between hover:bg-neon-blue/20 transition-all"><span class="text-xs font-black italic">INSTANT BLAST</span><i class="fas fa-radio animate-pulse"></i></button>
+            <button onclick="logout()" class="mt-4 text-neon-red text-[10px] font-black uppercase tracking-widest text-left px-4 opacity-50 hover:opacity-100">Terminate Session</button>
         </nav>
 
-        <!-- Main HUD Stage -->
         <main class="flex-1 flex flex-col overflow-hidden relative">
             <header class="flex items-center justify-between p-6 md:p-10 border-b border-white/5 shrink-0">
-                <div>
-                    <div id="view-indicator" class="text-[10px] font-black text-neon-blue mb-1 tracking-[0.5em] uppercase">ACCESSING MODULE...</div>
-                    <h2 id="view-title" class="font-heading font-black text-4xl italic tracking-tighter uppercase">OVERVIEW</h2>
-                </div>
-                <div class="flex items-center gap-6">
-                    <div class="hidden md:block">
-                        <div class="text-[9px] text-slate-500 font-bold mb-1">DATA LATENCY</div>
-                        <div class="font-mono text-xs text-neon-green">24MS / NOMINAL</div>
-                    </div>
-                    <button onclick="refreshData()" class="w-12 h-12 border border-white/10 flex items-center justify-center hover:border-neon-blue hover:text-neon-blue transition-all">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                </div>
+                <div><div id="view-indicator" class="text-[10px] font-black text-neon-blue mb-1 tracking-[0.5em] uppercase">ACCESSING MODULE...</div><h2 id="view-title" class="font-heading font-black text-4xl italic tracking-tighter uppercase">OVERVIEW</h2></div>
+                <button onclick="refreshData()" class="w-12 h-12 border border-white/10 flex items-center justify-center hover:border-neon-blue hover:text-neon-blue transition-all"><i class="fas fa-sync-alt"></i></button>
             </header>
 
             <div class="flex-1 overflow-y-auto p-6 md:p-10 pb-24 md:pb-10 no-scrollbar">
-                
-                <!-- OVERVIEW HUD -->
                 <div id="view-overview" class="space-y-8">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div class="hud-border p-8 text-center relative">
-                            <div class="hud-corner hud-corner-tl"></div>
-                            <div class="text-[10px] font-black text-slate-500 tracking-widest mb-8">CONNECTION STATUS</div>
-                            <div id="conn-display" class="flex flex-col items-center py-4">
-                                <i class="fas fa-circle-notch fa-spin text-neon-blue text-5xl mb-6"></i>
-                                <span class="font-black italic tracking-widest text-xl">SCANNING...</span>
-                            </div>
-                        </div>
-                        <div class="md:col-span-2 hud-border p-8">
-                            <div class="text-[10px] font-black text-slate-500 tracking-widest mb-8">SYSTEM TELEMETRY</div>
-                            <div class="grid grid-cols-3 gap-6">
-                                <div class="bg-white/5 p-6 border-l-2 border-neon-blue">
-                                    <div class="text-[9px] text-slate-500 font-bold mb-2">UPTIME</div>
-                                    <div id="sys-uptime" class="font-mono text-xl font-bold">0.00S</div>
-                                </div>
-                                <div class="bg-white/5 p-6 border-l-2 border-neon-purple">
-                                    <div class="text-[9px] text-slate-500 font-bold mb-2">MEMORY</div>
-                                    <div id="sys-mem" class="font-mono text-xl font-bold">0 MB</div>
-                                </div>
-                                <div class="bg-white/5 p-6 border-l-2 border-neon-green">
-                                    <div class="text-[9px] text-slate-500 font-bold mb-2">STATUS</div>
-                                    <div class="font-mono text-lg font-bold text-neon-green">STABLE</div>
-                                </div>
-                            </div>
-                        </div>
+                        <div class="hud-border p-8 text-center relative"><div class="hud-corner hud-corner-tl"></div><div class="text-[10px] font-black text-slate-500 tracking-widest mb-8">CONNECTION STATUS</div><div id="conn-display" class="flex flex-col items-center py-4"><i class="fas fa-circle-notch fa-spin text-neon-blue text-5xl mb-6"></i><span class="font-black italic tracking-widest text-xl uppercase">Scanning...</span></div></div>
+                        <div class="md:col-span-2 hud-border p-8"><div class="text-[10px] font-black text-slate-500 tracking-widest mb-8">SYSTEM TELEMETRY</div><div class="grid grid-cols-3 gap-6"><div class="bg-white/5 p-6 border-l-2 border-neon-blue"><div class="text-[9px] text-slate-500 font-bold mb-2 uppercase">Uptime</div><div id="sys-uptime" class="font-mono text-xl font-bold uppercase">...</div></div><div class="bg-white/5 p-6 border-l-2 border-neon-purple"><div class="text-[9px] text-slate-500 font-bold mb-2 uppercase">Memory</div><div id="sys-mem" class="font-mono text-xl font-bold uppercase">...</div></div><div class="bg-white/5 p-6 border-l-2 border-neon-green"><div class="text-[9px] text-slate-500 font-bold mb-2 uppercase">Status</div><div class="font-mono text-lg font-bold text-neon-green uppercase">Stable</div></div></div></div>
                     </div>
-
                     <div class="hud-border p-8 flex items-center justify-between">
-                        <div class="flex items-center gap-6">
-                            <div class="w-14 h-14 bg-neon-purple/10 flex items-center justify-center text-neon-purple text-2xl border border-neon-purple/20"><i class="fas fa-shield-virus"></i></div>
-                            <div>
-                                <h3 class="font-black italic text-xl">MAINTENANCE OVERRIDE</h3>
-                                <p class="text-xs text-slate-500 font-bold">GLOBAL COMMAND LOCKDOWN</p>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-6">
-                            <span id="maint-status" class="text-xs font-black px-6 py-2 border border-neon-green text-neon-green">OFFLINE</span>
-                            <button onclick="toggleMaintenance()" id="maint-btn" class="bg-white/5 px-8 py-3 font-black text-xs border border-white/10 hover:border-neon-purple transition-all">ACTIVATE</button>
-                        </div>
+                        <div class="flex items-center gap-6"><div class="w-14 h-14 bg-neon-purple/10 flex items-center justify-center text-neon-purple text-2xl border border-neon-purple/20"><i class="fas fa-shield-virus"></i></div><div><h3 class="font-black italic text-xl uppercase">Maintenance Override</h3><p class="text-xs text-slate-500 font-bold uppercase">Global Command Lockdown</p></div></div>
+                        <div class="flex items-center gap-6"><span id="maint-status" class="text-xs font-black px-6 py-2 border border-neon-green text-neon-green uppercase">Offline</span><button onclick="toggleMaintenance()" id="maint-btn" class="bg-white/5 px-8 py-3 font-black text-xs border border-white/10 hover:border-neon-purple transition-all uppercase">Activate</button></div>
                     </div>
                 </div>
 
-                <!-- ANALYSIS HUD -->
                 <div id="view-analytics" class="hidden space-y-8">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div class="hud-border p-10 text-center">
-                            <div class="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-4 uppercase">Retention Rate</div>
-                            <div id="ana-retention" class="text-6xl font-black italic text-neon-blue">0%</div>
-                        </div>
-                        <div class="hud-border p-10 text-center">
-                            <div class="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-4 uppercase">Weekly Active</div>
-                            <div id="ana-active-7" class="text-6xl font-black italic text-neon-green">0</div>
-                        </div>
-                        <div class="hud-border p-10 text-center">
-                            <div class="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-4 uppercase">Previous Active</div>
-                            <div id="ana-active-prev" class="text-6xl font-black italic text-slate-700">0</div>
-                        </div>
+                        <div class="hud-border p-10 text-center"><div class="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-4 uppercase">Retention</div><div id="ana-retention" class="text-6xl font-black italic text-neon-blue uppercase">0%</div></div>
+                        <div class="hud-border p-10 text-center"><div class="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-4 uppercase">Weekly Active</div><div id="ana-active-7" class="text-6xl font-black italic text-neon-green uppercase">0</div></div>
+                        <div class="hud-border p-10 text-center"><div class="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-4 uppercase">Prev Weekly</div><div id="ana-active-prev" class="text-6xl font-black italic text-slate-700 uppercase">0</div></div>
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div class="hud-border p-8">
-                            <h3 class="font-black italic text-sm mb-8 tracking-widest text-neon-blue uppercase">Word Velocity Map</h3>
-                            <div class="h-80"><canvas id="chart-velocity"></canvas></div>
-                        </div>
-                        <div class="hud-border p-8">
-                            <h3 class="font-black italic text-sm mb-8 tracking-widest text-neon-purple uppercase">Neural Load (Hours)</h3>
-                            <div class="h-80"><canvas id="chart-hours"></canvas></div>
-                        </div>
+                        <div class="hud-border p-8"><h3 class="font-black italic text-sm mb-8 tracking-widest text-neon-blue uppercase">Word Velocity Map</h3><div class="h-80"><canvas id="chart-velocity"></canvas></div></div>
+                        <div class="hud-border p-8"><h3 class="font-black italic text-sm mb-8 tracking-widest text-neon-purple uppercase">Neural Load (Hours)</h3><div class="h-80"><canvas id="chart-hours"></canvas></div></div>
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div class="hud-border p-8">
-                            <h3 class="font-black italic text-sm mb-8 text-neon-green tracking-widest uppercase">High Performance Nodes</h3>
-                            <table class="w-full"><tbody id="ana-growers"></tbody></table>
-                        </div>
-                        <div class="hud-border p-8">
-                            <h3 class="font-black italic text-sm mb-8 text-neon-purple tracking-widest uppercase">Node Population Density</h3>
-                            <table class="w-full"><tbody id="ana-groups"></tbody></table>
-                        </div>
+                        <div class="hud-border p-8"><h3 class="font-black italic text-sm mb-8 text-neon-green tracking-widest uppercase">High Performance Nodes</h3><table class="w-full"><tbody id="ana-growers"></tbody></table></div>
+                        <div class="hud-border p-8"><h3 class="font-black italic text-sm mb-8 text-neon-purple tracking-widest uppercase">Node Density</h3><table class="w-full"><tbody id="ana-groups"></tbody></table></div>
                     </div>
                 </div>
 
-                <!-- LIVE HUD -->
                 <div id="view-live" class="hidden space-y-8">
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        <div class="hud-border p-6 text-center">
-                            <div class="text-[9px] font-black text-slate-500 mb-2 uppercase tracking-widest">Global Words</div>
-                            <div id="live-words" class="text-3xl font-heading font-black italic">0</div>
-                        </div>
-                        <div class="hud-border p-6 text-center">
-                            <div class="text-[9px] font-black text-slate-500 mb-2 uppercase tracking-widest">Active Hunters</div>
-                            <div id="live-writers" class="text-3xl font-heading font-black italic">0</div>
-                        </div>
-                        <div class="hud-border p-6 text-center">
-                            <div class="text-[9px] font-black text-slate-500 mb-2 uppercase tracking-widest">Active Guilds</div>
-                            <div id="live-groups" class="text-3xl font-heading font-black italic">0</div>
-                        </div>
-                        <div class="hud-border p-6 text-center">
-                            <div class="text-[9px] font-black text-slate-500 mb-2 uppercase tracking-widest">Live Missions</div>
-                            <div id="live-active-sprints" class="text-3xl font-heading font-black italic text-neon-blue">0</div>
-                        </div>
+                        <div class="hud-border p-6 text-center"><div class="text-[9px] font-black text-slate-500 mb-2 uppercase tracking-widest">Global Words</div><div id="live-words" class="text-3xl font-heading font-black italic uppercase">0</div></div>
+                        <div class="hud-border p-6 text-center"><div class="text-[9px] font-black text-slate-500 mb-2 uppercase tracking-widest">Writers</div><div id="live-writers" class="text-3xl font-heading font-black italic uppercase">0</div></div>
+                        <div class="hud-border p-6 text-center"><div class="text-[9px] font-black text-slate-500 mb-2 uppercase tracking-widest">Groups</div><div id="live-groups" class="text-3xl font-heading font-black italic uppercase">0</div></div>
+                        <div class="hud-border p-6 text-center"><div class="text-[9px] font-black text-slate-500 mb-2 uppercase tracking-widest">Missions</div><div id="live-active-sprints" class="text-3xl font-heading font-black italic text-neon-blue uppercase">0</div></div>
                     </div>
-                    <div class="hud-border p-8">
-                        <h3 class="font-black italic text-sm mb-8 tracking-widest uppercase">Global Pulse Telemetry</h3>
-                        <div class="h-80"><canvas id="chart-pulse"></canvas></div>
-                    </div>
+                    <div class="hud-border p-8"><h3 class="font-black italic text-sm mb-8 tracking-widest uppercase">Global Pulse Telemetry</h3><div class="h-80"><canvas id="chart-pulse"></canvas></div></div>
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div class="hud-border p-8">
-                            <h3 class="text-xs font-black text-neon-blue mb-6 uppercase italic tracking-widest">Hall of Monarchs</h3>
-                            <div class="space-y-4" id="live-all-time"></div>
-                        </div>
-                        <div class="hud-border p-8">
-                            <h3 class="text-xs font-black text-neon-green mb-6 uppercase italic tracking-widest">Daily Elite</h3>
-                            <div class="space-y-4" id="live-today"></div>
-                        </div>
-                        <div class="hud-border p-8">
-                            <h3 class="text-xs font-black text-neon-purple mb-6 uppercase italic tracking-widest">Peak Guilds</h3>
-                            <div class="space-y-4" id="live-groups-list"></div>
-                        </div>
+                        <div class="hud-border p-8"><h3 class="text-xs font-black text-neon-blue mb-6 uppercase italic tracking-widest">Hall of Monarchs</h3><div class="space-y-4" id="live-all-time"></div></div>
+                        <div class="hud-border p-8"><h3 class="text-xs font-black text-neon-green mb-6 uppercase italic tracking-widest">Daily Elite</h3><div class="space-y-4" id="live-today"></div></div>
+                        <div class="hud-border p-8"><h3 class="text-xs font-black text-neon-purple mb-6 uppercase italic tracking-widest">Peak Guilds</h3><div class="space-y-4" id="live-groups-list"></div></div>
                     </div>
                 </div>
 
-                <!-- MISSIONS HUD -->
                 <div id="view-sprints" class="hidden space-y-8">
-                    <div class="flex justify-between items-center mb-8">
-                        <h3 class="font-black italic text-2xl text-neon-blue tracking-tighter uppercase">ACTIVE MISSIONS</h3>
-                    </div>
+                    <h3 class="font-black italic text-2xl text-neon-blue uppercase tracking-tighter">Active Missions</h3>
                     <div id="sprints-grid" class="grid grid-cols-1 md:grid-cols-2 gap-8"></div>
                 </div>
 
-                <!-- WRITERS HUD -->
                 <div id="view-writers" class="hidden space-y-8">
                     <div class="flex flex-col md:flex-row gap-6 mb-12">
-                        <div class="relative flex-1">
-                            <i class="fas fa-search absolute left-6 top-5 text-slate-500"></i>
-                            <input type="text" id="writer-search" onkeyup="searchWriters(this.value)" class="w-full bg-white/5 border border-white/10 pl-14 pr-6 py-5 rounded font-black italic uppercase tracking-widest text-sm outline-none focus:border-neon-blue" placeholder="SCAN DATABASE FOR NODES...">
-                        </div>
-                        <select id="writer-sort" onchange="loadWritersGrid()" class="bg-void border border-white/10 px-8 py-5 font-black text-xs uppercase tracking-widest outline-none">
-                            <option value="recent">RECENT ACTIVITY</option>
-                            <option value="words">TOTAL WORDS</option>
-                            <option value="name">NAME (A-Z)</option>
-                        </select>
+                        <div class="relative flex-1"><i class="fas fa-search absolute left-6 top-5 text-slate-500"></i><input type="text" id="writer-search" onkeyup="searchWriters(this.value)" class="w-full bg-white/5 border border-white/10 pl-14 pr-6 py-5 rounded font-black italic uppercase tracking-widest text-sm outline-none focus:border-neon-blue" placeholder="SCAN DATABASE..."></div>
+                        <select id="writer-sort" onchange="loadWritersGrid()" class="bg-void border border-white/10 px-8 py-5 font-black text-xs uppercase tracking-widest outline-none"><option value="recent">RECENT</option><option value="words">WORDS</option><option value="name">NAME</option></select>
                     </div>
                     <div id="writers-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"></div>
                 </div>
 
-                <!-- NODES HUD (GROUPS) -->
                 <div id="view-groups" class="hidden space-y-8">
-                    <div class="flex justify-between items-center mb-12">
-                        <h3 class="font-black italic text-2xl text-neon-green tracking-tighter uppercase">NODE NETWORK</h3>
-                        <button onclick="openJoinGroup()" class="bg-neon-green text-void px-8 py-3 font-black text-xs uppercase italic tracking-widest">JOIN NEW NODE</button>
-                    </div>
+                    <div class="flex justify-between items-center mb-12"><h3 class="font-black italic text-2xl text-neon-green uppercase tracking-tighter">Guild Network</h3><button onclick="openJoinGroup()" class="bg-neon-green text-void px-8 py-3 font-black text-xs uppercase italic tracking-widest">Join New Node</button></div>
                     <div id="groups-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8"></div>
                 </div>
 
-                <!-- BROADCAST HUD -->
                 <div id="view-broadcast" class="hidden space-y-8">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
                         <div class="hud-border p-10">
-                            <h3 class="font-black italic text-xl text-neon-blue mb-8 uppercase tracking-widest">Global Transmission</h3>
-                            <textarea id="bc-msg" rows="8" class="w-full bg-void/50 border border-white/10 p-6 mb-8 text-sm outline-none focus:border-neon-blue resize-none font-medium leading-relaxed" placeholder="Type transmission payload..."></textarea>
+                            <h3 class="font-black italic text-xl text-neon-blue mb-8 uppercase">Transmission</h3>
+                            <textarea id="bc-msg" rows="8" class="w-full bg-void/50 border border-white/10 p-6 mb-8 text-sm outline-none focus:border-neon-blue resize-none font-medium" placeholder="Payload..."></textarea>
                             <div id="bc-preview-cont" class="hidden mb-8 relative border border-white/10 p-1"><img id="bc-preview-img" class="w-full h-48 object-cover opacity-80"><button onclick="removeBCImage()" class="absolute top-4 right-4 bg-neon-red text-white w-10 h-10 flex items-center justify-center border border-white/20"><i class="fas fa-times"></i></button></div>
-                            <div class="flex gap-6">
-                                <input type="file" id="bc-file" class="hidden" onchange="previewBCImage(event)">
-                                <label for="bc-file" class="flex-1 border border-white/10 py-4 text-center text-xs font-black tracking-widest uppercase cursor-pointer hover:bg-white/5 transition-all">LOAD IMAGE</label>
-                                <button onclick="sendBroadcast()" class="flex-[1.5] bg-neon-blue text-void py-4 font-black italic tracking-widest uppercase hover:bg-white transition-all">FIRE BLAST</button>
-                            </div>
+                            <div class="flex gap-6"><input type="file" id="bc-file" class="hidden" onchange="previewBCImage(event)"><label for="bc-file" class="flex-1 border border-white/10 py-4 text-center text-xs font-black tracking-widest uppercase cursor-pointer">LOAD IMAGE</label><button onclick="sendBroadcast()" class="flex-[1.5] bg-neon-blue text-void py-4 font-black italic tracking-widest uppercase">FIRE BLAST</button></div>
                         </div>
                         <div class="hud-border p-10 flex flex-col">
-                            <div class="flex justify-between items-center mb-6">
-                                <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Target Nodes</h3>
-                                <button onclick="toggleAllTargets()" class="text-[10px] font-black text-neon-blue">TOGGLE ALL</button>
-                            </div>
-                            <input type="text" onkeyup="filterBCGroups(this.value)" class="bg-void border border-white/10 px-4 py-3 text-xs outline-none focus:border-neon-blue mb-6 font-bold" placeholder="SEARCH NODES...">
+                            <div class="flex justify-between items-center mb-6"><h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Targets</h3><button onclick="toggleAllTargets()" class="text-[10px] font-black text-neon-blue uppercase">Toggle All</button></div>
+                            <input type="text" onkeyup="filterBCGroups(this.value)" class="bg-void border border-white/10 px-4 py-3 text-xs outline-none focus:border-neon-blue mb-6 font-bold uppercase" placeholder="Search targets...">
                             <div id="bc-groups-list" class="flex-1 space-y-3 overflow-y-auto no-scrollbar max-h-[450px]"></div>
                         </div>
                     </div>
                 </div>
-
             </div>
         </main>
     </div>
@@ -368,46 +171,22 @@
     <div id="writer-drawer" class="fixed inset-y-0 right-0 w-full md:w-[500px] bg-void border-l border-neon-blue/30 z-[160] drawer overflow-y-auto no-scrollbar">
         <div class="p-10 space-y-10">
             <div class="flex justify-between items-start">
-                <div class="flex items-center gap-6">
-                    <div class="w-20 h-20 border-2 border-neon-blue text-neon-blue flex items-center justify-center text-3xl font-black italic" id="dr-avatar">?</div>
-                    <div>
-                        <h3 class="text-3xl font-black italic tracking-tighter uppercase" id="dr-name">...</h3>
-                        <p class="text-[10px] font-mono text-slate-500 mt-1" id="dr-id">...</p>
-                    </div>
-                </div>
+                <div class="flex items-center gap-6"><div class="w-20 h-20 border-2 border-neon-blue text-neon-blue flex items-center justify-center text-3xl font-black italic" id="dr-avatar">?</div><div><h3 class="text-3xl font-black italic tracking-tighter uppercase" id="dr-name">...</h3><p class="text-[10px] font-mono text-slate-500 mt-1" id="dr-id">...</p></div></div>
                 <button onclick="closeDrawer()" class="w-12 h-12 border border-white/10 flex items-center justify-center hover:border-neon-red"><i class="fas fa-times"></i></button>
             </div>
-
             <div class="grid grid-cols-3 gap-6">
-                <div class="bg-white/5 p-6 border-b-2 border-slate-700 text-center">
-                    <div class="text-2xl font-mono font-bold" id="dr-streak">0</div>
-                    <div class="text-[9px] font-black text-slate-500 mt-1 uppercase">Streak</div>
-                </div>
-                <div class="bg-white/5 p-6 border-b-2 border-slate-700 text-center">
-                    <div class="text-2xl font-mono font-bold" id="dr-best">0</div>
-                    <div class="text-[9px] font-black text-slate-500 mt-1 uppercase">Best</div>
-                </div>
-                <div class="bg-white/5 p-6 border-b-2 border-neon-blue text-center">
-                    <div class="text-2xl font-mono font-bold text-neon-blue" id="dr-total">0</div>
-                    <div class="text-[9px] font-black text-slate-500 mt-1 uppercase">Total</div>
-                </div>
+                <div class="bg-white/5 p-6 border-b-2 border-slate-700 text-center"><div class="text-2xl font-mono font-bold" id="dr-streak">0</div><div class="text-[9px] font-black text-slate-500 mt-1 uppercase">Streak</div></div>
+                <div class="bg-white/5 p-6 border-b-2 border-slate-700 text-center"><div class="text-2xl font-mono font-bold" id="dr-best">0</div><div class="text-[9px] font-black text-slate-500 mt-1 uppercase">Best</div></div>
+                <div class="bg-white/5 p-6 border-b-2 border-neon-blue text-center"><div class="text-2xl font-mono font-bold text-neon-blue" id="dr-total">0</div><div class="text-[9px] font-black text-slate-500 mt-1 uppercase">Total</div></div>
             </div>
-
-            <div class="hud-border p-8">
-                <h4 class="text-[10px] font-black italic mb-6 text-neon-blue uppercase tracking-widest">Neural Activity Log</h4>
-                <div class="h-48"><canvas id="chart-drawer"></canvas></div>
-            </div>
-
+            <div class="hud-border p-8"><h4 class="text-[10px] font-black italic mb-6 text-neon-blue uppercase tracking-widest">Neural activity</h4><div class="h-48"><canvas id="chart-drawer"></canvas></div></div>
             <div class="space-y-6">
-                <h4 class="text-[10px] font-black italic text-slate-600 uppercase tracking-widest">SYSTEM OVERRIDE</h4>
+                <h4 class="text-[10px] font-black italic text-slate-600 uppercase tracking-widest">System Override</h4>
                 <div class="grid grid-cols-2 gap-6">
-                    <button onclick="openFreezeGrant()" class="bg-neon-blue/10 border border-neon-blue/30 py-5 font-black text-xs italic tracking-widest text-neon-blue uppercase hover:bg-neon-blue hover:text-void transition-all">GRANT FREEZE</button>
-                    <button id="dr-ban-btn" class="bg-neon-red/10 border border-neon-red/30 py-5 font-black text-xs italic tracking-widest text-neon-red uppercase hover:bg-neon-red hover:text-void transition-all">BLOCK NODE</button>
+                    <button onclick="openFreezeGrant()" class="bg-neon-blue/10 border border-neon-blue/30 py-5 font-black text-xs italic tracking-widest text-neon-blue uppercase">Grant Freeze</button>
+                    <button id="dr-ban-btn" class="bg-neon-red/10 border border-neon-red/30 py-5 font-black text-xs italic tracking-widest text-neon-red uppercase">Block Node</button>
                 </div>
-                <div class="flex gap-4">
-                    <input type="text" id="dr-rename" class="flex-1 bg-white/5 border border-white/10 px-6 py-4 text-sm font-bold outline-none focus:border-neon-blue" placeholder="New display name">
-                    <button onclick="renameWriter()" class="border border-white/10 px-8 font-black text-[10px] uppercase hover:border-neon-blue transition-all">APPLY</button>
-                </div>
+                <div class="flex gap-4"><input type="text" id="dr-rename-val" class="flex-1 bg-white/5 border border-white/10 px-6 py-4 text-sm font-bold outline-none focus:border-neon-blue uppercase" placeholder="New Name"><button onclick="renameWriter()" class="border border-white/10 px-8 font-black text-[10px] uppercase">Apply</button></div>
             </div>
         </div>
     </div>
@@ -425,14 +204,7 @@
         let allGroups = [];
         let selectedWriterId = null;
 
-        function login() {
-            const pass = document.getElementById('admin-pass').value;
-            if (!pass) return;
-            token = pass;
-            localStorage.setItem('admin_key', pass);
-            location.reload();
-        }
-
+        function login() { const pass = document.getElementById('admin-pass').value; if (!pass) return; token = pass; localStorage.setItem('admin_key', pass); location.reload(); }
         function logout() { localStorage.removeItem('admin_key'); location.reload(); }
 
         async function api(endpoint, body, method = 'POST') {
@@ -440,16 +212,9 @@
             if (body) opts.body = JSON.stringify(body);
             try {
                 const res = await fetch(`${API_URL}${endpoint}`, opts);
-                if (res.status === 403) { 
-                    if (token) showToast("Access Denied", "error");
-                    logout(); return null; 
-                }
-                const json = await res.json();
-                return json;
-            } catch (e) { 
-                showToast("Connection Interrupted", "error");
-                return null; 
-            }
+                if (res.status === 403) { logout(); return null; }
+                return await res.json();
+            } catch (e) { showToast("Connection interrupted", "error"); return null; }
         }
 
         function switchTab(tab) {
@@ -459,7 +224,7 @@
             if (navBtn) navBtn.classList.add('active');
             document.getElementById(`view-${tab}`).classList.remove('hidden');
             document.getElementById('view-title').textContent = tab.toUpperCase();
-            document.getElementById('view-indicator').textContent = `ACCESSING ${tab.toUpperCase()} MODULE...`;
+            document.getElementById('view-indicator').textContent = `Accessing ${tab.toUpperCase()} module...`;
             currentTab = tab;
             loadTabData();
         }
@@ -474,95 +239,46 @@
             if (currentTab === 'broadcast') loadBCGroups();
         }
 
-        function refreshData() {
-            showToast("Syncing System Data...");
-            loadTabData();
-        }
-
-        // --- View Handlers ---
+        function refreshData() { showToast("Syncing data..."); loadTabData(); }
 
         async function loadOverview() {
             const stats = await api('/api/stats', null, 'GET');
             const sys = await api('/api/admin/system', null, 'GET');
-            
             const conn = document.getElementById('conn-display');
-            if (stats?.isConnected) {
-                conn.innerHTML = `<i class="fas fa-satellite-dish text-neon-green text-5xl mb-6"></i><span class="font-black italic tracking-widest text-2xl text-neon-green">SYSTEM ONLINE</span>`;
-            } else if (stats?.qrCode) {
-                conn.innerHTML = `<img src="${stats.qrCode}" class="w-40 h-40 mb-4 p-3 bg-white rounded border-4 border-neon-blue"><span class="text-[10px] text-neon-blue font-black tracking-widest uppercase">SCAN TO LINK NODE</span>`;
-            } else {
-                conn.innerHTML = `<i class="fas fa-satellite-dish text-slate-800 text-5xl mb-6"></i><span class="font-black italic tracking-widest text-2xl text-slate-700">WAITING...</span>`;
-            }
-
-            document.getElementById('sys-uptime').textContent = sys?.uptime ? `${Math.floor(sys.uptime / 3600)}H ${Math.floor((sys.uptime % 3600) / 60)}M` : '0.00S';
+            if (stats?.isConnected) conn.innerHTML = `<i class="fas fa-satellite-dish text-neon-green text-5xl mb-6"></i><span class="font-black italic text-2xl text-neon-green uppercase">System Online</span>`;
+            else if (stats?.qrCode) conn.innerHTML = `<img src="${stats.qrCode}" class="w-40 h-40 mb-4 p-3 bg-white rounded border-4 border-neon-blue"><span class="text-[10px] text-neon-blue font-black tracking-widest uppercase">Scan to link</span>`;
+            document.getElementById('sys-uptime').textContent = sys?.uptime ? `${Math.floor(sys.uptime/3600)}H ${Math.floor((sys.uptime%3600)/60)}M` : '...';
             document.getElementById('sys-mem').textContent = `${sys?.memory || 0} MB`;
-            
             const maint = sys?.maintenance;
             const mStat = document.getElementById('maint-status');
-            mStat.textContent = maint ? 'ACTIVE' : 'OFFLINE';
-            mStat.className = `text-xs font-black px-6 py-2 border ${maint ? 'border-neon-red text-neon-red' : 'border-neon-green text-neon-green'}`;
-            document.getElementById('maint-btn').textContent = maint ? 'DEACTIVATE' : 'ACTIVATE';
+            mStat.textContent = maint ? 'Active' : 'Offline';
+            mStat.className = `text-xs font-black px-6 py-2 border ${maint ? 'border-neon-red text-neon-red' : 'border-neon-green text-neon-green'} uppercase`;
+            document.getElementById('maint-btn').textContent = maint ? 'Deactivate' : 'Activate';
         }
 
         async function loadAnalytics() {
             const data = await api('/api/admin/analytics', null, 'GET');
             if (!data) return;
-
             document.getElementById('ana-retention').textContent = `${data.retentionRate || 0}%`;
             document.getElementById('ana-active-7').textContent = data.activeThisWeek || 0;
             document.getElementById('ana-active-prev').textContent = data.activeLastWeek || 0;
-
             renderVelocityChart(data.wordsByDay);
             renderHoursChart(data.wordsByHour);
-            
-            document.getElementById('ana-growers').innerHTML = (data.growers || []).map(g => `
-                <tr class="border-b border-white/5">
-                    <td class="py-4 font-bold text-sm italic">${g.name}</td>
-                    <td class="py-4 text-right font-mono text-neon-blue">${g.thisWeek.toLocaleString()}</td>
-                    <td class="py-4 text-right text-neon-green font-black">↑ ${g.growth.toLocaleString()}</td>
-                </tr>
-            `).join('');
-
-            document.getElementById('ana-groups').innerHTML = (data.groupBreakdown || []).map(g => `
-                <tr class="border-b border-white/5">
-                    <td class="py-4 font-bold text-sm italic">${g.name}</td>
-                    <td class="py-4 text-right text-slate-500 font-bold">${g.writers} HUNTERS</td>
-                    <td class="py-4 text-right font-mono text-neon-purple font-bold">${g.words.toLocaleString()}</td>
-                </tr>
-            `).join('');
+            document.getElementById('ana-growers').innerHTML = (data.growers || []).map(g => `<tr class="border-b border-white/5"><td class="py-4 font-bold text-sm italic">${g.name}</td><td class="py-4 text-right font-mono text-neon-blue">${g.thisWeek.toLocaleString()}</td><td class="py-4 text-right text-neon-green font-black uppercase">↑ ${g.growth.toLocaleString()}</td></tr>`).join('');
+            document.getElementById('ana-groups').innerHTML = (data.groupBreakdown || []).map(g => `<tr class="border-b border-white/5"><td class="py-4 font-bold text-sm italic">${g.name}</td><td class="py-4 text-right text-slate-500 font-bold uppercase">${g.writers} Hunters</td><td class="py-4 text-right font-mono text-neon-purple font-bold">${g.words.toLocaleString()}</td></tr>`).join('');
         }
 
         async function loadLive() {
             const data = await api('/api/stats', null, 'GET');
             if (!data) return;
-
             document.getElementById('live-words').textContent = (data.totalWords || 0).toLocaleString();
             document.getElementById('live-writers').textContent = data.totalWriters || 0;
             document.getElementById('live-groups').textContent = data.totalGroups || 0;
             document.getElementById('live-active-sprints').textContent = data.activeSprintsCount || 0;
-
             renderPulseChart(data.chartData);
-
-            document.getElementById('live-all-time').innerHTML = (data.topWriters || []).slice(0, 6).map((u, i) => `
-                <div class="flex justify-between items-center p-4 bg-white/5 border-l-2 border-neon-blue">
-                    <span class="text-xs font-black italic uppercase"><span class="text-slate-500 mr-2">0${i+1}</span> ${u.name}</span>
-                    <span class="font-mono text-[10px] text-neon-blue font-bold">${u.words.toLocaleString()}</span>
-                </div>
-            `).join('');
-            
-            document.getElementById('live-today').innerHTML = (data.todayWriters || []).slice(0, 6).map((u, i) => `
-                <div class="flex justify-between items-center p-4 bg-white/5 border-l-2 border-neon-green">
-                    <span class="text-xs font-black italic uppercase"><span class="text-slate-500 mr-2">0${i+1}</span> ${u.name}</span>
-                    <span class="font-mono text-[10px] text-neon-green font-bold">${u.words.toLocaleString()}</span>
-                </div>
-            `).join('') || '<p class="text-center text-[10px] text-slate-600 py-6 font-black tracking-widest">SCANNING FOR NEW DATA...</p>';
-
-            document.getElementById('live-groups-list').innerHTML = (data.topGroups || []).slice(0, 6).map((g, i) => `
-                <div class="flex justify-between items-center p-4 bg-white/5 border-l-2 border-neon-purple">
-                    <span class="text-xs font-black italic uppercase truncate pr-4">${g.name}</span>
-                    <span class="font-mono text-[10px] text-neon-purple font-bold">${g.words.toLocaleString()}</span>
-                </div>
-            `).join('');
+            document.getElementById('live-all-time').innerHTML = (data.topWriters || []).slice(0, 6).map((u, i) => `<div class="flex justify-between items-center p-4 bg-white/5 border-l-2 border-neon-blue"><span class="text-xs font-black italic uppercase"><span class="text-slate-500 mr-2">0${i+1}</span> ${u.name}</span><span class="font-mono text-[10px] text-neon-blue font-bold">${u.words.toLocaleString()}</span></div>`).join('');
+            document.getElementById('live-today').innerHTML = (data.todayWriters || []).slice(0, 6).map((u, i) => `<div class="flex justify-between items-center p-4 bg-white/5 border-l-2 border-neon-green"><span class="text-xs font-black italic uppercase"><span class="text-slate-500 mr-2">0${i+1}</span> ${u.name}</span><span class="font-mono text-[10px] text-neon-green font-bold">${u.words.toLocaleString()}</span></div>`).join('') || '<p class="text-center text-[10px] text-slate-600 py-6 uppercase font-black">Waiting for activity...</p>';
+            document.getElementById('live-groups-list').innerHTML = (data.topGroups || []).slice(0, 6).map((g, i) => `<div class="flex justify-between items-center p-4 bg-white/5 border-l-2 border-neon-purple"><span class="text-xs font-black italic uppercase truncate pr-4">${g.name}</span><span class="font-mono text-[10px] text-neon-purple font-bold">${g.words.toLocaleString()}</span></div>`).join('');
         }
 
         async function loadSprints() {
@@ -572,19 +288,17 @@
                     <div class="hud-corner hud-corner-tl"></div>
                     <div class="flex justify-between items-start">
                         <div class="min-w-0">
-                            <div class="font-black italic text-xl text-neon-blue mb-1 uppercase tracking-tighter truncate">${s.name}</div>
-                            <div class="text-[9px] font-black text-slate-500 tracking-[0.2em] mb-4">NODE ID: ${s.id.split('@')[0]}</div>
+                            <div class="font-black italic text-xl text-neon-blue mb-1 uppercase truncate">${s.name}</div>
+                            <div class="text-[9px] font-black text-slate-500 tracking-[0.2em] mb-4">NODE: ${s.id.split('@')[0]}</div>
                             <div class="flex items-center gap-6">
                                 <div><div class="text-[8px] font-black text-slate-600 mb-1 uppercase">Hunters</div><div class="font-mono font-bold text-sm">${s.participants}</div></div>
-                                <div><div class="text-[8px] font-black text-slate-600 mb-1 uppercase">Time Left</div><div class="font-mono font-bold text-sm text-neon-purple">${s.timeLeft}M</div></div>
+                                <div><div class="text-[8px] font-black text-slate-600 mb-1 uppercase">Time</div><div class="font-mono font-bold text-sm text-neon-purple">${s.timeLeft}M</div></div>
                             </div>
                         </div>
-                        <button onclick="stopMission('${s.id}')" class="w-14 h-14 border border-neon-red/30 text-neon-red flex items-center justify-center hover:bg-neon-red hover:text-void transition-all">
-                            <i class="fas fa-stop-circle"></i>
-                        </button>
+                        <button onclick="stopMission('${s.id}')" class="w-14 h-14 border border-neon-red/30 text-neon-red flex items-center justify-center hover:bg-neon-red hover:text-void"><i class="fas fa-stop-circle"></i></button>
                     </div>
                 </div>
-            `).join('') || '<div class="col-span-full text-center py-24 text-slate-700 font-black tracking-[0.5em] italic">NO ACTIVE MISSIONS DETECTED</div>';
+            `).join('') || '<div class="col-span-full text-center py-24 text-slate-700 font-black uppercase">No missions active</div>';
         }
 
         async function loadWritersGrid() {
@@ -595,15 +309,9 @@
             if (sort === 'words') list.sort((a,b) => b.totalWords - a.totalWords);
             if (sort === 'name') list.sort((a,b) => a.name.localeCompare(b.name));
             document.getElementById('writers-grid').innerHTML = list.map(u => `
-                <div class="hud-border p-6 cursor-pointer group hover:border-neon-blue/40 transition-all" onclick="openWriterDrawer('${u._id}')">
-                    <div class="flex items-center gap-4 mb-6">
-                        <div class="w-12 h-12 border border-neon-blue flex items-center justify-center font-black text-neon-blue italic text-lg bg-neon-blue/5">${u.name.charAt(0).toUpperCase()}</div>
-                        <div class="min-w-0"><div class="font-black text-sm uppercase italic tracking-tighter truncate">${u.name}</div><div class="text-[9px] font-mono text-slate-600 mt-0.5">${u._id.split('@')[0]}</div></div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-white/5 p-4 border-b border-slate-700"><div class="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">TOTAL</div><div class="text-sm font-mono font-black">${(u.trueTotal || u.totalWords).toLocaleString()}</div></div>
-                        <div class="bg-white/5 p-4 border-b border-neon-green/30"><div class="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">STREAK</div><div class="text-sm font-mono font-black text-neon-green">${u.streak || 0}🔥</div></div>
-                    </div>
+                <div class="hud-border p-6 cursor-pointer" onclick="openWriterDrawer('${u._id}')">
+                    <div class="flex items-center gap-4 mb-6"><div class="w-12 h-12 border border-neon-blue flex items-center justify-center font-black text-neon-blue italic text-lg bg-neon-blue/5 uppercase">${u.name.charAt(0)}</div><div class="min-w-0"><div class="font-black text-sm uppercase italic truncate">${u.name}</div><div class="text-[9px] font-mono text-slate-600">${u._id.split('@')[0]}</div></div></div>
+                    <div class="grid grid-cols-2 gap-4"><div class="bg-white/5 p-4 border-b border-slate-700"><div class="text-[8px] font-black text-slate-500 uppercase mb-1">Total</div><div class="text-sm font-mono font-black">${(u.trueTotal || u.totalWords).toLocaleString()}</div></div><div class="bg-white/5 p-4 border-b border-neon-green/30"><div class="text-[8px] font-black text-slate-500 uppercase mb-1">Streak</div><div class="text-sm font-mono font-black text-neon-green">${u.streak || 0}🔥</div></div></div>
                 </div>
             `).join('');
         }
@@ -612,74 +320,41 @@
             const data = await api('/api/admin/groups', null, 'GET');
             document.getElementById('groups-grid').innerHTML = (data || []).map(g => `
                 <div class="hud-border p-8">
-                    <div class="flex justify-between items-start mb-8">
-                        <div class="min-w-0"><div class="font-black italic text-lg uppercase tracking-tighter truncate">${g.name}</div><div class="text-[9px] text-slate-500 font-mono mt-1">${g.participants} HUNTERS</div></div>
-                        <span class="w-3 h-3 border border-white/20 ${g.health === 'Active' ? 'bg-neon-green' : g.health === 'Quiet' ? 'bg-yellow-500' : 'bg-slate-700'}"></span>
-                    </div>
+                    <div class="flex justify-between items-start mb-8"><div class="min-w-0"><div class="font-black italic text-lg uppercase truncate">${g.name}</div><div class="text-[9px] text-slate-500 font-mono mt-1 uppercase">${g.participants} Hunters</div></div><span class="w-3 h-3 border border-white/20 ${g.health === 'Active' ? 'bg-neon-green' : g.health === 'Quiet' ? 'bg-yellow-500' : 'bg-slate-700'}"></span></div>
                     <div class="xp-bar mb-8"><div class="xp-fill" style="width: ${Math.min(100, (g.weekWords/5000)*100)}%"></div></div>
                     <div class="flex gap-3">
-                        <button onclick="testComms('${g.id}')" class="flex-1 py-3 bg-white/5 border border-white/10 text-[10px] font-black tracking-widest uppercase hover:border-neon-blue">TEST PING</button>
+                        <button onclick="testComms('${g.id}')" class="flex-1 py-3 bg-white/5 border border-white/10 text-[10px] font-black uppercase">Test Ping</button>
                         <button onclick="confirmLeaveGroup('${g.id}')" class="w-12 border border-neon-red/30 text-neon-red flex items-center justify-center"><i class="fas fa-sign-out-alt"></i></button>
                     </div>
                 </div>
             `).join('');
         }
 
-        async function loadBCGroups() {
-            const data = await api('/api/admin/groups', null, 'GET');
-            allGroups = data || [];
-            renderBCGroups();
-        }
-
+        async function loadBCGroups() { const data = await api('/api/admin/groups', null, 'GET'); allGroups = data || []; renderBCGroups(); }
         function renderBCGroups(filter = '') {
             const list = document.getElementById('bc-groups-list');
-            list.innerHTML = allGroups.filter(g => g.name.toLowerCase().includes(filter.toLowerCase())).map(g => `
-                <label class="flex items-center justify-between p-4 bg-white/5 border border-white/5 cursor-pointer hover:border-neon-blue/30 group">
-                    <div class="flex items-center gap-4 min-w-0">
-                        <input type="checkbox" name="bc-target" value="${g.id}" class="sr-only peer">
-                        <div class="w-6 h-6 border border-white/20 peer-checked:bg-neon-blue peer-checked:border-neon-blue flex items-center justify-center transition-all"><i class="fas fa-check text-[10px] text-void opacity-0 peer-checked:opacity-100"></i></div>
-                        <span class="text-xs font-black italic uppercase truncate">${g.name}</span>
-                    </div>
-                </label>
-            `).join('');
+            list.innerHTML = allGroups.filter(g => g.name.toLowerCase().includes(filter.toLowerCase())).map(g => `<label class="flex items-center justify-between p-4 bg-white/5 border border-white/5 cursor-pointer hover:border-neon-blue/30 group"><div class="flex items-center gap-4 min-w-0"><input type="checkbox" name="bc-target" value="${g.id}" class="sr-only peer"><div class="w-6 h-6 border border-white/20 peer-checked:bg-neon-blue peer-checked:border-neon-blue flex items-center justify-center transition-all"><i class="fas fa-check text-[10px] text-void opacity-0 peer-checked:opacity-100"></i></div><span class="text-xs font-black italic uppercase truncate">${g.name}</span></div></label>`).join('');
         }
 
-        function renderPulseChart(data) {
-            const ctx = document.getElementById('chart-pulse').getContext('2d');
-            if (charts.pulse) charts.pulse.destroy();
-            charts.pulse = new Chart(ctx, { type: 'line', data: { labels: data?.labels || [], datasets: [{ label: 'FLOW', data: data?.data || [], borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false, beginAtZero: true }, x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 10, family: 'JetBrains Mono' } } } } } });
-        }
-
-        function renderVelocityChart(data) {
-            const ctx = document.getElementById('chart-velocity').getContext('2d');
-            if (charts.velocity) charts.velocity.destroy();
-            charts.velocity = new Chart(ctx, { type: 'bar', data: { labels: data?.labels || [], datasets: [{ data: data?.data || [], backgroundColor: '#38bdf8' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#475569', font: { size: 9 } } } } } });
-        }
-
-        function renderHoursChart(data) {
-            const ctx = document.getElementById('chart-hours').getContext('2d');
-            if (charts.hours) charts.hours.destroy();
-            charts.hours = new Chart(ctx, { type: 'line', data: { labels: (data || []).map(d => d.hour + ':00'), datasets: [{ data: (data || []).map(d => d.total), borderColor: '#a855f7', tension: 0.4, borderWidth: 2, pointRadius: 2, pointBackgroundColor: '#a855f7' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#475569', font: { size: 9 } } } } } });
-        }
-
-        function renderDrawerChart(data) {
-            const ctx = document.getElementById('chart-drawer').getContext('2d');
-            if (charts.drawer) charts.drawer.destroy();
-            charts.drawer = new Chart(ctx, { type: 'line', data: { labels: data?.labels || [], datasets: [{ data: data?.data || [], borderColor: '#38bdf8', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: true, backgroundColor: 'rgba(56, 189, 248, 0.05)' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } });
-        }
+        function renderPulseChart(data) { const ctx = document.getElementById('chart-pulse').getContext('2d'); if (charts.pulse) charts.pulse.destroy(); charts.pulse = new Chart(ctx, { type: 'line', data: { labels: data?.labels || [], datasets: [{ label: 'FLOW', data: data?.data || [], borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false, beginAtZero: true }, x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 10, family: 'JetBrains Mono' } } } } } }); }
+        function renderVelocityChart(data) { const ctx = document.getElementById('chart-velocity').getContext('2d'); if (charts.velocity) charts.velocity.destroy(); charts.velocity = new Chart(ctx, { type: 'bar', data: { labels: data?.labels || [], datasets: [{ data: data?.data || [], backgroundColor: '#38bdf8' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#475569', font: { size: 9 } } } } } }); }
+        function renderHoursChart(data) { const ctx = document.getElementById('chart-hours').getContext('2d'); if (charts.hours) charts.hours.destroy(); charts.hours = new Chart(ctx, { type: 'line', data: { labels: (data || []).map(d => d.hour + ':00'), datasets: [{ data: (data || []).map(d => d.total), borderColor: '#a855f7', tension: 0.4, borderWidth: 2, pointRadius: 2, pointBackgroundColor: '#a855f7' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#475569', font: { size: 9 } } } } } }); }
+        function renderDrawerChart(data) { const ctx = document.getElementById('chart-drawer').getContext('2d'); if (charts.drawer) charts.drawer.destroy(); charts.drawer = new Chart(ctx, { type: 'line', data: { labels: data?.labels || [], datasets: [{ data: data?.data || [], borderColor: '#38bdf8', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: true, backgroundColor: 'rgba(56, 189, 248, 0.05)' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } }); }
 
         async function openWriterDrawer(id) {
             selectedWriterId = id;
-            const list = await api('/api/admin/search', { query: id });
-            if (!list) return;
-            const u = list.find(x => x._id === id);
-            if (!u) return;
+            const res = await api('/api/admin/search', { query: id, exact: true });
+            if (!res || res.length === 0) return;
+            const u = res[0];
             document.getElementById('dr-name').textContent = u.name;
             document.getElementById('dr-id').textContent = u._id;
             document.getElementById('dr-avatar').textContent = u.name.charAt(0).toUpperCase();
             document.getElementById('dr-streak').textContent = u.streak || 0;
             document.getElementById('dr-best').textContent = u.bestStreak || 0;
             document.getElementById('dr-total').textContent = (u.trueTotal || u.totalWords).toLocaleString();
+            const bBtn = document.getElementById('dr-ban-btn');
+            bBtn.textContent = u.isBanned ? 'UNBLOCK' : 'BLOCK';
+            bBtn.onclick = () => toggleBan(u._id, u.isBanned);
             document.getElementById('drawer-overlay').classList.remove('hidden');
             document.getElementById('writer-drawer').classList.add('open');
             const history = await api(`/api/admin/writer/${encodeURIComponent(id)}/history`, null, 'GET');
@@ -687,14 +362,22 @@
         }
 
         function closeDrawer() { document.getElementById('drawer-overlay').classList.add('hidden'); document.getElementById('writer-drawer').classList.remove('open'); }
-        async function stopMission(chatId) { if (!confirm("Terminate mission?")) return; const res = await api('/api/admin/sprints/stop', { chatId }); if (res?.success) { showToast("TERMINATED"); loadSprints(); } }
-        async function toggleMaintenance() { const stats = await api('/api/admin/system', null, 'GET'); const res = await api('/api/admin/maintenance', { status: !stats?.maintenance }); if (res) { showToast(`SYSTEM LOCKDOWN ${res.status ? 'ENGAGED' : 'RELEASED'}`); loadOverview(); } }
-        function openFreezeGrant() { showModal(`<h3 class="font-black italic text-xl mb-6 text-neon-blue uppercase">GRANT FREEZE</h3><input type="number" id="mod-freeze-val" value="1" min="1" class="w-full bg-void border border-white/10 p-6 rounded text-center text-3xl font-mono mb-8 outline-none focus:border-neon-blue"><div class="flex gap-4"><button onclick="closeModal()" class="flex-1 py-4 border border-white/10 font-black text-[10px] uppercase">ABORT</button><button onclick="grantFreeze()" class="flex-1 py-4 bg-neon-blue text-void font-black italic uppercase">CONFIRM</button></div>`); }
-        async function grantFreeze() { const amount = document.getElementById('mod-freeze-val').value; const res = await api('/api/admin/writers/freeze', { userId: selectedWriterId, amount }); if (res?.success) { showToast(`GRANTED ${amount} SHIELDS`); closeModal(); } }
+        async function stopMission(chatId) { if (!confirm("Stop mission?")) return; const res = await api('/api/admin/sprints/stop', { chatId }); if (res?.success) { showToast("MISSION STOPPED"); loadSprints(); } }
+        async function toggleMaintenance() { const stats = await api('/api/admin/system', null, 'GET'); const res = await api('/api/admin/maintenance', { status: !stats?.maintenance }); if (res) { showToast(`MAINTENANCE ${res.status ? 'ON' : 'OFF'}`); loadOverview(); } }
+        
+        function openJoinGroup() { showModal(`<h3 class="font-black italic text-xl mb-6 text-neon-green uppercase">Link New Node</h3><input type="text" id="invite-code" class="w-full bg-void border border-white/10 p-6 rounded text-sm mb-8 outline-none focus:border-neon-green uppercase" placeholder="Invite link or code"><div class="flex gap-4"><button onclick="closeModal()" class="flex-1 py-4 border border-white/10 font-black text-[10px] uppercase">Abort</button><button onclick="joinGroup()" class="flex-1 py-4 bg-neon-green text-void font-black italic uppercase">Connect</button></div>`); }
+        async function joinGroup() { const code = document.getElementById('invite-code').value; const res = await api('/api/admin/groups/accept', { inviteCode: code }); if (res?.success) { showToast("NODE CONNECTED"); closeModal(); loadGroups(); } }
+        async function testComms(chatId) { const res = await api('/api/admin/broadcast', { targetGroups: [chatId], message: "System Ping: Connection Stable." }); if (res?.success) showToast("PING DELIVERED"); }
+        function confirmLeaveGroup(chatId) { showModal(`<h3 class="font-black italic text-xl mb-6 text-neon-red uppercase tracking-tighter">Terminate Node?</h3><p class="text-[10px] font-black text-slate-500 mb-8 uppercase">Disconnect bot from guild ${chatId.split('@')[0]}</p><div class="flex gap-4"><button onclick="closeModal()" class="flex-1 py-4 border border-white/10 font-black text-[10px] uppercase">Abort</button><button onclick="leaveGroup('${chatId}')" class="flex-1 py-4 bg-neon-red text-void font-black italic uppercase">Disconnect</button></div>`); }
+        async function leaveGroup(chatId) { const res = await api('/api/admin/groups/leave', { chatId }); if (res?.success) { showToast("NODE DISCONNECTED"); closeModal(); loadGroups(); } }
+        async function renameWriter() { const name = document.getElementById('dr-rename-val').value; if (!name) return; const res = await api('/api/admin/update', { userId: selectedWriterId, type: 'name', name }); if (res?.success) { showToast("NAME REWRITTEN"); document.getElementById('dr-name').textContent = name; } }
+        async function toggleBan(userId, isBanned) { const res = await api('/api/admin/ban', { userId, action: isBanned ? 'unban' : 'ban' }); if (res?.success) { showToast(isBanned ? "NODE UNBLOCKED" : "NODE BLOCKED"); openWriterDrawer(userId); } }
+        function openFreezeGrant() { showModal(`<h3 class="font-black italic text-xl mb-6 text-neon-blue uppercase">Grant Freeze</h3><input type="number" id="mod-freeze-val" value="1" min="1" class="w-full bg-void border border-white/10 p-6 rounded text-center text-3xl font-mono mb-8 outline-none focus:border-neon-blue"><div class="flex gap-4"><button onclick="closeModal()" class="flex-1 py-4 border border-white/10 font-black text-[10px] uppercase">Abort</button><button onclick="grantFreeze()" class="flex-1 py-4 bg-neon-blue text-void font-black italic uppercase">Confirm</button></div>`); }
+        async function grantFreeze() { const amount = document.getElementById('mod-freeze-val').value; const res = await api('/api/admin/writers/freeze', { userId: selectedWriterId, amount }); if (res?.success) { showToast(`GRANTED ${amount} FREEZES`); closeModal(); } }
         async function sendBroadcast() { const msg = document.getElementById('bc-msg').value; const targets = Array.from(document.querySelectorAll('input[name="bc-target"]:checked')).map(cb => cb.value); const img = document.getElementById('bc-preview-img').src; if (!msg && !img) return showToast("NO PAYLOAD", "error"); const res = await api('/api/admin/broadcast', { message: msg, image: img.startsWith('data') ? img : null, targetGroups: targets }); if (res?.success) { showToast(`BLAST DELIVERED`); document.getElementById('bc-msg').value = ''; removeBCImage(); } }
         function showModal(html) { document.getElementById('modal-content').innerHTML = html; document.getElementById('modal-container').classList.remove('hidden'); }
         function closeModal() { document.getElementById('modal-container').classList.add('hidden'); }
-        function showToast(msg, type = 'success') { const t = document.createElement('div'); t.className = `fixed top-8 right-8 px-8 py-4 sys-toast font-black italic text-xs z-[500] ${type==='success'?'text-neon-blue':'text-neon-red border-neon-red'}`; t.innerHTML = `<div class="text-[8px] opacity-50 mb-1 tracking-[0.2em]">SYSTEM NOTIFICATION</div><div>${msg.toUpperCase()}</div>`; document.body.appendChild(t); setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 3500); }
+        function showToast(msg, type = 'success') { const t = document.createElement('div'); t.className = `fixed top-8 right-8 px-8 py-4 sys-toast font-black italic text-xs z-[500] ${type==='success'?'text-neon-blue':'text-neon-red border-neon-red'}`; t.innerHTML = `<div class="text-[8px] opacity-50 mb-1 tracking-[0.2em]">System Notification</div><div>${msg.toUpperCase()}</div>`; document.body.appendChild(t); setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 3500); }
         function previewBCImage(e) { const reader = new FileReader(); reader.onload = ev => { document.getElementById('bc-preview-img').src = ev.target.result; document.getElementById('bc-preview-cont').classList.remove('hidden'); }; reader.readAsDataURL(e.target.files[0]); }
         function removeBCImage() { document.getElementById('bc-preview-cont').classList.add('hidden'); document.getElementById('bc-preview-img').src = ''; }
         if (token) { document.getElementById('auth-modal').classList.add('hidden'); document.getElementById('app').classList.remove('hidden'); switchTab('overview'); }

@@ -207,7 +207,11 @@ router.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
 // Writers: all matching query, no .limit()
 router.post('/api/admin/search', requireAdmin, async (req, res) => {
     try {
-        const profiles = await UserProfile.find({ name: { $regex: req.body.query || '', $options: 'i' } });
+        const { query, exact } = req.body;
+        let filter = { $or: [{ name: { $regex: query || '', $options: 'i' } }, { userId: { $regex: query || '', $options: 'i' } }] };
+        if (exact) filter = { userId: query };
+
+        const profiles = await UserProfile.find(filter);
         const enriched = await Promise.all(profiles.map(async p => {
             const isBanned = await Blacklist.exists({ userId: p.userId });
             return {
