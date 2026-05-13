@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint Bot - Moderator Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+                    colors: { glass: "rgba(255, 255, 255, 0.7)" }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .dark .glass-panel {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-300">
+
+    <div id="auth-modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="glass-panel p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center mx-4">
+            <div class="mb-6 inline-block p-4 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 text-4xl shadow-lg">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-2">Moderator Access</h2>
+            <p class="text-sm text-gray-500 mb-6">Please verify your identity.</p>
+            <input type="password" id="admin-pass" placeholder="Access Key" class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl mb-4 focus:ring-2 focus:ring-indigo-500 outline-none">
+            <button onclick="login()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition">Login</button>
+        </div>
+    </div>
+
+    <div id="app" class="hidden flex flex-col min-h-screen">
+        
+        <nav class="glass-panel sticky top-4 mx-4 rounded-2xl z-40 shadow-lg mt-4 px-6 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-indigo-500 flex items-center justify-center text-white shadow-md">
+                    <i class="fas fa-user-shield text-lg"></i>
+                </div>
+                <div>
+                    <span class="font-bold text-lg tracking-tight block leading-none">Sprint Bot</span>
+                    <span class="text-[10px] font-mono text-indigo-500 uppercase font-bold tracking-wider">Moderator</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button onclick="switchTab('sprints')" id="tab-sprints" class="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-50 text-indigo-600">Sprints</button>
+                <button onclick="switchTab('writers')" id="tab-writers" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-indigo-600">Writers</button>
+                <div class="h-6 w-px bg-gray-200 dark:bg-slate-700 mx-2"></div>
+                <button onclick="toggleTheme()" class="w-9 h-9 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center text-gray-500"><i class="fas fa-moon"></i></button>
+                <button onclick="logout()" class="w-9 h-9 rounded-full bg-red-50 text-red-500 flex items-center justify-center"><i class="fas fa-power-off"></i></button>
+            </div>
+        </nav>
+
+        <main class="container mx-auto px-4 py-8 max-w-5xl flex-1">
+
+            <div id="view-sprints" class="space-y-6">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-stopwatch text-indigo-500"></i> Active Sprints</h2>
+                    <button onclick="loadSprints()" class="text-sm font-bold text-indigo-500 hover:underline"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
+                
+                <div id="sprints-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    </div>
+
+                <div class="mt-8">
+                    <h2 class="text-xl font-bold mb-4 text-gray-500 uppercase text-xs tracking-wider">Scheduled Queue</h2>
+                    <div id="scheduled-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        </div>
+                </div>
+            </div>
+
+            <div id="view-writers" class="hidden space-y-6">
+                <div class="flex gap-4">
+                    <div class="relative flex-1">
+                        <i class="fas fa-search absolute left-4 top-3.5 text-gray-400"></i>
+                        <input type="text" id="dash-search" placeholder="Search for a user..." onkeyup="filterWriterCards()"
+                            class="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
+                    </div>
+                    <button onclick="loadWritersGrid()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 rounded-xl font-bold transition shadow-lg shadow-indigo-500/30">
+                        Refresh
+                    </button>
+                </div>
+
+                <div id="writers-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[70]">
+        <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl w-full max-w-sm text-center shadow-2xl mx-4 animate-enter">
+            <div class="w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-500 flex items-center justify-center mx-auto mb-4 text-xl">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3 class="text-lg font-bold mb-2 text-slate-800 dark:text-white">Confirm Action</h3>
+            <p id="confirm-msg" class="text-sm text-gray-500 mb-6">Are you sure?</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="document.getElementById('confirm-modal').classList.add('hidden')" class="px-5 py-2.5 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition">Cancel</button>
+                <button id="confirm-yes-btn" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-slate-900 dark:bg-indigo-600 text-white hover:shadow-lg hover:scale-105 transition">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://sprint-bot-9bll.onrender.com';
+        let token = localStorage.getItem('mod_key');
+
+        // Init Logic
+        if(token) {
+            document.getElementById('auth-modal').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            loadSprints();
+        }
+
+        function login() {
+            const pass = document.getElementById('admin-pass').value;
+            if(!pass) return alert("Enter password");
+            token = pass;
+            localStorage.setItem('mod_key', pass);
+            location.reload();
+        }
+        function logout() { localStorage.removeItem('mod_key'); location.reload(); }
+
+        function switchTab(tab) {
+            document.getElementById('view-sprints').classList.add('hidden');
+            document.getElementById('view-writers').classList.add('hidden');
+            document.getElementById('tab-sprints').className = "px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-indigo-600";
+            document.getElementById('tab-writers').className = "px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-indigo-600";
+            
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).className = "px-4 py-2 rounded-lg text-sm font-bold bg-indigo-50 text-indigo-600";
+            
+            if(tab === 'sprints') loadSprints();
+            if(tab === 'writers') loadWritersGrid();
+        }
+
+        async function api(endpoint, body, method = 'POST') {
+            const opts = { method: method, headers: { 'Content-Type': 'application/json', 'x-admin-password': token } };
+            if(body) opts.body = JSON.stringify(body);
+            try {
+                const res = await fetch(`${API_URL}${endpoint}`, opts);
+                if(res.status === 403) { alert("Access Denied"); logout(); return null; }
+                return res.json();
+            } catch(e) { console.error(e); return null; }
+        }
+
+        // --- SPRINTS ---
+        async function loadSprints() {
+            const container = document.getElementById('sprints-list');
+            container.innerHTML = '<p class="text-gray-400 text-sm">Loading...</p>';
+            const data = await api('/api/admin/sprints', null, 'GET');
+            container.innerHTML = '';
+            
+            if(!data || data.length === 0) container.innerHTML = '<div class="col-span-full p-6 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl text-center text-gray-400 text-sm">No active sprints.</div>';
+            
+            data?.forEach(s => {
+                container.innerHTML += `
+                    <div class="bg-white dark:bg-slate-800 p-5 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold text-lg text-slate-800 dark:text-white">${s.name}</h3>
+                                <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded mt-2 inline-block">Active: ${s.timeLeft}m left</span>
+                            </div>
+                            <button onclick="stopSprint('${s.id}')" class="bg-red-50 text-red-600 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">Stop Sprint</button>
+                        </div>
+                    </div>`;
+            });
+
+            // Scheduled
+            const schedContainer = document.getElementById('scheduled-list');
+            const schedData = await api('/api/admin/scheduled', null, 'GET');
+            schedContainer.innerHTML = '';
+            
+            if(!schedData || schedData.length === 0) schedContainer.innerHTML = '<div class="col-span-full p-4 text-center text-xs text-gray-400">Queue empty.</div>';
+
+            schedData?.forEach(s => {
+                const d = new Date(s.startTime);
+                schedContainer.innerHTML += `
+                    <div class="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-200 dark:border-slate-700 flex justify-between items-center">
+                        <div>
+                            <h4 class="font-bold text-sm text-slate-800 dark:text-white">${s.groupName}</h4>
+                            <p class="text-xs text-gray-500">Starts: ${d.toLocaleTimeString()}</p>
+                        </div>
+                        <button onclick="cancelScheduled('${s.id}')" class="text-gray-400 hover:text-red-500 transition"><i class="fas fa-trash"></i></button>
+                    </div>`;
+            });
+        }
+
+        function showConfirm(msg, callback) {
+            document.getElementById('confirm-msg').innerText = msg;
+            document.getElementById('confirm-modal').classList.remove('hidden');
+            const btn = document.getElementById('confirm-yes-btn');
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', () => { callback(); document.getElementById('confirm-modal').classList.add('hidden'); });
+        }
+
+        async function stopSprint(id) { showConfirm("Stop this sprint?", async () => { await api('/api/admin/sprints/stop', { chatId: id }); loadSprints(); }); }
+        async function cancelScheduled(id) { showConfirm("Delete schedule?", async () => { await api('/api/admin/scheduled/cancel', { id }); loadSprints(); }); }
+
+        // --- WRITERS (Modified: No Modal) ---
+        async function loadWritersGrid() {
+            const container = document.getElementById('writers-grid');
+            container.innerHTML = '<p class="text-gray-400 text-sm col-span-full text-center">Loading users...</p>';
+            const data = await api('/api/admin/search', { query: '' });
+            container.innerHTML = '';
+
+            if(!data || data.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-sm col-span-full text-center">No writers found.</p>';
+                return;
+            }
+
+            data?.forEach(u => {
+                // Determine Button State
+                const isBanned = u.isBanned;
+                const btnColor = isBanned ? 'bg-green-50 text-green-600 border border-green-100 hover:bg-green-500 hover:text-white' : 'bg-red-50 text-red-500 border border-red-100 hover:bg-red-500 hover:text-white';
+                const btnText = isBanned ? 'Unban' : 'Ban';
+                const btnIcon = isBanned ? 'fa-unlock' : 'fa-ban';
+                const cardOpacity = isBanned ? 'opacity-75 grayscale' : '';
+
+                container.innerHTML += `
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm flex items-center gap-4 group ${cardOpacity}">
+                        <div class="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold shrink-0">
+                            ${u.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-bold text-sm truncate text-slate-800 dark:text-white">${u.name}</h4>
+                            <p class="text-xs text-gray-500 font-mono">${(u.trueTotal||u.totalWords).toLocaleString()} words</p>
+                        </div>
+                        <button onclick="toggleBan('${u._id}', ${isBanned})" class="${btnColor} px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shrink-0">
+                            <i class="fas ${btnIcon}"></i> ${btnText}
+                        </button>
+                    </div>`;
+            });
+            filterWriterCards();
+        }
+
+        function filterWriterCards() {
+            const query = document.getElementById('dash-search').value.toLowerCase();
+            const items = document.getElementById('writers-grid').children;
+            for (let item of items) {
+                const text = item.innerText.toLowerCase();
+                item.classList.toggle('hidden', !text.includes(query));
+            }
+        }
+
+        async function toggleBan(userId, currentStatus) {
+            const action = currentStatus ? 'unban' : 'ban';
+            showConfirm(`Are you sure you want to ${action.toUpperCase()} this user?`, async () => {
+                const res = await api('/api/admin/ban', { userId, action });
+                if(res && res.success) {
+                    loadWritersGrid(); // Refresh grid to update button state
+                } else {
+                    alert("Action failed.");
+                }
+            });
+        }
+
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+            } else {
+                document.documentElement.classList.add('dark');
+            }
+        }
+        
+        // Auto-load theme preference
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark');
+    </script>
+</body>
+</html>

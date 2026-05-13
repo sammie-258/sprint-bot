@@ -14,67 +14,7 @@ require("dotenv").config();
 // =======================
 //   HELPER FUNCTIONS
 // =======================
-const toSuperscript = (num) => {
-    const map = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
-    return num.toString().split('').map(d => map[d]).join('');
-};
-
-const getRank = (total) => {
-    if (total >= 1000000) return "Novel God ⚡";
-    if (total >= 500000)  return "Word Expert 🎓";
-    if (total >= 250000)  return "Word Architect 🏗️";
-    if (total >= 100000)  return "Prolific Writer 📚";
-    if (total >= 50000)   return "Novelist 📘";
-    if (total >= 10000)   return "Aspiring Author ✍️";
-    return "Unranked ⚪";
-};
-
-const getNextRank = (total) => {
-    if (total < 10000)   return { name: "Aspiring Author ✍️", threshold: 10000 };
-    if (total < 50000)   return { name: "Novelist 📘",         threshold: 50000 };
-    if (total < 100000)  return { name: "Prolific Writer 📚",  threshold: 100000 };
-    if (total < 250000)  return { name: "Word Architect 🏗️",  threshold: 250000 };
-    if (total < 500000)  return { name: "Word Expert 🎓",      threshold: 500000 };
-    if (total < 1000000) return { name: "Novel God ⚡",         threshold: 1000000 };
-    return null;
-};
-
-// Max streak freezes by rank
-const getMaxFreezes = (rank) => {
-    if (rank === "Novel God ⚡")        return 5;
-    if (rank === "Word Expert 🎓")      return 3;
-    if (rank === "Word Architect 🏗️")  return 3;
-    if (rank === "Prolific Writer 📚")  return 2;
-    if (rank === "Novelist 📘")         return 2;
-    if (rank === "Aspiring Author ✍️")  return 1;
-    return 0; // Unranked gets 0
-};
-
-const getDurationString = (startDate, endDate = new Date()) => {
-    const diffMs   = new Date(endDate) - new Date(startDate);
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const diffHrs  = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    if (diffDays > 0) return `${diffDays} day${diffDays !== 1 ? 's' : ''}${diffHrs > 0 ? ` ${diffHrs}h` : ''}`;
-    if (diffHrs  > 0) return `${diffHrs} hour${diffHrs !== 1 ? 's' : ''}`;
-    return "less than an hour";
-};
-
-// Badge definitions
-const BADGE_DEFS = [
-    { key: 'first_log',     icon: '✍️',  label: 'First Words',    desc: 'Logged your first words' },
-    { key: 'streak_7',      icon: '🔥',  label: '7-Day Streak',   desc: '7 consecutive writing days' },
-    { key: 'streak_30',     icon: '🌟',  label: '30-Day Streak',  desc: '30 consecutive writing days' },
-    { key: 'streak_100',    icon: '💎',  label: '100-Day Streak', desc: '100 consecutive writing days' },
-    { key: 'words_10k',     icon: '📝',  label: '10K Club',       desc: 'Wrote 10,000 total words' },
-    { key: 'words_100k',    icon: '📚',  label: '100K Club',      desc: 'Wrote 100,000 total words' },
-    { key: 'words_250k',    icon: '🏗️',  label: '250K Club',      desc: 'Wrote 250,000 total words' },
-    { key: 'words_500k',    icon: '🎓',  label: '500K Club',      desc: 'Wrote 500,000 total words' },
-    { key: 'novel_god',     icon: '⚡',  label: 'Novel God',      desc: 'Reached 1,000,000 words' },
-    { key: 'challenge_mvp', icon: '🏆',  label: 'Challenge MVP',  desc: 'Top contributor in a challenge' },
-    { key: 'daily_first',   icon: '🥇',  label: 'Daily Champ',    desc: 'Topped the daily leaderboard' },
-    { key: 'duel_win',      icon: '⚔️',  label: 'Duelist',        desc: 'Won a word duel' },
-    { key: 'sprint_500',    icon: '💨',  label: 'Speed Writer',   desc: 'Wrote 500+ words in one sprint' },
-];
+const { toSuperscript, getRank, getNextRank, getMaxFreezes, getDurationString, BADGE_DEFS } = require('./src/utils/helpers');
 
 // =======================
 //   CONFIG & SERVER SETUP
@@ -161,110 +101,19 @@ const updateGroupCache = async (force = false) => {
 // =======================
 //   DATABASE SCHEMAS
 // =======================
-const groupMetaSchema = new mongoose.Schema({
-    groupId: String,
-    subject: String,
-    size: Number,
-    lastActive: { type: Date, default: Date.now }
-});
-const GroupMeta = mongoose.model("GroupMeta", groupMetaSchema);
-
-const dailyStatsSchema = new mongoose.Schema({
-    userId: String, name: String, groupId: String, date: String,
-    words: { type: Number, default: 0 }, timestamp: { type: Date, default: Date.now }
-});
-const DailyStats = mongoose.model("DailyStats", dailyStatsSchema);
-
-const goalSchema = new mongoose.Schema({
-    userId: String, name: String, target: Number,
-    current:    { type: Number,  default: 0 },
-    isActive:   { type: Boolean, default: true },
-    startDate:  { type: String,  default: () => new Date().toLocaleDateString('en-CA', { timeZone: "Africa/Lagos" }) },
-    startedAt:  { type: Date,    default: Date.now },
-    completedAt:{ type: Date,    default: null }
-});
-const PersonalGoal = mongoose.model("PersonalGoal", goalSchema);
-
-const scheduleSchema = new mongoose.Schema({
-    groupId: String, startTime: Date, duration: Number, createdBy: String
-});
-const ScheduledSprint = mongoose.model("ScheduledSprint", scheduleSchema);
-
-const blacklistSchema = new mongoose.Schema({ userId: String });
-const Blacklist = mongoose.model("Blacklist", blacklistSchema);
-
-const activeSprintSchema = new mongoose.Schema({
-    groupId: String, endsAt: Number, duration: Number,
-    participants: { type: Object, default: {} }
-});
-const ActiveSprint = mongoose.model("ActiveSprint", activeSprintSchema);
-
-const userProfileSchema = new mongoose.Schema({
-    userId: String, name: String,
-    currentStreak:     { type: Number, default: 0 },
-    bestStreak:        { type: Number, default: 0 },
-    lastActiveDate:    String,
-    totalWordsAllTime: { type: Number, default: 0 },
-    joinedAt:          { type: Date,   default: Date.now },
-    // NEW fields
-    badges:            { type: [String], default: [] },
-    activityLog:       { type: String,   default: '0'.repeat(35) }, // 35-char bitmask, index 0 = today
-    bestSprintWords:   { type: Number,   default: 0 },
-    bestSprintWpm:     { type: Number,   default: 0 },
-    sprintCount:       { type: Number,   default: 0 },
-    totalSprintWords:  { type: Number,   default: 0 },
-});
-const UserProfile = mongoose.model("UserProfile", userProfileSchema);
-
-const challengeSchema = new mongoose.Schema({
-    groupId: String, target: Number,
-    current:      { type: Number, default: 0 },
-    contributors: { type: Object, default: {} },
-    createdBy: String, startedAt: { type: Date, default: Date.now }
-});
-const GroupChallenge = mongoose.model("GroupChallenge", challengeSchema);
-
-// NEW: weekly auto-challenge
-const weeklyChallengeSchema = new mongoose.Schema({
-    groupId: String, target: Number,
-    current:      { type: Number,  default: 0 },
-    contributors: { type: Object,  default: {} },
-    weekStart: Date, weekEnd: Date,
-    resolved:  { type: Boolean, default: false }
-});
-const WeeklyChallenge = mongoose.model("WeeklyChallenge", weeklyChallengeSchema);
-
-// NEW: sprint record for WPM history
-const sprintRecordSchema = new mongoose.Schema({
-    groupId: String, duration: Number,
-    participants: [{ userId: String, name: String, words: Number, wpm: Number }],
-    timestamp: { type: Date, default: Date.now }
-});
-const SprintRecord = mongoose.model("SprintRecord", sprintRecordSchema);
-
-// NEW: streak freeze wallet
-const streakFreezeSchema = new mongoose.Schema({
-    userId: String,
-    freezesAvailable: { type: Number, default: 0 },
-    lastEarnedDate:   { type: String, default: null }
-});
-const StreakFreeze = mongoose.model("StreakFreeze", streakFreezeSchema);
-
-// NEW: user feedback -> admin dashboard
-const feedbackSchema = new mongoose.Schema({
-    userId: String, name: String, groupId: String,
-    message: String, isRead: { type: Boolean, default: false },
-    timestamp: { type: Date, default: Date.now }
-});
-const Feedback = mongoose.model("Feedback", feedbackSchema);
-
-// NEW: scheduled broadcasts
-const scheduledBroadcastSchema = new mongoose.Schema({
-    message: String, image: String,
-    sendAt: Date, sent: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now }
-});
-const ScheduledBroadcast = mongoose.model("ScheduledBroadcast", scheduledBroadcastSchema);
+const GroupMeta = require('./src/models/GroupMeta');
+const DailyStats = require('./src/models/DailyStats');
+const PersonalGoal = require('./src/models/PersonalGoal');
+const ScheduledSprint = require('./src/models/ScheduledSprint');
+const Blacklist = require('./src/models/Blacklist');
+const ActiveSprint = require('./src/models/ActiveSprint');
+const UserProfile = require('./src/models/UserProfile');
+const GroupChallenge = require('./src/models/GroupChallenge');
+const WeeklyChallenge = require('./src/models/WeeklyChallenge');
+const SprintRecord = require('./src/models/SprintRecord');
+const StreakFreeze = require('./src/models/StreakFreeze');
+const Feedback = require('./src/models/Feedback');
+const ScheduledBroadcast = require('./src/models/ScheduledBroadcast');
 
 const MONGO_URI = process.env.MONGO_URI;
 if (!MONGO_URI) { console.error("❌ MONGO_URI missing"); process.exit(1); }
@@ -272,426 +121,19 @@ if (!MONGO_URI) { console.error("❌ MONGO_URI missing"); process.exit(1); }
 // =======================
 //   WEB API ENDPOINTS
 // =======================
-app.get('/', (req, res) => res.redirect('https://quillreads.com/sprint-bot-dashboard'));
-
-// Profile card
-app.get('/profile/:userId', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const potentialJids = [
-            userId.includes('@') ? userId : userId + '@s.whatsapp.net',
-            userId.includes('@') ? userId : userId + '@lid'
-        ];
-        const profile = await UserProfile.findOne({ userId: { $in: potentialJids } });
-        if (!profile) return res.status(404).send(`<h1>Profile Not Found</h1>`);
-
-        const goal      = await PersonalGoal.findOne({ userId: profile.userId, isActive: true });
-        const rank      = getRank(profile.totalWordsAllTime);
-        const nextRank  = getNextRank(profile.totalWordsAllTime);
-        const todayStr  = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
-        const todayAgg  = await DailyStats.aggregate([
-            { $match: { userId: profile.userId, date: todayStr } },
-            { $group: { _id: null, total: { $sum: "$words" } } }
-        ]);
-        const dailyWords = todayAgg[0]?.total || 0;
-
-        const templatePath = path.join(__dirname, 'profile.html');
-        if (!fs.existsSync(templatePath)) return res.status(500).send("<h1>Profile Template Missing</h1>");
-        let html = fs.readFileSync(templatePath, 'utf8');
-
-        const nextRankPct   = nextRank ? Math.min(100, (profile.totalWordsAllTime / nextRank.threshold) * 100).toFixed(1) : '100';
-        const nextRankName  = nextRank ? nextRank.name : 'MAX RANK';
-        const nextRankThres = nextRank ? nextRank.threshold.toLocaleString() : '-';
-
-        html = html
-            .replace(/{{NAME}}/g, profile.name)
-            .replace(/{{INITIAL}}/g, profile.name.charAt(0).toUpperCase())
-            .replace(/{{RANK}}/g, rank)
-            .replace(/{{TOTAL}}/g, profile.totalWordsAllTime.toLocaleString())
-            .replace(/{{STREAK}}/g, profile.currentStreak)
-            .replace(/{{DAILY_WORDS}}/g, dailyWords.toLocaleString())
-            .replace(/{{BEST_SPRINT_WORDS}}/g, profile.bestSprintWords.toLocaleString())
-            .replace(/{{BEST_SPRINT_WPM}}/g, profile.bestSprintWpm)
-            .replace(/{{BADGES_JSON}}/g, JSON.stringify(profile.badges || []))
-            .replace(/{{ACTIVITY_LOG}}/g, profile.activityLog || '0'.repeat(35))
-            .replace(/{{NEXT_RANK_NAME}}/g, nextRankName)
-            .replace(/{{NEXT_RANK_PCT}}/g, nextRankPct)
-            .replace(/{{NEXT_RANK_THRESHOLD}}/g, nextRankThres);
-
-        if (goal) {
-            const pct = Math.min(100, (goal.current / goal.target) * 100).toFixed(1);
-            html = html
-                .replace('{{GOAL_DISPLAY}}',  'block')
-                .replace('{{GOAL_CURRENT}}',  goal.current.toLocaleString())
-                .replace('{{GOAL_TARGET}}',   goal.target.toLocaleString())
-                .replace('{{GOAL_PERCENT}}',  pct);
-        } else {
-            html = html.replace('{{GOAL_DISPLAY}}', 'hidden');
-        }
-        res.send(html);
-    } catch (e) { console.error(e); res.status(500).send("Error"); }
-});
-
-// Public stats (dashboard)
-app.get('/api/stats', async (req, res) => {
-    try {
-        let qrImage = null;
-        if (!isConnected && qrCodeData) qrImage = await QR.toDataURL(qrCodeData);
-
-        const dbGroups = await GroupMeta.find({});
-        const groupMap = {};
-        dbGroups.forEach(g => groupMap[g.groupId] = g.subject);
-
-        const todayStr       = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
-        const sevenDaysAgo   = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-        const [topWriters, todayWriters, topGroups, totalWordsAgg, chartDataRaw,
-               todayWordAgg, todayActiveUsers, hotGroupRaw, totalWriters, allGroupIds] = await Promise.all([
-            DailyStats.aggregate([{ $group: { _id: "$name", total: { $sum: "$words" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
-            DailyStats.aggregate([{ $match: { date: todayStr } }, { $group: { _id: "$name", total: { $sum: "$words" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
-            DailyStats.aggregate([{ $match: { groupId: { $ne: "Manual_Correction" } } }, { $group: { _id: "$groupId", total: { $sum: "$words" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
-            DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]),
-            DailyStats.aggregate([{ $match: { timestamp: { $gte: sevenDaysAgo } } }, { $group: { _id: "$date", total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
-            DailyStats.aggregate([{ $match: { date: todayStr } }, { $group: { _id: null, total: { $sum: "$words" } } }]),
-            DailyStats.distinct("userId", { date: todayStr }),
-            DailyStats.aggregate([{ $match: { date: todayStr, groupId: { $ne: "Manual_Correction" } } }, { $group: { _id: "$groupId", total: { $sum: "$words" } } }, { $sort: { total: -1 } }, { $limit: 1 }]),
-            DailyStats.distinct("name"),
-            DailyStats.distinct("groupId"),
-        ]);
-
-        const hotGroup = hotGroupRaw[0] ? { name: groupMap[hotGroupRaw[0]._id] || hotGroupRaw[0]._id, words: hotGroupRaw[0].total } : null;
-
-        res.json({
-            isConnected, qrCode: qrImage,
-            topWriters:   topWriters.map(w => ({ name: w._id, words: w.total })),
-            todayWriters: todayWriters.map(w => ({ name: w._id, words: w.total })),
-            topGroups:    topGroups.map(g => ({ name: groupMap[g._id] || g._id, words: g.total })),
-            totalWords:   totalWordsAgg[0]?.total || 0,
-            totalWriters: totalWriters.length,
-            totalGroups:  allGroupIds.filter(id => id !== "Manual_Correction").length,
-            activeSprintsCount: Object.keys(activeSprints).length,
-            chartData: { labels: chartDataRaw.map(d => d._id), data: chartDataRaw.map(d => d.total) },
-            todayPulse: { words: todayWordAgg[0]?.total || 0, writers: todayActiveUsers.length, hotGroup },
-            recentActivity: recentActivity.slice(0, 10)
-        });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Admin: system info (includes recentActivity + feedback unread count)
-app.get('/api/admin/system', requireAdmin, async (req, res) => {
-    try {
-        const memory = process.memoryUsage();
-        const unreadFeedback = await Feedback.countDocuments({ isRead: false });
-        res.json({
-            uptime:    process.uptime(),
-            memory:    Math.round(memory.heapUsed / 1024 / 1024),
-            platform:  os.platform() + " " + os.release(),
-            cpu:       os.cpus()[0].model,
-            maintenance: maintenanceMode,
-            activeSprintsCount:    Object.keys(activeSprints).length,
-            activeDuelsCount:      Object.keys(activeDuels).length,
-            activePomodorosCount:  Object.keys(activePomodoros).length,
-            unreadFeedback,
-            recentActivity
-        });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/maintenance', requireAdmin, (req, res) => {
-    maintenanceMode = req.body.status;
-    res.json({ success: true, status: maintenanceMode });
-});
-
-app.get('/api/admin/sprints', requireAdmin, async (req, res) => {
-    try {
-        await updateGroupCache();
-        const sprints = Object.entries(activeSprints).map(([chatId, sprint]) => ({
-            id: chatId,
-            name: groupCache[chatId]?.subject || chatId,
-            timeLeft: Math.ceil(Math.max(0, sprint.endsAt - Date.now()) / 60000),
-            participants: Object.keys(sprint.participants).length,
-            participantList: Object.entries(sprint.participants).map(([uid, d]) => ({ uid: uid.split('@')[0], words: d.words || 0 }))
-        }));
-        res.json(sprints);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/sprints/stop', requireAdmin, async (req, res) => {
-    const { chatId } = req.body;
-    if (activeSprints[chatId]) {
-        delete activeSprints[chatId];
-        await ActiveSprint.deleteOne({ groupId: chatId });
-        try { if (sock && isConnected) await sock.sendMessage(chatId, { text: "🛑 *ADMIN STOP*: Sprint cancelled by Admin." }); } catch(e) {}
-        return res.json({ success: true });
-    }
-    res.status(404).json({ error: "Sprint not found" });
-});
-
-app.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
-    try {
-        await updateGroupCache();
-        const sprints = await ScheduledSprint.find({ startTime: { $gt: new Date() } }).sort({ startTime: 1 });
-        res.json(sprints.map(s => ({
-            id: s._id,
-            groupName: groupCache[s.groupId]?.subject || s.groupId,
-            startTime: s.startTime, duration: s.duration,
-            createdBy: s.createdBy.split('@')[0]
-        })));
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
-    try { await ScheduledSprint.findByIdAndDelete(req.body.id); res.json({ success: true }); }
-    catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Writers: all matching query, no .limit()
-app.post('/api/admin/search', requireAdmin, async (req, res) => {
-    try {
-        const profiles = await UserProfile.find({ name: { $regex: req.body.query || '', $options: 'i' } });
-        const enriched = await Promise.all(profiles.map(async p => {
-            const isBanned = await Blacklist.exists({ userId: p.userId });
-            return {
-                _id: p.userId, name: p.name,
-                totalWords: p.totalWordsAllTime, lastActive: p.lastActiveDate,
-                rank: getRank(p.totalWordsAllTime), streak: p.currentStreak,
-                bestStreak: p.bestStreak, trueTotal: p.totalWordsAllTime,
-                isBanned: !!isBanned,
-                badges: p.badges || [],
-                bestSprintWords: p.bestSprintWords, bestSprintWpm: p.bestSprintWpm,
-                sprintCount: p.sprintCount, activityLog: p.activityLog
-            };
-        }));
-        res.json(enriched);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Writer sprint history (for drawer)
-app.get('/api/admin/writer/:userId/history', requireAdmin, async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const [wordsByDay, goals, recentSprints] = await Promise.all([
-            DailyStats.aggregate([
-                { $match: { userId, timestamp: { $gte: thirtyDaysAgo } } },
-                { $group: { _id: "$date", total: { $sum: "$words" } } },
-                { $sort: { _id: 1 } }
-            ]),
-            PersonalGoal.find({ userId }).sort({ _id: -1 }).limit(5),
-            SprintRecord.find({ 'participants.userId': userId }).sort({ timestamp: -1 }).limit(10)
-        ]);
-        res.json({
-            wordsByDay: { labels: wordsByDay.map(d => d._id), data: wordsByDay.map(d => d.total) },
-            goals: goals.map(g => ({
-                target: g.target, current: g.current, isActive: g.isActive,
-                startDate: g.startDate, completedAt: g.completedAt,
-                duration: g.completedAt ? getDurationString(g.startedAt, g.completedAt) : null
-            })),
-            recentSprints: recentSprints.map(sr => {
-                const p = sr.participants.find(x => x.userId === userId);
-                return { date: sr.timestamp, duration: sr.duration, words: p?.words || 0, wpm: p?.wpm || 0 };
-            })
-        });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/update', requireAdmin, async (req, res) => {
-    const { userId, amount, type, name } = req.body;
-    try {
-        if (type === 'name') {
-            await UserProfile.findOneAndUpdate({ userId }, { name });
-            await DailyStats.updateMany({ userId }, { name });
-            await PersonalGoal.updateMany({ userId }, { name });
-            return res.json({ success: true });
-        }
-        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
-        const history  = await DailyStats.findOne({ userId }).sort({ timestamp: -1 });
-        let doc = await DailyStats.findOne({ userId, date: todayStr, groupId: history?.groupId || "Manual_Correction" });
-        if (!doc) doc = await DailyStats.create({ userId, name: history?.name || userId, groupId: history?.groupId || "Manual_Correction", date: todayStr, words: 0 });
-        let diff = 0;
-        if (type === 'set') { diff = parseInt(amount) - doc.words; doc.words = parseInt(amount); }
-        else { diff = parseInt(amount); doc.words += diff; }
-        doc.timestamp = new Date();
-        await doc.save();
-        await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: diff } });
-        await UserProfile.findOneAndUpdate({ userId }, { $inc: { totalWordsAllTime: diff } }, { upsert: true });
-        res.json({ success: true, newTotal: doc.words });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/ban', requireAdmin, async (req, res) => {
-    const { userId, action } = req.body;
-    try {
-        if (action === 'ban') await Blacklist.findOneAndUpdate({ userId }, { userId }, { upsert: true });
-        else await Blacklist.deleteMany({ userId });
-        res.json({ success: true, isBanned: action === 'ban' });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
-    try {
-        const { message, image } = req.body;
-        if (!message && !image) return res.status(400).json({ error: "Need text or image" });
-        const groups = await sock.groupFetchAllParticipating();
-        let count = 0;
-        for (const gid of Object.keys(groups)) {
-            try {
-                if (image) {
-                    const buffer = Buffer.from(image.split(",")[1], 'base64');
-                    await sock.sendMessage(gid, { image: buffer, caption: message || "" });
-                } else {
-                    await sock.sendMessage(gid, { text: message });
-                }
-                count++;
-                await new Promise(r => setTimeout(r, 500));
-            } catch (e) {}
-        }
-        res.json({ success: true, count });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Groups: enriched with health data
-app.get('/api/admin/groups', requireAdmin, async (req, res) => {
-    try {
-        const groups = await GroupMeta.find({});
-        const todayStr    = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
-        const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-        const result = await Promise.all(groups.map(async (data) => {
-            const jid = data.groupId;
-            try {
-                const [weekWords, activeWriters, lastSprint] = await Promise.all([
-                    DailyStats.aggregate([{ $match: { groupId: jid, timestamp: { $gte: sevenDaysAgo } } }, { $group: { _id: null, total: { $sum: "$words" } } }]),
-                    DailyStats.distinct("userId", { groupId: jid, date: todayStr }),
-                    SprintRecord.findOne({ groupId: jid }).sort({ timestamp: -1 })
-                ]);
-                const weekTotal = weekWords[0]?.total || 0;
-                const health = weekTotal > 5000 ? 'Active' : weekTotal > 500 ? 'Quiet' : 'Dormant';
-                return {
-                    id: jid, name: data.subject || jid,
-                    participants: data.size || 0,
-                    weekWords: weekTotal, activeWritersToday: activeWriters.length,
-                    lastSprintAt: lastSprint?.timestamp || null, health
-                };
-            } catch (err) {
-                // Return fallback data so the list doesn't crash
-                return {
-                    id: jid, name: data.subject || jid,
-                    participants: data.size || 0,
-                    weekWords: 0, activeWritersToday: 0,
-                    lastSprintAt: null, health: 'Dormant'
-                };
-            }
-        }));
-        res.json(result);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/groups/leave', requireAdmin, async (req, res) => {
-    try {
-        const { chatId } = req.body;
-        if (sock && isConnected) {
-            await sock.sendMessage(chatId, { text: "👋 Bot leaving via Admin Console." });
-            await sock.groupLeave(chatId);
-        }
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/groups/accept', requireAdmin, async (req, res) => {
-    const { inviteCode } = req.body;
-    if (!inviteCode) return res.status(400).json({ error: "Provide invite code." });
-    if (!sock || !isConnected) return res.status(503).json({ error: "Bot not connected." });
-    try {
-        const code    = inviteCode.includes('chat.whatsapp.com/') ? inviteCode.split('chat.whatsapp.com/').pop().trim() : inviteCode.trim();
-        const groupId = await sock.groupAcceptInvite(code);
-        res.json({ success: true, groupId });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Feedback
-app.get('/api/admin/feedback', requireAdmin, async (req, res) => {
-    try {
-        const [items, unreadCount] = await Promise.all([
-            Feedback.find().sort({ timestamp: -1 }).limit(100),
-            Feedback.countDocuments({ isRead: false })
-        ]);
-        res.json({ items, unreadCount });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/feedback/read', requireAdmin, async (req, res) => {
-    try {
-        const { id } = req.body;
-        if (id === 'all') await Feedback.updateMany({}, { isRead: true });
-        else await Feedback.findByIdAndUpdate(id, { isRead: true });
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Analytics
-app.get('/api/admin/analytics', requireAdmin, async (req, res) => {
-    try {
-        const now          = new Date();
-        const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const sevenDaysAgo  = new Date(now); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const prevSevenStart = new Date(sevenDaysAgo.getTime() - 7 * 86400000);
-
-        const [wordsByDay, wordsByHour, activeThisWeek, activeLastWeek, thisWeekWords, lastWeekWords, groupBreakdown, dbGroups] = await Promise.all([
-            DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo } } }, { $group: { _id: "$date", total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
-            DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo } } }, { $group: { _id: { $hour: "$timestamp" }, total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
-            DailyStats.distinct("userId", { timestamp: { $gte: sevenDaysAgo } }),
-            DailyStats.distinct("userId", { timestamp: { $gte: prevSevenStart, $lt: sevenDaysAgo } }),
-            DailyStats.aggregate([{ $match: { timestamp: { $gte: sevenDaysAgo } } }, { $group: { _id: "$userId", total: { $sum: "$words" }, name: { $first: "$name" } } }]),
-            DailyStats.aggregate([{ $match: { timestamp: { $gte: prevSevenStart, $lt: sevenDaysAgo } } }, { $group: { _id: "$userId", total: { $sum: "$words" } } }]),
-            DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo }, groupId: { $ne: "Manual_Correction" } } }, { $group: { _id: "$groupId", total: { $sum: "$words" }, writers: { $addToSet: "$userId" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
-            GroupMeta.find({})
-        ]);
-
-        const retained      = activeThisWeek.filter(u => activeLastWeek.includes(u));
-        const retentionRate = activeLastWeek.length > 0 ? Math.round((retained.length / activeLastWeek.length) * 100) : 0;
-
-        const lastWeekMap = {};
-        lastWeekWords.forEach(w => lastWeekMap[w._id] = w.total);
-        const growers = thisWeekWords
-            .map(w => ({ name: w.name, thisWeek: w.total, lastWeek: lastWeekMap[w._id] || 0, growth: w.total - (lastWeekMap[w._id] || 0) }))
-            .filter(w => w.growth > 0).sort((a, b) => b.growth - a.growth).slice(0, 10);
-
-        const groupMap = {};
-        dbGroups.forEach(g => groupMap[g.groupId] = g.subject);
-
-        res.json({
-            wordsByDay: { labels: wordsByDay.map(d => d._id), data: wordsByDay.map(d => d.total) },
-            wordsByHour: Array.from({ length: 24 }, (_, h) => ({ hour: h, total: wordsByHour.find(x => x._id === h)?.total || 0 })),
-            retentionRate, activeThisWeek: activeThisWeek.length, activeLastWeek: activeLastWeek.length,
-            growers,
-            groupBreakdown: groupBreakdown.map(g => ({ name: groupMap[g._id] || g._id, words: g.total, writers: g.writers.length }))
-        });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Scheduled broadcasts
-app.get('/api/admin/broadcasts/scheduled', requireAdmin, async (req, res) => {
-    try {
-        const items = await ScheduledBroadcast.find({ sent: false, sendAt: { $gt: new Date() } }).sort({ sendAt: 1 });
-        res.json(items);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/broadcasts/schedule', requireAdmin, async (req, res) => {
-    try {
-        const { message, image, sendAt } = req.body;
-        if (!message && !image) return res.status(400).json({ error: "Need message or image" });
-        if (!sendAt) return res.status(400).json({ error: "Need sendAt time" });
-        const broadcast = await ScheduledBroadcast.create({ message, image, sendAt: new Date(sendAt) });
-        res.json({ success: true, id: broadcast._id });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/admin/broadcasts/cancel', requireAdmin, async (req, res) => {
-    try { await ScheduledBroadcast.findByIdAndDelete(req.body.id); res.json({ success: true }); }
-    catch (e) { res.status(500).json({ error: e.message }); }
-});
+const apiRoutes = require('./src/routes/api');
+app.use('/', apiRoutes({
+    get sock() { return sock; },
+    get isConnected() { return isConnected; },
+    get qrCodeData() { return qrCodeData; },
+    get maintenanceMode() { return maintenanceMode; },
+    set maintenanceMode(v) { maintenanceMode = v; },
+    get activeSprints() { return activeSprints; },
+    get activeDuels() { return activeDuels; },
+    get activePomodoros() { return activePomodoros; },
+    get recentActivity() { return recentActivity; },
+    updateGroupCache
+}));
 
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server on port ${PORT}`));
 setInterval(() => { http.get(`http://localhost:${PORT}/`, () => {}).on('error', () => {}); }, 5 * 60 * 1000);
@@ -1022,15 +464,19 @@ mongoose.connect(MONGO_URI).then(async () => {
 
             // ── 23:00 STREAK REMINDER ─────────────────────────────────────────────
             if (h === 23 && m === 0 && s < 10) {
-                const allProfiles = await UserProfile.find({ currentStreak: { $gt: 0 } });
-                const activeToday = new Set(await DailyStats.distinct("userId", { date: today }));
-                const atRisk      = allProfiles.filter(p => !activeToday.has(p.userId));
-                for (const profile of atRisk) {
+                const yesterday = (() => { const d = new Date(lagos); d.setDate(d.getDate() - 1); return d.toLocaleDateString('en-CA', { timeZone: TIMEZONE }); })();
+                const activeYesterday = new Set(await DailyStats.distinct("userId", { date: yesterday }));
+                const activeToday     = new Set(await DailyStats.distinct("userId", { date: today }));
+                
+                const atRiskUserIds = [...activeYesterday].filter(uid => !activeToday.has(uid));
+                const atRiskProfiles = await UserProfile.find({ userId: { $in: atRiskUserIds } });
+
+                for (const profile of atRiskProfiles) {
                     try {
                         const recent = await DailyStats.findOne({ userId: profile.userId }).sort({ timestamp: -1 });
                         if (!recent?.groupId || !groupIds.includes(recent.groupId)) continue;
                         await sock.sendMessage(recent.groupId, {
-                            text: `⚠️ *Streak Alert!*\n\n@${profile.userId.split('@')[0]}, your *${profile.currentStreak}-day streak* is at risk! 🔥\n\nYou have ~1 hour before the day resets.\nType *!log 1* or start a *!sprint* to keep it alive!`,
+                            text: `⚠️ *Streak Alert!*\n\n@${profile.userId.split('@')[0]}, your streak is at risk! 🔥\n\nYou have ~1 hour before the day resets.\nType *!log 1* or start a *!sprint* to keep it alive!`,
                             mentions: [profile.userId]
                         });
                         await new Promise(r => setTimeout(r, 1000));

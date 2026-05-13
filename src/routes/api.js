@@ -1,0 +1,459 @@
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const QR = require('qrcode');
+
+const UserProfile = require('../models/UserProfile');
+const PersonalGoal = require('../models/PersonalGoal');
+const DailyStats = require('../models/DailyStats');
+const GroupMeta = require('../models/GroupMeta');
+const ActiveSprint = require('../models/ActiveSprint');
+const ScheduledSprint = require('../models/ScheduledSprint');
+const Blacklist = require('../models/Blacklist');
+const Feedback = require('../models/Feedback');
+const ScheduledBroadcast = require('../models/ScheduledBroadcast');
+const SprintRecord = require('../models/SprintRecord');
+
+const { getRank, getNextRank, getDurationString } = require('../utils/helpers');
+
+const TIMEZONE = "Africa/Lagos";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+
+const requireAdmin = (req, res, next) => {
+    if (req.headers['x-admin-password'] === ADMIN_PASSWORD) return next();
+    res.status(403).json({ error: "Unauthorized" });
+};
+
+module.exports = function(appState) {
+    const { sock, isConnected, qrCodeData, maintenanceMode, groupCache, activeSprints, activePomodoros, activeDuels, pushActivity, updateGroupCache } = appState;
+    const router = express.Router();
+    
+
+router.get('/', (req, res) => res.redirect('https://quillreads.com/sprint-bot-dashboard'));
+
+// Profile card
+router.get('/profile/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const potentialJids = [
+            userId.includes('@') ? userId : userId + '@s.whatsrouter.net',
+            userId.includes('@') ? userId : userId + '@lid'
+        ];
+        const profile = await UserProfile.findOne({ userId: { $in: potentialJids } });
+        if (!profile) return res.status(404).send(`<h1>Profile Not Found</h1>`);
+
+        const goal      = await PersonalGoal.findOne({ userId: profile.userId, isActive: true });
+        const rank      = getRank(profile.totalWordsAllTime);
+        const nextRank  = getNextRank(profile.totalWordsAllTime);
+        const todayStr  = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+        const todayAgg  = await DailyStats.aggregate([
+            { $match: { userId: profile.userId, date: todayStr } },
+            { $group: { _id: null, total: { $sum: "$words" } } }
+        ]);
+        const dailyWords = todayAgg[0]?.total || 0;
+
+        const templatePath = path.join(__dirname, 'profile.html');
+        if (!fs.existsSync(templatePath)) return res.status(500).send("<h1>Profile Template Missing</h1>");
+        let html = fs.readFileSync(templatePath, 'utf8');
+
+        const nextRankPct   = nextRank ? Math.min(100, (profile.totalWordsAllTime / nextRank.threshold) * 100).toFixed(1) : '100';
+        const nextRankName  = nextRank ? nextRank.name : 'MAX RANK';
+        const nextRankThres = nextRank ? nextRank.threshold.toLocaleString() : '-';
+
+        html = html
+            .replace(/{{NAME}}/g, profile.name)
+            .replace(/{{INITIAL}}/g, profile.name.charAt(0).toUpperCase())
+            .replace(/{{RANK}}/g, rank)
+            .replace(/{{TOTAL}}/g, profile.totalWordsAllTime.toLocaleString())
+            .replace(/{{STREAK}}/g, profile.currentStreak)
+            .replace(/{{DAILY_WORDS}}/g, dailyWords.toLocaleString())
+            .replace(/{{BEST_SPRINT_WORDS}}/g, profile.bestSprintWords.toLocaleString())
+            .replace(/{{BEST_SPRINT_WPM}}/g, profile.bestSprintWpm)
+            .replace(/{{BADGES_JSON}}/g, JSON.stringify(profile.badges || []))
+            .replace(/{{ACTIVITY_LOG}}/g, profile.activityLog || '0'.repeat(35))
+            .replace(/{{NEXT_RANK_NAME}}/g, nextRankName)
+            .replace(/{{NEXT_RANK_PCT}}/g, nextRankPct)
+            .replace(/{{NEXT_RANK_THRESHOLD}}/g, nextRankThres);
+
+        if (goal) {
+            const pct = Math.min(100, (goal.current / goal.target) * 100).toFixed(1);
+            html = html
+                .replace('{{GOAL_DISPLAY}}',  'block')
+                .replace('{{GOAL_CURRENT}}',  goal.current.toLocaleString())
+                .replace('{{GOAL_TARGET}}',   goal.target.toLocaleString())
+                .replace('{{GOAL_PERCENT}}',  pct);
+        } else {
+            html = html.replace('{{GOAL_DISPLAY}}', 'hidden');
+        }
+        res.send(html);
+    } catch (e) { console.error(e); res.status(500).send("Error"); }
+});
+
+// Public stats (dashboard)
+router.get('/api/stats', async (req, res) => {
+    try {
+        let qrImage = null;
+        if (!isConnected && qrCodeData) qrImage = await QR.toDataURL(qrCodeData);
+
+        const dbGroups = await GroupMeta.find({});
+        const groupMap = {};
+        dbGroups.forEach(g => groupMap[g.groupId] = g.subject);
+
+        const todayStr       = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+        const sevenDaysAgo   = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        const [topWriters, todayWriters, topGroups, totalWordsAgg, chartDataRaw,
+               todayWordAgg, todayActiveUsers, hotGroupRaw, totalWriters, allGroupIds] = await Promise.all([
+            DailyStats.aggregate([{ $group: { _id: "$name", total: { $sum: "$words" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
+            DailyStats.aggregate([{ $match: { date: todayStr } }, { $group: { _id: "$name", total: { $sum: "$words" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
+            DailyStats.aggregate([{ $match: { groupId: { $ne: "Manual_Correction" } } }, { $group: { _id: "$groupId", total: { $sum: "$words" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
+            DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }]),
+            DailyStats.aggregate([{ $match: { timestamp: { $gte: sevenDaysAgo } } }, { $group: { _id: "$date", total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
+            DailyStats.aggregate([{ $match: { date: todayStr } }, { $group: { _id: null, total: { $sum: "$words" } } }]),
+            DailyStats.distinct("userId", { date: todayStr }),
+            DailyStats.aggregate([{ $match: { date: todayStr, groupId: { $ne: "Manual_Correction" } } }, { $group: { _id: "$groupId", total: { $sum: "$words" } } }, { $sort: { total: -1 } }, { $limit: 1 }]),
+            DailyStats.distinct("name"),
+            DailyStats.distinct("groupId"),
+        ]);
+
+        const hotGroup = hotGroupRaw[0] ? { name: groupMap[hotGroupRaw[0]._id] || hotGroupRaw[0]._id, words: hotGroupRaw[0].total } : null;
+
+        res.json({
+            isConnected, qrCode: qrImage,
+            topWriters:   topWriters.map(w => ({ name: w._id, words: w.total })),
+            todayWriters: todayWriters.map(w => ({ name: w._id, words: w.total })),
+            topGroups:    topGroups.map(g => ({ name: groupMap[g._id] || g._id, words: g.total })),
+            totalWords:   totalWordsAgg[0]?.total || 0,
+            totalWriters: totalWriters.length,
+            totalGroups:  allGroupIds.filter(id => id !== "Manual_Correction").length,
+            activeSprintsCount: Object.keys(activeSprints).length,
+            chartData: { labels: chartDataRaw.map(d => d._id), data: chartDataRaw.map(d => d.total) },
+            todayPulse: { words: todayWordAgg[0]?.total || 0, writers: todayActiveUsers.length, hotGroup },
+            recentActivity: recentActivity.slice(0, 10)
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin: system info (includes recentActivity + feedback unread count)
+router.get('/api/admin/system', requireAdmin, async (req, res) => {
+    try {
+        const memory = process.memoryUsage();
+        const unreadFeedback = await Feedback.countDocuments({ isRead: false });
+        res.json({
+            uptime:    process.uptime(),
+            memory:    Math.round(memory.heapUsed / 1024 / 1024),
+            platform:  os.platform() + " " + os.release(),
+            cpu:       os.cpus()[0].model,
+            maintenance: maintenanceMode,
+            activeSprintsCount:    Object.keys(activeSprints).length,
+            activeDuelsCount:      Object.keys(activeDuels).length,
+            activePomodorosCount:  Object.keys(activePomodoros).length,
+            unreadFeedback,
+            recentActivity
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/maintenance', requireAdmin, (req, res) => {
+    maintenanceMode = req.body.status;
+    res.json({ success: true, status: maintenanceMode });
+});
+
+router.get('/api/admin/sprints', requireAdmin, async (req, res) => {
+    try {
+        await updateGroupCache();
+        const sprints = Object.entries(activeSprints).map(([chatId, sprint]) => ({
+            id: chatId,
+            name: groupCache[chatId]?.subject || chatId,
+            timeLeft: Math.ceil(Math.max(0, sprint.endsAt - Date.now()) / 60000),
+            participants: Object.keys(sprint.participants).length,
+            participantList: Object.entries(sprint.participants).map(([uid, d]) => ({ uid: uid.split('@')[0], words: d.words || 0 }))
+        }));
+        res.json(sprints);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/sprints/stop', requireAdmin, async (req, res) => {
+    const { chatId } = req.body;
+    if (activeSprints[chatId]) {
+        delete activeSprints[chatId];
+        await ActiveSprint.deleteOne({ groupId: chatId });
+        try { if (sock && isConnected) await sock.sendMessage(chatId, { text: "🛑 *ADMIN STOP*: Sprint cancelled by Admin." }); } catch(e) {}
+        return res.json({ success: true });
+    }
+    res.status(404).json({ error: "Sprint not found" });
+});
+
+router.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
+    try {
+        await updateGroupCache();
+        const sprints = await ScheduledSprint.find({ startTime: { $gt: new Date() } }).sort({ startTime: 1 });
+        res.json(sprints.map(s => ({
+            id: s._id,
+            groupName: groupCache[s.groupId]?.subject || s.groupId,
+            startTime: s.startTime, duration: s.duration,
+            createdBy: s.createdBy.split('@')[0]
+        })));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
+    try { await ScheduledSprint.findByIdAndDelete(req.body.id); res.json({ success: true }); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Writers: all matching query, no .limit()
+router.post('/api/admin/search', requireAdmin, async (req, res) => {
+    try {
+        const profiles = await UserProfile.find({ name: { $regex: req.body.query || '', $options: 'i' } });
+        const enriched = await Promise.all(profiles.map(async p => {
+            const isBanned = await Blacklist.exists({ userId: p.userId });
+            return {
+                _id: p.userId, name: p.name,
+                totalWords: p.totalWordsAllTime, lastActive: p.lastActiveDate,
+                rank: getRank(p.totalWordsAllTime), streak: p.currentStreak,
+                bestStreak: p.bestStreak, trueTotal: p.totalWordsAllTime,
+                isBanned: !!isBanned,
+                badges: p.badges || [],
+                bestSprintWords: p.bestSprintWords, bestSprintWpm: p.bestSprintWpm,
+                sprintCount: p.sprintCount, activityLog: p.activityLog
+            };
+        }));
+        res.json(enriched);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Writer sprint history (for drawer)
+router.get('/api/admin/writer/:userId/history', requireAdmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const [wordsByDay, goals, recentSprints] = await Promise.all([
+            DailyStats.aggregate([
+                { $match: { userId, timestamp: { $gte: thirtyDaysAgo } } },
+                { $group: { _id: "$date", total: { $sum: "$words" } } },
+                { $sort: { _id: 1 } }
+            ]),
+            PersonalGoal.find({ userId }).sort({ _id: -1 }).limit(5),
+            SprintRecord.find({ 'participants.userId': userId }).sort({ timestamp: -1 }).limit(10)
+        ]);
+        res.json({
+            wordsByDay: { labels: wordsByDay.map(d => d._id), data: wordsByDay.map(d => d.total) },
+            goals: goals.map(g => ({
+                target: g.target, current: g.current, isActive: g.isActive,
+                startDate: g.startDate, completedAt: g.completedAt,
+                duration: g.completedAt ? getDurationString(g.startedAt, g.completedAt) : null
+            })),
+            recentSprints: recentSprints.map(sr => {
+                const p = sr.participants.find(x => x.userId === userId);
+                return { date: sr.timestamp, duration: sr.duration, words: p?.words || 0, wpm: p?.wpm || 0 };
+            })
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/update', requireAdmin, async (req, res) => {
+    const { userId, amount, type, name } = req.body;
+    try {
+        if (type === 'name') {
+            await UserProfile.findOneAndUpdate({ userId }, { name });
+            await DailyStats.updateMany({ userId }, { name });
+            await PersonalGoal.updateMany({ userId }, { name });
+            return res.json({ success: true });
+        }
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+        const history  = await DailyStats.findOne({ userId }).sort({ timestamp: -1 });
+        let doc = await DailyStats.findOne({ userId, date: todayStr, groupId: history?.groupId || "Manual_Correction" });
+        if (!doc) doc = await DailyStats.create({ userId, name: history?.name || userId, groupId: history?.groupId || "Manual_Correction", date: todayStr, words: 0 });
+        let diff = 0;
+        if (type === 'set') { diff = parseInt(amount) - doc.words; doc.words = parseInt(amount); }
+        else { diff = parseInt(amount); doc.words += diff; }
+        doc.timestamp = new Date();
+        await doc.save();
+        await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: diff } });
+        await UserProfile.findOneAndUpdate({ userId }, { $inc: { totalWordsAllTime: diff } }, { upsert: true });
+        res.json({ success: true, newTotal: doc.words });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/ban', requireAdmin, async (req, res) => {
+    const { userId, action } = req.body;
+    try {
+        if (action === 'ban') await Blacklist.findOneAndUpdate({ userId }, { userId }, { upsert: true });
+        else await Blacklist.deleteMany({ userId });
+        res.json({ success: true, isBanned: action === 'ban' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
+    try {
+        const { message, image } = req.body;
+        if (!message && !image) return res.status(400).json({ error: "Need text or image" });
+        const groups = await sock.groupFetchAllParticipating();
+        let count = 0;
+        for (const gid of Object.keys(groups)) {
+            try {
+                if (image) {
+                    const buffer = Buffer.from(image.split(",")[1], 'base64');
+                    await sock.sendMessage(gid, { image: buffer, caption: message || "" });
+                } else {
+                    await sock.sendMessage(gid, { text: message });
+                }
+                count++;
+                await new Promise(r => setTimeout(r, 500));
+            } catch (e) {}
+        }
+        res.json({ success: true, count });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Groups: enriched with health data
+router.get('/api/admin/groups', requireAdmin, async (req, res) => {
+    try {
+        const groups = await GroupMeta.find({});
+        const todayStr    = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+        const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        const result = await Promise.all(groups.map(async (data) => {
+            const jid = data.groupId;
+            try {
+                const [weekWords, activeWriters, lastSprint] = await Promise.all([
+                    DailyStats.aggregate([{ $match: { groupId: jid, timestamp: { $gte: sevenDaysAgo } } }, { $group: { _id: null, total: { $sum: "$words" } } }]),
+                    DailyStats.distinct("userId", { groupId: jid, date: todayStr }),
+                    SprintRecord.findOne({ groupId: jid }).sort({ timestamp: -1 })
+                ]);
+                const weekTotal = weekWords[0]?.total || 0;
+                const health = weekTotal > 5000 ? 'Active' : weekTotal > 500 ? 'Quiet' : 'Dormant';
+                return {
+                    id: jid, name: data.subject || jid,
+                    participants: data.size || 0,
+                    weekWords: weekTotal, activeWritersToday: activeWriters.length,
+                    lastSprintAt: lastSprint?.timestamp || null, health
+                };
+            } catch (err) {
+                // Return fallback data so the list doesn't crash
+                return {
+                    id: jid, name: data.subject || jid,
+                    participants: data.size || 0,
+                    weekWords: 0, activeWritersToday: 0,
+                    lastSprintAt: null, health: 'Dormant'
+                };
+            }
+        }));
+        res.json(result);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/groups/leave', requireAdmin, async (req, res) => {
+    try {
+        const { chatId } = req.body;
+        if (sock && isConnected) {
+            await sock.sendMessage(chatId, { text: "👋 Bot leaving via Admin Console." });
+            await sock.groupLeave(chatId);
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/groups/accept', requireAdmin, async (req, res) => {
+    const { inviteCode } = req.body;
+    if (!inviteCode) return res.status(400).json({ error: "Provide invite code." });
+    if (!sock || !isConnected) return res.status(503).json({ error: "Bot not connected." });
+    try {
+        const code    = inviteCode.includes('chat.whatsrouter.com/') ? inviteCode.split('chat.whatsrouter.com/').pop().trim() : inviteCode.trim();
+        const groupId = await sock.groupAcceptInvite(code);
+        res.json({ success: true, groupId });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Feedback
+router.get('/api/admin/feedback', requireAdmin, async (req, res) => {
+    try {
+        const [items, unreadCount] = await Promise.all([
+            Feedback.find().sort({ timestamp: -1 }).limit(100),
+            Feedback.countDocuments({ isRead: false })
+        ]);
+        res.json({ items, unreadCount });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/feedback/read', requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.body;
+        if (id === 'all') await Feedback.updateMany({}, { isRead: true });
+        else await Feedback.findByIdAndUpdate(id, { isRead: true });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Analytics
+router.get('/api/admin/analytics', requireAdmin, async (req, res) => {
+    try {
+        const now          = new Date();
+        const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const sevenDaysAgo  = new Date(now); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const prevSevenStart = new Date(sevenDaysAgo.getTime() - 7 * 86400000);
+
+        const [wordsByDay, wordsByHour, activeThisWeek, activeLastWeek, thisWeekWords, lastWeekWords, groupBreakdown, dbGroups] = await Promise.all([
+            DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo } } }, { $group: { _id: "$date", total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
+            DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo } } }, { $group: { _id: { $hour: "$timestamp" }, total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
+            DailyStats.distinct("userId", { timestamp: { $gte: sevenDaysAgo } }),
+            DailyStats.distinct("userId", { timestamp: { $gte: prevSevenStart, $lt: sevenDaysAgo } }),
+            DailyStats.aggregate([{ $match: { timestamp: { $gte: sevenDaysAgo } } }, { $group: { _id: "$userId", total: { $sum: "$words" }, name: { $first: "$name" } } }]),
+            DailyStats.aggregate([{ $match: { timestamp: { $gte: prevSevenStart, $lt: sevenDaysAgo } } }, { $group: { _id: "$userId", total: { $sum: "$words" } } }]),
+            DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo }, groupId: { $ne: "Manual_Correction" } } }, { $group: { _id: "$groupId", total: { $sum: "$words" }, writers: { $addToSet: "$userId" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
+            GroupMeta.find({})
+        ]);
+
+        const retained      = activeThisWeek.filter(u => activeLastWeek.includes(u));
+        const retentionRate = activeLastWeek.length > 0 ? Math.round((retained.length / activeLastWeek.length) * 100) : 0;
+
+        const lastWeekMap = {};
+        lastWeekWords.forEach(w => lastWeekMap[w._id] = w.total);
+        const growers = thisWeekWords
+            .map(w => ({ name: w.name, thisWeek: w.total, lastWeek: lastWeekMap[w._id] || 0, growth: w.total - (lastWeekMap[w._id] || 0) }))
+            .filter(w => w.growth > 0).sort((a, b) => b.growth - a.growth).slice(0, 10);
+
+        const groupMap = {};
+        dbGroups.forEach(g => groupMap[g.groupId] = g.subject);
+
+        res.json({
+            wordsByDay: { labels: wordsByDay.map(d => d._id), data: wordsByDay.map(d => d.total) },
+            wordsByHour: Array.from({ length: 24 }, (_, h) => ({ hour: h, total: wordsByHour.find(x => x._id === h)?.total || 0 })),
+            retentionRate, activeThisWeek: activeThisWeek.length, activeLastWeek: activeLastWeek.length,
+            growers,
+            groupBreakdown: groupBreakdown.map(g => ({ name: groupMap[g._id] || g._id, words: g.total, writers: g.writers.length }))
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Scheduled broadcasts
+router.get('/api/admin/broadcasts/scheduled', requireAdmin, async (req, res) => {
+    try {
+        const items = await ScheduledBroadcast.find({ sent: false, sendAt: { $gt: new Date() } }).sort({ sendAt: 1 });
+        res.json(items);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/broadcasts/schedule', requireAdmin, async (req, res) => {
+    try {
+        const { message, image, sendAt } = req.body;
+        if (!message && !image) return res.status(400).json({ error: "Need message or image" });
+        if (!sendAt) return res.status(400).json({ error: "Need sendAt time" });
+        const broadcast = await ScheduledBroadcast.create({ message, image, sendAt: new Date(sendAt) });
+        res.json({ success: true, id: broadcast._id });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/broadcasts/cancel', requireAdmin, async (req, res) => {
+    try { await ScheduledBroadcast.findByIdAndDelete(req.body.id); res.json({ success: true }); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
+
+
+
+
+    return router;
+};

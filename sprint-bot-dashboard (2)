@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint Bot Dashboard</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#00a884">
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏃</text></svg>">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        whatsapp: '#00a884',
+                        darkbg: '#0f172a', // Slate 900
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    animation: {
+                        'blob': 'blob 7s infinite',
+                        'shimmer': 'shimmer 2s linear infinite',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        },
+                        shimmer: {
+                            '0%': { backgroundPosition: '-1000px 0' },
+                            '100%': { backgroundPosition: '1000px 0' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
+        
+        body { font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; }
+
+        /* Glassmorphism Cards */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .dark .glass-panel {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25);
+        }
+
+        /* Nav Glass */
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .dark .glass-nav {
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* 🟢 FIXED: Text Gradient Logic */
+        .text-gradient {
+            background: linear-gradient(135deg, #1e293b 0%, #64748b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .dark .text-gradient {
+            background: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
+            -webkit-background-clip: text; /* RE-ADDED THIS TO FIX THE BOX ISSUE */
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .text-gradient-green {
+            background: linear-gradient(135deg, #00a884 0%, #34d399 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Skeleton Loading Animation */
+        .skeleton {
+            background: #e2e8f0;
+            background-image: linear-gradient(to right, #e2e8f0 0%, #f1f5f9 20%, #e2e8f0 40%, #e2e8f0 100%);
+            background-repeat: no-repeat;
+            background-size: 800px 104px; 
+            animation-duration: 1.5s;
+            animation-fill-mode: forwards; 
+            animation-iteration-count: infinite;
+            animation-name: shimmer;
+            animation-timing-function: linear;
+        }
+        .dark .skeleton {
+            background: #334155;
+            background-image: linear-gradient(to right, #334155 0%, #475569 20%, #334155 40%, #334155 100%);
+        }
+
+        /* Hover Shimmer Overlay */
+        .card-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+        .card-shimmer::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
+            transform: skewX(-25deg);
+            transition: 0.5s;
+        }
+        .dark .card-shimmer::before {
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.05), transparent);
+        }
+        .card-shimmer:hover::before { left: 150%; transition: 0.7s; }
+        .card-shimmer:hover { transform: translateY(-5px); }
+
+    </style>
+</head>
+<body class="bg-gray-50 text-slate-800 dark:bg-darkbg dark:text-slate-100 min-h-screen pb-16 transition-colors duration-500 relative">
+
+    <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div class="absolute top-0 left-1/4 w-96 h-96 bg-green-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob dark:opacity-10 dark:bg-emerald-600"></div>
+        <div class="absolute top-0 right-1/4 w-96 h-96 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000 dark:opacity-10 dark:bg-blue-600"></div>
+        <div class="absolute -bottom-32 left-1/3 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000 dark:opacity-10 dark:bg-purple-600"></div>
+    </div>
+
+    <nav class="glass-nav sticky top-0 z-50 transition-all duration-300">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center max-w-7xl">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 transform hover:rotate-12 transition-transform duration-300">
+                    <i class="fas fa-running text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight text-slate-800 dark:text-white">Sprint Bot</h1>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <button id="refresh-btn" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-gray-500 dark:text-gray-400" title="Refresh Data">
+                    <i class="fas fa-sync-alt text-sm"></i>
+                </button>
+
+                <button id="theme-toggle" class="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-yellow-400 border border-gray-200 dark:border-slate-700 transition-transform hover:scale-105 active:scale-95 shadow-sm">
+                    <i class="fas fa-moon" id="theme-icon"></i>
+                </button>
+
+                <button id="install-btn" class="hidden bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all transform hover:-translate-y-0.5">
+                    <i class="fas fa-download mr-1"></i> App
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        
+        <div id="skeleton-loader" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            <div class="glass-panel h-32 rounded-2xl p-6"><div class="h-4 w-24 skeleton rounded mb-4"></div><div class="h-8 w-32 skeleton rounded"></div></div>
+            <div class="glass-panel h-32 rounded-2xl p-6"><div class="h-4 w-24 skeleton rounded mb-4"></div><div class="h-8 w-32 skeleton rounded"></div></div>
+            <div class="glass-panel h-32 rounded-2xl p-6"><div class="h-4 w-24 skeleton rounded mb-4"></div><div class="h-8 w-32 skeleton rounded"></div></div>
+            <div class="glass-panel h-32 rounded-2xl p-6"><div class="h-4 w-24 skeleton rounded mb-4"></div><div class="h-8 w-32 skeleton rounded"></div></div>
+        </div>
+
+        <div id="dashboard-content" class="hidden opacity-0 transition-opacity duration-500">
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+                <div class="glass-panel p-6 rounded-2xl card-shimmer group cursor-default">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest mb-1">Total Words</p>
+                            <h2 class="text-4xl font-extrabold text-gradient tracking-tight" id="total-words">0</h2>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-pen-nib"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl card-shimmer group cursor-default">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest mb-1">Total Writers</p>
+                            <h2 class="text-4xl font-extrabold text-gradient tracking-tight" id="total-writers">0</h2>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl card-shimmer group cursor-default">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest mb-1">Active Groups</p>
+                            <h2 class="text-4xl font-extrabold text-gradient tracking-tight" id="total-groups">0</h2>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center text-orange-500 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-layer-group"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl card-shimmer group cursor-default">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest mb-1">System Status</p>
+                            <h2 class="text-3xl font-extrabold text-gradient-green tracking-tight mt-1" id="system-status-text">Active</h2>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel p-6 rounded-2xl mb-8 border-l-4 border-emerald-500 shadow-lg">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-bold text-lg text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                        Sprint Velocity
+                    </h3>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span class="text-xs font-medium text-slate-400">Live Data</span>
+                    </div>
+                </div>
+                <div class="relative h-72 w-full">
+                    <canvas id="activityChart"></canvas>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <div class="glass-panel rounded-2xl overflow-hidden flex flex-col h-full hover:shadow-xl transition-shadow duration-300">
+                    <div class="p-5 border-b border-gray-100 dark:border-slate-700/50 flex items-center justify-between">
+                        <div class="font-bold text-slate-700 dark:text-slate-200"><i class="fas fa-trophy text-yellow-500 mr-2 drop-shadow-sm"></i> Hall of Fame</div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                            <tbody id="all-time-list" class="divide-y divide-gray-100 dark:divide-slate-700/50"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="glass-panel rounded-2xl overflow-hidden flex flex-col h-full hover:shadow-xl transition-shadow duration-300">
+                    <div class="p-5 border-b border-gray-100 dark:border-slate-700/50 flex items-center justify-between">
+                        <div class="font-bold text-slate-700 dark:text-slate-200"><i class="fas fa-fire text-blue-500 mr-2 drop-shadow-sm"></i> Today's Top</div>
+                        <span class="text-[10px] font-extrabold bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 px-2 py-1 rounded shadow-sm">LIVE</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                            <tbody id="today-list" class="divide-y divide-gray-100 dark:divide-slate-700/50"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="glass-panel rounded-2xl overflow-hidden flex flex-col h-full hover:shadow-xl transition-shadow duration-300">
+                    <div class="p-5 border-b border-gray-100 dark:border-slate-700/50 flex items-center justify-between">
+                        <div class="font-bold text-slate-700 dark:text-slate-200"><i class="fas fa-crown text-orange-500 mr-2 drop-shadow-sm"></i> Top Groups</div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                            <tbody id="groups-list" class="divide-y divide-gray-100 dark:divide-slate-700/50"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        
+        <footer class="text-center mt-12 text-slate-400 text-xs">
+            <p class="font-medium">Sprint Bot &copy; 2025</p>
+            <p class="mt-1 opacity-60">Designed by sam_marfe</p>
+        </footer>
+    </div>
+
+    <script>
+        const API_URL = 'https://sprint-bot-9bll.onrender.com/api/stats';
+        let myChart = null; 
+
+        // --- Persistence Logic ---
+        const htmlElement = document.documentElement;
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            htmlElement.classList.add('dark');
+            document.getElementById('theme-icon').classList.replace('fa-moon', 'fa-sun');
+        }
+
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            htmlElement.classList.toggle('dark');
+            const icon = document.getElementById('theme-icon');
+            if (htmlElement.classList.contains('dark')) {
+                localStorage.theme = 'dark';
+                icon.classList.replace('fa-moon', 'fa-sun');
+            } else {
+                localStorage.theme = 'light';
+                icon.classList.replace('fa-sun', 'fa-moon');
+            }
+            if (window.lastChartData) renderChart(window.lastChartData);
+        });
+
+        // --- Refresh Button ---
+        document.getElementById('refresh-btn').addEventListener('click', function() {
+            this.querySelector('i').classList.add('fa-spin');
+            loadData().then(() => {
+                setTimeout(() => this.querySelector('i').classList.remove('fa-spin'), 500);
+            });
+        });
+
+        // --- PWA Logic ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+        }
+        let deferredPrompt;
+        const installBtn = document.getElementById('install-btn');
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.classList.remove('hidden');
+        });
+        installBtn.addEventListener('click', (e) => {
+            installBtn.classList.add('hidden');
+            if (deferredPrompt) deferredPrompt.prompt();
+        });
+
+        // --- Data Logic ---
+        async function loadData() {
+            try {
+                // Keep skeletons visible if it's the first load
+                const isFirstLoad = document.getElementById('dashboard-content').classList.contains('hidden');
+                
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                window.lastChartData = data.chartData;
+
+                if (isFirstLoad) {
+                    // Hide Skeletons, Show Content with Fade
+                    document.getElementById('skeleton-loader').classList.add('hidden');
+                    const content = document.getElementById('dashboard-content');
+                    content.classList.remove('hidden');
+                    setTimeout(() => content.classList.remove('opacity-0'), 50);
+                }
+
+                updateStatus(data.isConnected);
+
+                // Animate Numbers
+                animateValue("total-words", data.totalWords);
+                animateValue("total-writers", data.totalWriters);
+                animateValue("total-groups", data.totalGroups);
+
+                renderTable('all-time-list', data.topWriters);
+                renderTable('today-list', data.todayWriters);
+                renderTable('groups-list', data.topGroups);
+
+                if (data.chartData) renderChart(data.chartData);
+
+            } catch (error) {
+                console.error("Error:", error);
+            }
+        }
+
+        function updateStatus(isConnected) {
+            const textEl = document.getElementById('system-status-text');
+            if (!isConnected) {
+                textEl.innerText = "Offline";
+                textEl.className = "text-3xl font-extrabold text-red-500 tracking-tight mt-1";
+            } else {
+                textEl.innerText = "Active";
+                textEl.className = "text-3xl font-extrabold text-gradient-green tracking-tight mt-1";
+            }
+        }
+
+        function animateValue(id, end) {
+            const obj = document.getElementById(id);
+            const current = parseInt(obj.innerText.replace(/,/g, '').replace('M','000000').replace('k','000')) || 0;
+            if (current === end) return; // Don't animate if same
+            
+            let startTimestamp = null;
+            const duration = 1000;
+            
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const val = Math.floor(progress * (end - current) + current);
+                
+                obj.innerHTML = formatNumber(val);
+
+                if (progress < 1) window.requestAnimationFrame(step);
+                else obj.innerHTML = formatNumber(end);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+            return num.toLocaleString();
+        }
+
+        function renderTable(elementId, items) {
+            const container = document.getElementById(elementId);
+            if (!items || items.length === 0) {
+                container.innerHTML = '<tr><td colspan="3" class="p-6 text-center text-slate-400 text-xs italic">No data available yet</td></tr>';
+                return;
+            }
+            container.innerHTML = items.map((w, i) => `
+                <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition border-b border-gray-50 dark:border-slate-700/50 last:border-0 group">
+                    <td class="px-4 py-3 w-10 text-center text-lg">${getMedal(i)}</td>
+                    <td class="px-4 py-3 font-medium truncate max-w-[140px] text-slate-700 dark:text-slate-200 group-hover:text-emerald-500 transition-colors" title="${w.name}">${w.name}</td>
+                    <td class="px-4 py-3 text-right font-bold text-slate-400 text-xs font-mono">${w.words.toLocaleString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        function getMedal(i) {
+            if (i === 0) return '🥇';
+            if (i === 1) return '🥈';
+            if (i === 2) return '🥉';
+            return `<span class="text-slate-400 text-[10px] font-mono">#${i+1}</span>`;
+        }
+
+        function renderChart(chartData) {
+            const ctx = document.getElementById('activityChart').getContext('2d');
+            const isDark = htmlElement.classList.contains('dark');
+            
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+
+            let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(0, 168, 132, 0.4)');   
+            gradient.addColorStop(1, 'rgba(0, 168, 132, 0)');
+
+            if (myChart) myChart.destroy();
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: 'Words',
+                        data: chartData.data,
+                        borderColor: '#00a884',
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        pointBackgroundColor: isDark ? '#0f172a' : '#ffffff',
+                        pointBorderColor: '#00a884',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: gridColor, borderDash: [6, 6] },
+                            ticks: { color: textColor, font: { size: 10, family: "'Plus Jakarta Sans'" } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { size: 10, family: "'Plus Jakarta Sans'" } }
+                        }
+                    }
+                }
+            });
+        }
+
+        loadData();
+        setInterval(loadData, 30000); 
+    </script>
+</body>
+</html>
