@@ -54,7 +54,7 @@
         /* Banner */
         .banner {
             background: linear-gradient(135deg,#0d9488 0%,#6366f1 60%,#8b5cf6 100%);
-            height: 108px; position:relative; overflow:hidden;
+            height: 108px; position:relative;
         }
         .banner::after {
             content:'';
@@ -170,9 +170,13 @@
         .d1{animation-delay:.08s} .d2{animation-delay:.16s} .d3{animation-delay:.25s}
         .d4{animation-delay:.35s} .d5{animation-delay:.45s} .d6{animation-delay:.55s}
 
-        /* Light text fixes */
-        body.light .t-white { color:#1e293b; }
-        body.light .t-sub   { color:#64748b; }
+        /* Utility Colors - Theme Aware */
+        .t-white { color: #f1f5f9; transition: color .2s; }
+        .t-sub   { color: #94a3b8; transition: color .2s; }
+        
+        body.light .t-white { color: #0f172a; } 
+        body.light .t-sub   { color: #475569; }
+        body.light .stat-card { background: rgba(255,255,255,0.7); box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
     </style>
 </head>
 <body>
@@ -236,7 +240,7 @@ const BADGE_DEFS = [
 
             <div class="text-center mb-5 fu d1">
                 <h1 id="ui-name" class="t-white"
-                    style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:#f1f5f9;margin:0 0 6px;"></h1>
+                    style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;margin:0 0 6px;"></h1>
                 <span id="ui-rank"
                     style="display:inline-block;padding:4px 16px;border-radius:99px;font-size:.75rem;font-weight:700;letter-spacing:.06em;background:rgba(34,211,160,.14);color:#22d3a0;border:1px solid rgba(34,211,160,.28);"></span>
             </div>
@@ -244,8 +248,8 @@ const BADGE_DEFS = [
             <div class="grid grid-cols-2 gap-3 mb-5 fu d2">
                 <div class="stat-card flex flex-col justify-center">
                     <div id="ui-total"
-                        style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#f1f5f9;" class="t-white"></div>
-                    <div style="font-size:.65rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">ALL-TIME WORDS</div>
+                        style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;" class="t-white"></div>
+                    <div style="font-size:.65rem;letter-spacing:.08em;font-weight:700;margin-top:3px;" class="t-sub">ALL-TIME WORDS</div>
                 </div>
                 <div class="stat-card flex flex-col justify-center">
                     <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:4px;color:#f97316;">
@@ -256,14 +260,14 @@ const BADGE_DEFS = [
                 </div>
                 <div class="stat-card flex flex-col justify-center">
                     <div id="ui-daily"
-                        style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#f1f5f9;" class="t-white"></div>
-                    <div style="font-size:.65rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">TODAY'S WORDS</div>
+                        style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;" class="t-white"></div>
+                    <div style="font-size:.65rem;letter-spacing:.08em;font-weight:700;margin-top:3px;" class="t-sub">TODAY'S WORDS</div>
                 </div>
                 <div class="stat-card flex flex-col justify-center">
                     <div id="ui-best-val"
                         style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:#818cf8;">—</div>
-                    <div style="font-size:.65rem;color:#94a3b8;letter-spacing:.08em;font-weight:700;margin-top:3px;">BEST SPRINT</div>
-                    <div id="ui-best-label" style="font-size:.55rem;color:#64748b;margin-top:2px;"></div>
+                    <div style="font-size:.65rem;letter-spacing:.08em;font-weight:700;margin-top:3px;" class="t-sub">BEST SPRINT</div>
+                    <div id="ui-best-label" style="font-size:.55rem;margin-top:2px;" class="t-sub"></div>
                 </div>
             </div>
 
@@ -280,9 +284,9 @@ const BADGE_DEFS = [
 
             <div id="goal-section" class="hidden mb-5 fu d3">
                 <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-                    <span style="font-size:.65rem;color:#94a3b8;font-weight:600;">Goal Progress</span>
+                    <span style="font-size:.65rem;font-weight:600;" class="t-sub">Goal Progress</span>
                     <span id="goal-text"
-                        style="font-family:'DM Mono',monospace;font-size:.65rem;color:#f1f5f9;" class="t-white"></span>
+                        style="font-family:'DM Mono',monospace;font-size:.65rem;" class="t-white"></span>
                 </div>
                 <div style="height:7px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;">
                     <div class="gfill" id="goal-bar" style="width:0%;height:100%;"></div>
@@ -400,7 +404,7 @@ function buildBadges() {
         if (!def) return;
         const el = document.createElement('div');
         el.className = 'bc';
-        el.innerHTML = `<span>${def.icon}</span><span style="color:#cbd5e1">${def.label}</span><div class="tip">${def.desc}</div>`;
+        el.innerHTML = `<span>${def.icon}</span><span class="t-white">${def.label}</span><div class="tip">${def.desc}</div>`;
         wrap.appendChild(el);
     });
 }
