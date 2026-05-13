@@ -121,7 +121,18 @@
                         <div class="hud-border p-6 text-center"><div class="text-[9px] font-black text-slate-500 mb-2 uppercase tracking-widest">Groups</div><div id="live-groups" class="text-3xl font-heading font-black italic uppercase">0</div></div>
                         <div class="hud-border p-6 text-center"><div class="text-[9px] font-black text-slate-500 mb-2 uppercase tracking-widest">Missions</div><div id="live-active-sprints" class="text-3xl font-heading font-black italic text-neon-blue uppercase">0</div></div>
                     </div>
-                    <div class="hud-border p-8"><h3 class="font-black italic text-sm mb-8 tracking-widest uppercase">Global Pulse Telemetry</h3><div class="h-80"><canvas id="chart-pulse"></canvas></div></div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-2 hud-border p-8">
+                            <h3 class="font-black italic text-sm mb-8 tracking-widest uppercase">Global Pulse Telemetry</h3>
+                            <div class="h-80"><canvas id="chart-pulse"></canvas></div>
+                        </div>
+                        <div class="hud-border p-8 flex flex-col">
+                            <h3 class="font-black italic text-[10px] mb-8 tracking-[0.3em] uppercase text-neon-blue">Neural Activity Log</h3>
+                            <div id="sys-log" class="flex-1 space-y-4 overflow-y-auto no-scrollbar max-h-[320px]"></div>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div class="hud-border p-8"><h3 class="text-xs font-black text-neon-blue mb-6 uppercase italic tracking-widest">Hall of Monarchs</h3><div class="space-y-4" id="live-all-time"></div></div>
                         <div class="hud-border p-8"><h3 class="text-xs font-black text-neon-green mb-6 uppercase italic tracking-widest">Daily Elite</h3><div class="space-y-4" id="live-today"></div></div>
@@ -276,6 +287,22 @@
             document.getElementById('live-groups').textContent = data.totalGroups || 0;
             document.getElementById('live-active-sprints').textContent = data.activeSprintsCount || 0;
             renderPulseChart(data.chartData);
+
+            // System Activity Log
+            const logEl = document.getElementById('sys-log');
+            if (logEl && data.recentActivity) {
+                logEl.innerHTML = data.recentActivity.map(a => `
+                    <div class="flex items-start gap-4 p-3 bg-white/5 border-l border-neon-blue">
+                        <div class="text-neon-blue mt-1">${a.icon || '📝'}</div>
+                        <div class="min-w-0">
+                            <div class="text-[10px] font-black uppercase text-slate-400">${a.type}</div>
+                            <div class="text-[11px] font-bold italic text-slate-200 truncate">${a.text}</div>
+                            <div class="text-[8px] font-mono text-slate-600 mt-1 uppercase">${new Date(a.at).toLocaleTimeString()}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
             document.getElementById('live-all-time').innerHTML = (data.topWriters || []).slice(0, 6).map((u, i) => `<div class="flex justify-between items-center p-4 bg-white/5 border-l-2 border-neon-blue"><span class="text-xs font-black italic uppercase"><span class="text-slate-500 mr-2">0${i+1}</span> ${u.name}</span><span class="font-mono text-[10px] text-neon-blue font-bold">${u.words.toLocaleString()}</span></div>`).join('');
             document.getElementById('live-today').innerHTML = (data.todayWriters || []).slice(0, 6).map((u, i) => `<div class="flex justify-between items-center p-4 bg-white/5 border-l-2 border-neon-green"><span class="text-xs font-black italic uppercase"><span class="text-slate-500 mr-2">0${i+1}</span> ${u.name}</span><span class="font-mono text-[10px] text-neon-green font-bold">${u.words.toLocaleString()}</span></div>`).join('') || '<p class="text-center text-[10px] text-slate-600 py-6 uppercase font-black">Waiting for activity...</p>';
             document.getElementById('live-groups-list').innerHTML = (data.topGroups || []).slice(0, 6).map((g, i) => `<div class="flex justify-between items-center p-4 bg-white/5 border-l-2 border-neon-purple"><span class="text-xs font-black italic uppercase truncate pr-4">${g.name}</span><span class="font-mono text-[10px] text-neon-purple font-bold">${g.words.toLocaleString()}</span></div>`).join('');
