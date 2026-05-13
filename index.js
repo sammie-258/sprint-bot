@@ -637,14 +637,15 @@ app.get('/api/admin/analytics', requireAdmin, async (req, res) => {
         const sevenDaysAgo  = new Date(now); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const prevSevenStart = new Date(sevenDaysAgo.getTime() - 7 * 86400000);
 
-        const [wordsByDay, wordsByHour, activeThisWeek, activeLastWeek, thisWeekWords, lastWeekWords, groupBreakdown] = await Promise.all([
+        const [wordsByDay, wordsByHour, activeThisWeek, activeLastWeek, thisWeekWords, lastWeekWords, groupBreakdown, dbGroups] = await Promise.all([
             DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo } } }, { $group: { _id: "$date", total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
             DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo } } }, { $group: { _id: { $hour: "$timestamp" }, total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
             DailyStats.distinct("userId", { timestamp: { $gte: sevenDaysAgo } }),
             DailyStats.distinct("userId", { timestamp: { $gte: prevSevenStart, $lt: sevenDaysAgo } }),
             DailyStats.aggregate([{ $match: { timestamp: { $gte: sevenDaysAgo } } }, { $group: { _id: "$userId", total: { $sum: "$words" }, name: { $first: "$name" } } }]),
             DailyStats.aggregate([{ $match: { timestamp: { $gte: prevSevenStart, $lt: sevenDaysAgo } } }, { $group: { _id: "$userId", total: { $sum: "$words" } } }]),
-            DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo }, groupId: { $ne: "Manual_Correction" } } }, { $group: { _id: "$groupId", total: { $sum: "$words" }, writers: { $addToSet: "$userId" } } }, { $sort: { total: -1 } }, { $limit: 10 }])
+            DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo }, groupId: { $ne: "Manual_Correction" } } }, { $group: { _id: "$groupId", total: { $sum: "$words" }, writers: { $addToSet: "$userId" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
+            GroupMeta.find({})
         ]);
 
         const retained      = activeThisWeek.filter(u => activeLastWeek.includes(u));
@@ -656,13 +657,15 @@ app.get('/api/admin/analytics', requireAdmin, async (req, res) => {
             .map(w => ({ name: w.name, thisWeek: w.total, lastWeek: lastWeekMap[w._id] || 0, growth: w.total - (lastWeekMap[w._id] || 0) }))
             .filter(w => w.growth > 0).sort((a, b) => b.growth - a.growth).slice(0, 10);
 
-        await updateGroupCache();
+        const groupMap = {};
+        dbGroups.forEach(g => groupMap[g.groupId] = g.subject);
+
         res.json({
             wordsByDay: { labels: wordsByDay.map(d => d._id), data: wordsByDay.map(d => d.total) },
             wordsByHour: Array.from({ length: 24 }, (_, h) => ({ hour: h, total: wordsByHour.find(x => x._id === h)?.total || 0 })),
             retentionRate, activeThisWeek: activeThisWeek.length, activeLastWeek: activeLastWeek.length,
             growers,
-            groupBreakdown: groupBreakdown.map(g => ({ name: groupCache[g._id]?.subject || g._id, words: g.total, writers: g.writers.length }))
+            groupBreakdown: groupBreakdown.map(g => ({ name: groupMap[g._id] || g._id, words: g.total, writers: g.writers.length }))
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
