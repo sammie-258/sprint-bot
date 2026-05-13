@@ -1,1459 +1,582 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprint Bot Command Center</title>
+    <title>SYSTEM INTERFACE — Sprint Bot Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        heading: ['Space Grotesk', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        void: '#020617',
+                        panel: '#0a1220',
+                        elevated: '#0f1a30',
+                        neon: {
+                            blue: '#38bdf8',
+                            purple: '#a855f7',
+                            green: '#22d3a0',
+                            red: '#f43f5e'
+                        }
+                    },
+                    boxShadow: {
+                        'neon-blue': '0 0 15px rgba(56, 189, 248, 0.2)',
+                        'neon-purple': '0 0 15px rgba(168, 85, 247, 0.2)',
+                    }
                 }
             }
         }
     </script>
 
     <style>
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-        
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #a3b1c6; border-radius: 10px; }
-        .dark ::-webkit-scrollbar-thumb { background: #0f172a; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        /* ── PURE CLAYMORPHISM COLOR VARIABLES ── */
         :root {
-            --bg-base: #e0e5ec;
-            --shadow-drk: #a3b1c6;
-            --shadow-lgt: #ffffff;
-            --text-main: #475569;
-            --text-bold: #1e293b;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.25);
         }
-
-        .dark {
-            --bg-base: #1e293b;
-            --shadow-drk: #0f172a;
-            --shadow-lgt: #2e3d54;
-            --text-main: #94a3b8;
-            --text-bold: #f1f5f9;
+        body {
+            background-color: #020617;
+            color: #e2e8f0;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
-
-        body { 
-            background-color: var(--bg-base); 
-            color: var(--text-main);
-            transition: background-color 0.3s ease; 
+        .system-panel {
+            background: rgba(10, 18, 32, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.1);
+            position: relative;
+            overflow: hidden;
         }
-        
-        h1, h2, h3, h4, h5, h6, .text-bold { color: var(--text-bold); }
-
-        /* ── CLAY ELEMENTS ── */
-        .panel {
-            background-color: var(--bg-base);
-            border-radius: 28px;
-            box-shadow: 
-                10px 10px 20px var(--shadow-drk), 
-                -10px -10px 20px var(--shadow-lgt),
-                inset 2px 2px 5px rgba(255,255,255,0.4),
-                inset -3px -3px 7px rgba(0,0,0,0.03);
-            border: none;
-            transition: all 0.3s ease;
+        .system-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.5;
         }
-        .dark .panel {
-            box-shadow: 
-                10px 10px 20px var(--shadow-drk), 
-                -10px -10px 20px var(--shadow-lgt),
-                inset 2px 2px 5px rgba(255,255,255,0.02),
-                inset -3px -3px 7px rgba(0,0,0,0.2);
+        .nav-item {
+            position: relative;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
-
-        .panel-inset {
-            background-color: var(--bg-base);
-            border-radius: 20px;
-            box-shadow: 
-                inset 6px 6px 12px var(--shadow-drk), 
-                inset -6px -6px 12px var(--shadow-lgt);
-            border: none;
+        .nav-item.active {
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.05);
         }
-
-        .btn-clay {
-            background-color: var(--bg-base);
-            border-radius: 14px;
-            box-shadow: 
-                5px 5px 10px var(--shadow-drk), 
-                -5px -5px 10px var(--shadow-lgt),
-                inset 1px 1px 2px rgba(255,255,255,0.5);
-            color: var(--text-bold);
-            font-weight: 700;
-            transition: all 0.15s ease;
-            cursor: pointer;
-            border: none;
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: auto;
+            width: 2px;
+            background: #38bdf8;
+            box-shadow: 0 0 10px #38bdf8;
         }
-        .dark .btn-clay {
-            box-shadow: 
-                5px 5px 10px var(--shadow-drk), 
-                -5px -5px 10px var(--shadow-lgt),
-                inset 1px 1px 2px rgba(255,255,255,0.05);
+        @media (max-width: 768px) {
+            .nav-item.active::before {
+                left: 0; right: 0; top: 0; bottom: auto;
+                width: auto; height: 2px;
+            }
         }
-        .btn-clay:active, .btn-clay.active {
-            box-shadow: inset 4px 4px 8px var(--shadow-drk), inset -4px -4px 8px var(--shadow-lgt);
-            color: #10b981;
-        }
-
-        .btn-clay-primary {
-            background-color: #10b981;
-            border-radius: 14px;
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .input-system {
+            background: rgba(2, 6, 23, 0.6);
+            border: 1px solid rgba(56, 189, 248, 0.2);
             color: white;
-            font-weight: 700;
-            box-shadow: 
-                6px 6px 12px rgba(16, 185, 129, 0.4), 
-                -6px -6px 12px rgba(255, 255, 255, 0.5),
-                inset 2px 2px 4px rgba(255, 255, 255, 0.4),
-                inset -2px -2px 4px rgba(0, 0, 0, 0.1);
-            transition: all 0.15s ease;
-            border: none;
+            transition: all 0.2s;
         }
-        .dark .btn-clay-primary {
-            box-shadow: 
-                6px 6px 12px rgba(0, 0, 0, 0.4), 
-                -6px -6px 12px rgba(16, 185, 129, 0.15),
-                inset 2px 2px 4px rgba(255, 255, 255, 0.2),
-                inset -2px -2px 4px rgba(0, 0, 0, 0.2);
+        .input-system:focus {
+            border-color: #38bdf8;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+            outline: none;
         }
-        .btn-clay-primary:active { box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2); }
-
-        .btn-clay-danger {
-            background-color: #ef4444;
-            border-radius: 14px;
-            color: white;
-            font-weight: 700;
-            box-shadow: 
-                6px 6px 12px rgba(239, 68, 68, 0.3), 
-                -6px -6px 12px rgba(255, 255, 255, 0.5),
-                inset 2px 2px 4px rgba(255, 255, 255, 0.3);
-            transition: all 0.15s ease;
-            border: none;
+        .btn-system {
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
         }
-        .dark .btn-clay-danger {
-            box-shadow: 
-                6px 6px 12px rgba(0, 0, 0, 0.4), 
-                -6px -6px 12px rgba(239, 68, 68, 0.15),
-                inset 2px 2px 4px rgba(255, 255, 255, 0.2);
-        }
-        .btn-clay-danger:active { box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2); }
-
-        .input-clay {
-            background-color: var(--bg-base);
-            border-radius: 14px;
-            border: none;
-            box-shadow: inset 5px 5px 10px var(--shadow-drk), inset -5px -5px 10px var(--shadow-lgt);
-            color: var(--text-bold);
-            transition: box-shadow 0.2s ease;
-        }
-        .input-clay:focus { outline: none; box-shadow: inset 6px 6px 12px var(--shadow-drk), inset -6px -6px 12px var(--shadow-lgt); }
-
-        /* Layout utilities */
-        .drawer-right { transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-        .drawer-right.open { transform: translateX(0); }
+        .btn-system:active { transform: scale(0.95); }
+        .glow-blue { box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); }
+        .glow-purple { box-shadow: 0 0 15px rgba(168, 85, 247, 0.3); }
         
-        @media (max-width: 767px) {
-            .sidebar-mobile { transform: translateX(-120%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-            .sidebar-mobile.open { transform: translateX(0); }
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+        .scanline {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to bottom, transparent 50%, rgba(56, 189, 248, 0.02) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
         }
     </style>
 </head>
-<body class="h-screen w-screen font-sans flex overflow-hidden selection:bg-emerald-500 selection:text-white p-3 md:p-6 gap-4 md:gap-6">
+<body class="font-sans antialiased">
+    <div class="scanline"></div>
 
-    <div id="auth-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center transition-opacity duration-300">
-        <div class="panel p-10 max-w-sm w-full text-center mx-4">
-            <div class="mb-6 inline-flex p-5 rounded-3xl bg-[#10b981] text-white shadow-[0_10px_20px_rgba(16,185,129,0.4)] text-3xl">
-                <i class="fas fa-lock"></i>
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-void/95 z-[100] flex items-center justify-center p-4">
+        <div class="system-panel p-8 w-full max-w-md animate-in fade-in zoom-in duration-300">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 border-2 border-neon-blue rounded-full flex items-center justify-center mx-auto mb-4 glow-blue">
+                    <i class="fas fa-shield-halved text-2xl text-neon-blue"></i>
+                </div>
+                <h1 class="font-heading font-bold text-2xl tracking-tighter">SYSTEM AUTHENTICATION</h1>
+                <p class="text-slate-500 text-sm mt-1">Verify Shadow Monarch credentials</p>
             </div>
-            <h2 class="text-2xl font-extrabold mb-2 text-bold">Admin Access</h2>
-            <div class="relative mb-8 mt-6">
-                <i class="fas fa-key absolute left-4 top-3.5 opacity-50"></i>
-                <input type="password" id="admin-pass" placeholder="Enter Access Key" 
-                    class="input-clay w-full pl-11 pr-4 py-3 text-sm"
-                    onkeydown="if(event.key==='Enter') login()">
+            <div class="space-y-4">
+                <input type="password" id="admin-pass" placeholder="ENTER ACCESS KEY" 
+                    class="input-system w-full px-6 py-4 rounded-xl font-mono text-center tracking-[0.5em]">
+                <button onclick="login()" class="w-full py-4 bg-neon-blue text-void font-heading font-black rounded-xl hover:bg-white transition-colors duration-300">
+                    ACCESS SYSTEM
+                </button>
             </div>
-            <button onclick="login()" class="btn-clay-primary w-full py-4 text-lg tracking-wide">
-                Unlock <i class="fas fa-arrow-right ml-2"></i>
-            </button>
         </div>
     </div>
 
-    <div id="app" class="hidden flex-1 w-full h-full flex gap-4 md:gap-6 min-h-0">
-
-        <div id="mobile-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden" onclick="toggleSidebar()"></div>
-
-        <aside id="sidebar" class="panel fixed inset-y-3 left-3 z-50 w-64 flex flex-col flex-shrink-0 sidebar-mobile md:relative md:inset-auto md:w-72 md:h-full">
-            <div class="h-24 flex items-center px-6 md:px-8 shrink-0">
-                <div class="w-12 h-12 rounded-2xl bg-[#10b981] flex items-center justify-center text-white mr-4 shadow-[0_8px_16px_rgba(16,185,129,0.3)]">
-                    <i class="fas fa-robot text-xl"></i>
+    <div id="app" class="hidden min-h-screen flex flex-col md:flex-row">
+        
+        <!-- Sidebar (Desktop) / Bottom Nav (Mobile) -->
+        <nav class="fixed bottom-0 left-0 right-0 md:relative md:w-64 bg-panel border-t md:border-t-0 md:border-r border-white/5 z-50 flex md:flex-col justify-around md:justify-start px-2 py-2 md:px-0 md:py-8 no-scrollbar overflow-x-auto">
+            <div class="hidden md:flex items-center gap-3 px-6 mb-12">
+                <div class="w-10 h-10 bg-neon-blue rounded flex items-center justify-center text-void">
+                    <i class="fas fa-bolt-lightning text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="font-extrabold text-xl leading-tight text-bold">Sprint Bot</h1>
-                    <p class="text-[10px] text-emerald-500 font-bold tracking-widest mt-1">ADMIN V4.0</p>
+                    <div class="font-heading font-black text-lg tracking-tighter leading-none">SYSTEM</div>
+                    <div class="text-[10px] text-neon-blue font-bold tracking-[0.2em]">COMMAND</div>
                 </div>
-                <button class="ml-auto md:hidden text-lg opacity-50 hover:opacity-100" onclick="toggleSidebar()"><i class="fas fa-times"></i></button>
             </div>
 
-            <nav class="flex-1 px-4 md:px-5 py-4 space-y-3 overflow-y-auto no-scrollbar min-h-0">
-                <p class="px-4 text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3 mt-2">Dashboards</p>
-                
-                <button onclick="switchTab('overview')" id="nav-overview" class="btn-clay w-full flex items-center gap-4 px-5 py-3.5 text-sm">
-                    <i class="fas fa-home w-5 text-center"></i> Overview
+            <div class="flex md:flex-col gap-1 w-full px-2">
+                <button onclick="switchTab('overview')" id="nav-overview" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-chart-line text-lg"></i>
+                    <span class="text-[10px] md:text-sm font-bold md:font-semibold uppercase tracking-wider md:tracking-normal">Status</span>
                 </button>
-                <button onclick="switchTab('analytics')" id="nav-analytics" class="btn-clay w-full flex items-center gap-4 px-5 py-3.5 text-sm">
-                    <i class="fas fa-chart-pie w-5 text-center"></i> Analytics
+                <button onclick="switchTab('sprints')" id="nav-sprints" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-clock text-lg"></i>
+                    <span class="text-[10px] md:text-sm font-bold md:font-semibold uppercase tracking-wider md:tracking-normal">Sprints</span>
                 </button>
-                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="btn-clay w-full flex items-center gap-4 px-5 py-3.5 text-sm">
-                    <i class="fas fa-tv w-5 text-center"></i> Live Display
+                <button onclick="switchTab('broadcast')" id="nav-broadcast" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-tower-broadcast text-lg"></i>
+                    <span class="text-[10px] md:text-sm font-bold md:font-semibold uppercase tracking-wider md:tracking-normal">Blast</span>
                 </button>
-
-                <p class="px-4 text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3 mt-8">Management</p>
-                
-                <button onclick="switchTab('sprints')" id="nav-sprints" class="btn-clay w-full flex items-center gap-4 px-5 py-3.5 text-sm">
-                    <i class="fas fa-stopwatch w-5 text-center"></i> Active Sprints
+                <button onclick="switchTab('writers')" id="nav-writers" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-users-viewfinder text-lg"></i>
+                    <span class="text-[10px] md:text-sm font-bold md:font-semibold uppercase tracking-wider md:tracking-normal">Writers</span>
                 </button>
-                <button onclick="switchTab('writers')" id="nav-writers" class="btn-clay w-full flex items-center gap-4 px-5 py-3.5 text-sm">
-                    <i class="fas fa-users w-5 text-center"></i> Writers
-                </button>
-                <button onclick="switchTab('groups')" id="nav-groups" class="btn-clay w-full flex items-center gap-4 px-5 py-3.5 text-sm">
-                    <i class="fas fa-hashtag w-5 text-center"></i> Groups
-                </button>
-                <button onclick="switchTab('broadcasts')" id="nav-broadcasts" class="btn-clay w-full flex items-center gap-4 px-5 py-3.5 text-sm">
-                    <i class="fas fa-calendar-alt w-5 text-center"></i> Scheduler
-                </button>
-
-                <p class="px-4 text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3 mt-8">Comms</p>
-                
-                <button onclick="openBroadcast()" class="btn-clay w-full flex items-center gap-4 px-5 py-3.5 text-sm text-blue-500">
-                    <i class="fas fa-bolt w-5 text-center"></i> Instant Blast
-                </button>
-                <button onclick="openFeedbackDrawer()" class="btn-clay w-full flex items-center justify-between px-5 py-3.5 mt-2 text-sm text-indigo-500">
-                    <div class="flex items-center gap-4"><i class="fas fa-inbox w-5 text-center"></i> Feedback</div>
-                    <span id="sidebar-feedback-badge" class="hidden bg-indigo-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-inner">0</span>
-                </button>
-            </nav>
-
-            <div class="p-6 shrink-0 flex gap-4">
-                <button onclick="toggleTheme()" class="btn-clay flex-1 py-3.5 flex justify-center items-center text-lg">
-                    <i id="theme-icon" class="fas fa-moon"></i>
-                </button>
-                <button onclick="logout()" class="btn-clay flex-1 py-3.5 flex justify-center items-center text-red-500 text-lg">
-                    <i class="fas fa-power-off"></i>
+                <button onclick="switchTab('system')" id="nav-system" class="nav-item flex flex-col md:flex-row items-center gap-1 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl flex-1 md:flex-none">
+                    <i class="fas fa-microchip text-lg"></i>
+                    <span class="text-[10px] md:text-sm font-bold md:font-semibold uppercase tracking-wider md:tracking-normal">System</span>
                 </button>
             </div>
-        </aside>
 
-        <main class="flex-1 flex flex-col h-full min-w-0 relative">
+            <div class="hidden md:block mt-auto px-6 space-y-4">
+                <div class="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <div class="text-[10px] text-slate-500 font-bold uppercase mb-2">Connected Device</div>
+                    <div class="text-xs font-semibold flex items-center gap-2" id="device-info">
+                        <span class="w-2 h-2 rounded-full bg-neon-green"></span> WhatsApp Bot
+                    </div>
+                </div>
+                <button onclick="logout()" class="w-full flex items-center gap-4 px-4 py-3 text-neon-red hover:bg-neon-red/10 rounded-xl transition-all">
+                    <i class="fas fa-power-off"></i> <span class="font-bold text-sm">LOGOUT</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto max-h-screen">
             
-            <header class="md:hidden panel h-16 flex items-center justify-between px-4 shrink-0 mb-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-xl bg-[#10b981] flex items-center justify-center text-white"><i class="fas fa-robot text-xs"></i></div>
-                    <h1 class="font-extrabold text-bold">Sprint Bot</h1>
+            <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div>
+                    <h2 id="view-title" class="font-heading font-black text-3xl tracking-tighter uppercase italic">Overview</h2>
+                    <p id="view-desc" class="text-slate-500 text-sm">Real-time system telemetry</p>
                 </div>
-                <button onclick="toggleSidebar()" class="btn-clay w-10 h-10 flex items-center justify-center"><i class="fas fa-bars"></i></button>
+                <div class="flex items-center gap-3">
+                    <button onclick="refreshData()" class="w-10 h-10 system-panel rounded-full flex items-center justify-center hover:text-neon-blue transition-colors">
+                        <i class="fas fa-rotate"></i>
+                    </button>
+                    <div class="px-4 py-2 system-panel rounded-xl flex items-center gap-2 text-xs font-bold">
+                        <span class="w-2 h-2 rounded-full animate-pulse bg-neon-blue"></span> LIVE STATS
+                    </div>
+                </div>
             </header>
 
-            <div class="flex-1 overflow-y-auto no-scrollbar pb-10 min-h-0 px-2 md:px-4 pt-2">
-                
-                <div id="view-overview" class="space-y-8 animate-fade-in hidden">
-                    <h2 class="text-3xl font-extrabold mb-2 text-bold px-2">System Overview</h2>
-                    
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-                        <div class="panel p-6 md:p-8 flex flex-col justify-center items-center text-center">
-                            <h3 class="font-bold text-[11px] uppercase tracking-widest opacity-50 mb-6">Bot Connection</h3>
-                            <div id="connection-container">
-                                <i class="fas fa-circle-notch fa-spin text-[#10b981] text-4xl mb-4"></i>
-                                <p class="font-bold text-lg">Checking...</p>
-                            </div>
+            <!-- VIEWS -->
+            
+            <!-- OVERVIEW -->
+            <div id="view-overview" class="space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="system-panel p-6 rounded-2xl group hover:border-neon-blue transition-all">
+                        <div class="text-xs font-bold text-slate-500 uppercase mb-4 flex justify-between">
+                            Total Words <i class="fas fa-pen-nib group-hover:text-neon-blue"></i>
                         </div>
+                        <div class="text-3xl font-mono font-bold" id="stat-total-words">0</div>
+                    </div>
+                    <div class="system-panel p-6 rounded-2xl group hover:border-neon-purple transition-all">
+                        <div class="text-xs font-bold text-slate-500 uppercase mb-4 flex justify-between">
+                            Writers <i class="fas fa-user-edit group-hover:text-neon-purple"></i>
+                        </div>
+                        <div class="text-3xl font-mono font-bold" id="stat-total-writers">0</div>
+                    </div>
+                    <div class="system-panel p-6 rounded-2xl group hover:border-neon-green transition-all">
+                        <div class="text-xs font-bold text-slate-500 uppercase mb-4 flex justify-between">
+                            Groups <i class="fas fa-users-rectangle group-hover:text-neon-green"></i>
+                        </div>
+                        <div class="text-3xl font-mono font-bold" id="stat-total-groups">0</div>
+                    </div>
+                    <div class="system-panel p-6 rounded-2xl group hover:border-neon-red transition-all">
+                        <div class="text-xs font-bold text-slate-500 uppercase mb-4 flex justify-between">
+                            Active Sprints <i class="fas fa-fire group-hover:text-neon-red"></i>
+                        </div>
+                        <div class="text-3xl font-mono font-bold" id="stat-active-sprints">0</div>
+                    </div>
+                </div>
 
-                        <div class="panel p-6 md:p-8 lg:col-span-2 flex flex-col justify-between">
-                            <div class="flex justify-between items-start mb-6">
-                                <h3 class="font-bold text-[11px] uppercase tracking-widest opacity-50">System Telemetry</h3>
-                                <span class="w-4 h-4 bg-[#10b981] rounded-full animate-pulse shadow-[0_0_12px_#10b981]"></span>
-                            </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 system-panel p-6 rounded-2xl">
+                        <h3 class="font-heading font-bold text-lg mb-6 flex items-center gap-2">
+                            <i class="fas fa-wave-square text-neon-blue"></i> RECENT ACTIVITY
+                        </h3>
+                        <div id="activity-feed" class="space-y-4 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
+                            <!-- Activity items -->
+                        </div>
+                    </div>
+                    <div class="system-panel p-6 rounded-2xl">
+                        <h3 class="font-heading font-bold text-lg mb-6 flex items-center gap-2">
+                            <i class="fas fa-crown text-neon-purple"></i> DAILY MVPs
+                        </h3>
+                        <div id="daily-mvps" class="space-y-4">
+                            <!-- MVP items -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SPRINTS -->
+            <div id="view-sprints" class="hidden space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-heading font-bold text-lg mb-6 flex items-center gap-2">
+                            <i class="fas fa-bolt text-neon-blue"></i> ACTIVE NOW
+                        </h3>
+                        <div id="sprints-active-list" class="space-y-4">
+                            <!-- Active sprints -->
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-heading font-bold text-lg mb-6 flex items-center gap-2 text-slate-500">
+                            <i class="fas fa-calendar-alt"></i> SCHEDULED
+                        </h3>
+                        <div id="sprints-scheduled-list" class="space-y-4">
+                            <!-- Scheduled sprints -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BROADCAST -->
+            <div id="view-broadcast" class="hidden space-y-6">
+                <div class="system-panel p-8 rounded-2xl max-w-4xl mx-auto">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="space-y-6">
+                            <h3 class="font-heading font-bold text-xl mb-4 flex items-center gap-3">
+                                <i class="fas fa-paper-plane text-neon-blue"></i> NEW BROADCAST
+                            </h3>
                             
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 w-full">
-                                <div class="panel-inset p-4 flex flex-col items-center justify-center text-center overflow-hidden">
-                                    <i class="fas fa-memory text-blue-500 text-xl md:text-2xl mb-2 md:mb-3 opacity-80"></i>
-                                    <p class="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Memory</p>
-                                    <p class="text-base sm:text-lg font-extrabold text-bold truncate w-full px-1" id="sys-mem">...</p>
-                                </div>
-                                <div class="panel-inset p-4 flex flex-col items-center justify-center text-center overflow-hidden">
-                                    <i class="fas fa-clock text-purple-500 text-xl md:text-2xl mb-2 md:mb-3 opacity-80"></i>
-                                    <p class="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Uptime</p>
-                                    <p class="text-base sm:text-lg font-extrabold text-bold truncate w-full px-1" id="sys-uptime">...</p>
-                                </div>
-                                <div class="panel-inset p-4 flex flex-col items-center justify-center text-center overflow-hidden col-span-2 md:col-span-1">
-                                    <i class="fas fa-server text-orange-500 text-xl md:text-2xl mb-2 md:mb-3 opacity-80"></i>
-                                    <p class="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-1">Server</p>
-                                    <p class="text-base sm:text-lg font-extrabold text-bold truncate w-full px-1" id="sys-platform">...</p>
+                            <textarea id="bc-message" rows="5" class="input-system w-full p-4 rounded-xl text-sm leading-relaxed" placeholder="Enter transmission message..."></textarea>
+                            
+                            <div class="relative group">
+                                <input type="file" id="bc-image" class="hidden" onchange="previewBCImage(event)">
+                                <label for="bc-image" id="bc-preview-label" class="flex flex-col items-center justify-center p-8 border-2 border-dashed border-white/10 rounded-xl cursor-pointer hover:border-neon-blue transition-all">
+                                    <i class="fas fa-image text-3xl text-slate-600 mb-2"></i>
+                                    <span class="text-xs font-bold text-slate-500">ATTACH IMAGE (OPTIONAL)</span>
+                                </label>
+                                <div id="bc-preview-container" class="hidden relative rounded-xl overflow-hidden">
+                                    <img id="bc-preview-img" class="w-full h-48 object-cover">
+                                    <button onclick="removeBCImage()" class="absolute top-2 right-2 w-8 h-8 bg-neon-red/80 rounded-full flex items-center justify-center"><i class="fas fa-times"></i></button>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                    
-                    <div class="panel p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-                        <div class="flex items-center gap-5">
-                            <div class="w-14 h-14 rounded-2xl panel-inset flex items-center justify-center text-xl opacity-70 shrink-0"><i class="fas fa-tools"></i></div>
-                            <div>
-                                <h3 class="font-extrabold text-xl text-bold">Maintenance Mode</h3>
-                                <p class="text-sm opacity-60 mt-1">Lock bot commands globally</p>
-                            </div>
-                        </div>
-                        <div class="flex flex-col sm:flex-row items-center gap-4 panel-inset p-2 rounded-2xl w-full sm:w-auto">
-                            <span id="maint-status" class="text-xs font-bold px-4 py-2 rounded-xl text-emerald-500 text-center w-full sm:w-auto">OFF</span>
-                            <button onclick="toggleMaintenance()" id="maint-btn" class="btn-clay px-6 py-2.5 text-sm font-bold w-full sm:w-auto">Enable</button>
-                        </div>
-                    </div>
-                </div>
 
-                <div id="view-analytics" class="space-y-8 animate-fade-in hidden">
-                    <h2 class="text-3xl font-extrabold mb-2 text-bold px-2">Analytics</h2>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-                        <div class="panel p-8 text-center flex flex-col justify-center">
-                            <h3 class="font-bold text-[10px] uppercase tracking-widest opacity-50 mb-3">Weekly Retention</h3>
-                            <h2 class="text-5xl font-black text-blue-500 mb-2" id="analytics-retention">0%</h2>
-                            <p class="text-xs font-bold opacity-40">vs last week</p>
-                        </div>
-                        <div class="panel p-8 text-center flex flex-col justify-center">
-                            <h3 class="font-bold text-[10px] uppercase tracking-widest opacity-50 mb-3">Active (7 Days)</h3>
-                            <h2 class="text-5xl font-black text-emerald-500" id="analytics-active-week">0</h2>
-                        </div>
-                        <div class="panel p-8 text-center flex flex-col justify-center">
-                            <h3 class="font-bold text-[10px] uppercase tracking-widest opacity-50 mb-3">Active (Prev 7)</h3>
-                            <h2 class="text-5xl font-black opacity-40" id="analytics-active-prev">0</h2>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-                        <div class="panel p-6 md:p-8">
-                            <h3 class="font-extrabold text-lg mb-6 text-bold">Word Velocity (30 Days)</h3>
-                            <div class="panel-inset p-4 h-72 w-full"><canvas id="chart-velocity"></canvas></div>
-                        </div>
-                        <div class="panel p-6 md:p-8">
-                            <h3 class="font-extrabold text-lg mb-6 text-bold">Active Hours (30 Days)</h3>
-                            <div class="panel-inset p-4 h-72 w-full"><canvas id="chart-hours"></canvas></div>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 pb-10">
-                        <div class="panel p-6 md:p-8 flex flex-col">
-                            <h3 class="font-extrabold text-lg mb-6 text-emerald-500"><i class="fas fa-arrow-trend-up mr-2"></i>Top Growers</h3>
-                            <div class="panel-inset p-2 flex-1 overflow-y-auto max-h-72 no-scrollbar">
-                                <table class="w-full text-left text-sm">
-                                    <thead>
-                                        <tr class="text-[10px] font-bold uppercase tracking-widest opacity-40">
-                                            <th class="p-4">Writer</th><th class="p-4 text-right">Words</th><th class="p-4 text-right">Growth</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="analytics-growers"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div class="panel p-6 md:p-8 flex flex-col">
-                            <h3 class="font-extrabold text-lg mb-6 text-purple-500"><i class="fas fa-chart-pie mr-2"></i>Group Breakdown</h3>
-                            <div class="panel-inset p-2 flex-1 overflow-y-auto max-h-72 no-scrollbar">
-                                <table class="w-full text-left text-sm">
-                                    <thead>
-                                        <tr class="text-[10px] font-bold uppercase tracking-widest opacity-40">
-                                            <th class="p-4">Group</th><th class="p-4 text-right">Writers</th><th class="p-4 text-right">Words</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="analytics-groups"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="view-dashboard" class="space-y-8 animate-fade-in hidden">
-                    <h2 class="text-3xl font-extrabold mb-2 text-bold px-2">Live Display</h2>
-                    
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div class="panel p-6 text-center">
-                            <p class="font-bold text-[10px] uppercase tracking-widest opacity-50 mb-2">Total Words</p>
-                            <h2 class="text-3xl font-black text-bold" id="dash-total-words">0</h2>
-                        </div>
-                        <div class="panel p-6 text-center">
-                            <p class="font-bold text-[10px] uppercase tracking-widest opacity-50 mb-2">Total Writers</p>
-                            <h2 class="text-3xl font-black text-bold" id="dash-total-writers">0</h2>
-                        </div>
-                        <div class="panel p-6 text-center">
-                            <p class="font-bold text-[10px] uppercase tracking-widest opacity-50 mb-2">Active Groups</p>
-                            <h2 class="text-3xl font-black text-bold" id="dash-total-groups">0</h2>
-                        </div>
-                        <div class="panel p-6 text-center flex flex-col justify-center items-center">
-                            <p class="font-bold text-[10px] uppercase tracking-widest opacity-50 mb-2">Bot Status</p>
-                            <div class="panel-inset px-4 py-2 rounded-xl inline-flex items-center gap-2">
-                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]"></div>
-                                <span class="text-sm font-black text-emerald-500" id="dash-status">ACTIVE</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="panel p-6 md:p-8 relative overflow-hidden">
-                        <div class="absolute top-0 left-0 w-2 h-full bg-[#10b981]"></div>
-                        <div class="flex justify-between items-center mb-6 pl-2">
-                            <h3 class="font-extrabold text-xl text-bold">Global Pulse <span class="opacity-40 text-sm ml-2 hidden sm:inline">(7 Days)</span></h3>
-                            <span class="panel-inset px-3 py-1.5 rounded-lg text-[10px] font-black text-emerald-500 tracking-widest flex items-center gap-2 shrink-0"><i class="fas fa-broadcast-tower"></i> LIVE</span>
-                        </div>
-                        <div class="panel-inset p-4 h-80 w-full"><canvas id="activityChart"></canvas></div>
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 pb-10">
-                        <div class="panel p-6 flex flex-col h-[400px]">
-                            <div class="flex items-center gap-3 mb-4 px-2">
-                                <div class="w-10 h-10 panel-inset rounded-xl flex items-center justify-center text-yellow-500 text-lg"><i class="fas fa-trophy"></i></div>
-                                <h3 class="font-extrabold text-bold text-lg">Hall of Fame</h3>
-                            </div>
-                            <div class="panel-inset p-2 flex-1 overflow-y-auto no-scrollbar">
-                                <table class="w-full text-left text-sm"><tbody id="all-time-list"></tbody></table>
-                            </div>
-                        </div>
-                        <div class="panel p-6 flex flex-col h-[400px]">
-                            <div class="flex items-center gap-3 mb-4 px-2">
-                                <div class="w-10 h-10 panel-inset rounded-xl flex items-center justify-center text-blue-500 text-lg"><i class="fas fa-fire"></i></div>
-                                <h3 class="font-extrabold text-bold text-lg">Today's Top</h3>
-                            </div>
-                            <div class="panel-inset p-2 flex-1 overflow-y-auto no-scrollbar">
-                                <table class="w-full text-left text-sm"><tbody id="today-list"></tbody></table>
-                            </div>
-                        </div>
-                        <div class="panel p-6 flex flex-col h-[400px]">
-                            <div class="flex items-center gap-3 mb-4 px-2">
-                                <div class="w-10 h-10 panel-inset rounded-xl flex items-center justify-center text-orange-500 text-lg"><i class="fas fa-crown"></i></div>
-                                <h3 class="font-extrabold text-bold text-lg">Top Groups</h3>
-                            </div>
-                            <div class="panel-inset p-2 flex-1 overflow-y-auto no-scrollbar">
-                                <table class="w-full text-left text-sm"><tbody id="groups-list"></tbody></table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="view-writers" class="animate-fade-in hidden pb-24">
-                    <div class="panel p-6 mb-8 flex flex-col lg:flex-row justify-between items-center gap-6">
-                        <div class="text-center lg:text-left">
-                            <h2 class="text-3xl font-extrabold text-bold">Writer Database</h2>
-                            <p class="text-sm opacity-60 mt-1">Manage profiles, ranks, and track progress.</p>
-                        </div>
-                        <div class="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-                            <select id="sort-writers" onchange="applyWriterSort()" class="input-clay px-4 py-3 text-sm font-bold w-full sm:w-auto">
-                                <option value="recent">Sort: Recent Active</option>
-                                <option value="words">Sort: Highest Words</option>
-                                <option value="name">Sort: Name (A-Z)</option>
-                            </select>
-                            <div class="relative flex-1 sm:w-64">
-                                <i class="fas fa-search absolute left-4 top-3.5 opacity-40"></i>
-                                <input type="text" id="dash-search" placeholder="Search writers..." onkeyup="filterWriterCards()" class="input-clay w-full pl-11 pr-4 py-3 text-sm">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="bulk-action-bar" class="hidden fixed bottom-8 left-1/2 transform -translate-x-1/2 panel px-6 py-4 z-40 flex items-center gap-6 w-[90%] md:w-auto justify-between md:justify-center">
-                        <span id="bulk-count" class="panel-inset px-4 py-2 rounded-xl text-sm font-black text-emerald-500">0 Selected</span>
-                        <button onclick="exportWritersCSV()" class="btn-clay px-4 py-2 text-sm text-blue-500"><i class="fas fa-file-csv mr-2"></i> Export CSV</button>
-                        <button onclick="bulkBanWriters()" class="btn-clay-danger px-4 py-2 text-sm"><i class="fas fa-ban mr-2"></i> Block</button>
-                        <button onclick="clearBulkSelection()" class="btn-clay w-10 h-10 flex items-center justify-center rounded-full shrink-0"><i class="fas fa-times"></i></button>
-                    </div>
-
-                    <div id="writers-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-                </div>
-
-                <div id="view-groups" class="animate-fade-in hidden pb-10">
-                    <div class="panel p-6 mb-8 flex flex-col lg:flex-row justify-between items-center gap-6">
-                        <div class="text-center lg:text-left">
-                            <h2 class="text-3xl font-extrabold text-bold">Group Management</h2>
-                            <p class="text-sm opacity-60 mt-1">Monitor group health and bot presence.</p>
-                        </div>
-                        <div class="flex flex-wrap justify-center gap-4 w-full lg:w-auto">
-                            <select id="sort-groups" onchange="applyGroupSort()" class="input-clay px-4 py-3 text-sm font-bold flex-1 sm:flex-none">
-                                <option value="name">Sort: Name (A-Z)</option>
-                                <option value="size">Sort: Size (Largest)</option>
-                            </select>
-                            <button onclick="openJoinGroup()" class="btn-clay-primary px-5 py-3 text-sm flex items-center justify-center gap-2 flex-1 sm:flex-none">
-                                <i class="fas fa-plus"></i> Join Group
+                            <button id="btn-transmit" onclick="transmitBroadcast()" class="w-full py-4 bg-neon-blue text-void font-heading font-black rounded-xl glow-blue flex items-center justify-center gap-3">
+                                <i class="fas fa-radio"></i> INITIATE TRANSMISSION
                             </button>
-                            <button onclick="loadGroups()" class="btn-clay w-12 h-12 flex items-center justify-center shrink-0"><i class="fas fa-sync-alt"></i></button>
                         </div>
-                    </div>
-                    <div id="groups-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
-                </div>
 
-                <div id="view-sprints" class="animate-fade-in hidden pb-10">
-                    <div class="panel p-6 mb-8 flex justify-between items-center">
-                        <div>
-                            <h2 class="text-2xl sm:text-3xl font-extrabold text-bold flex items-center gap-4">
-                                Live Sprints
-                                <span class="relative flex h-4 w-4"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-4 w-4 bg-[#10b981]"></span></span>
-                            </h2>
-                            <p class="text-sm opacity-60 mt-1 hidden sm:block">Auto-refreshing every 30s</p>
-                        </div>
-                        <button onclick="loadSprints()" class="btn-clay px-5 py-3 font-bold text-sm shrink-0"><i class="fas fa-sync-alt sm:mr-2"></i><span class="hidden sm:inline">Refresh</span></button>
-                    </div>
-                    <div id="sprints-list" class="grid grid-cols-1 xl:grid-cols-2 gap-6"></div>
-                </div>
-
-                <div id="view-broadcasts" class="animate-fade-in hidden pb-10">
-                    <h2 class="text-3xl font-extrabold mb-8 text-bold px-2">Broadcast Scheduler</h2>
-                    
-                    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 md:gap-8">
-                        <div class="panel p-6 md:p-8 xl:col-span-1 h-fit">
-                            <h3 class="font-extrabold text-xl text-bold mb-6">New Draft</h3>
-                            
-                            <div id="sched-preview-container" class="hidden mb-6 relative group">
-                                <div class="panel-inset p-2">
-                                    <img id="sched-broadcast-preview" class="w-full h-40 object-cover rounded-xl opacity-90">
-                                </div>
-                                <button onclick="removeSchedBroadcastImage()" class="btn-clay-danger absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center"><i class="fas fa-times"></i></button>
-                            </div>
-
-                            <textarea id="sched-broadcast-text" rows="5" class="input-clay w-full p-5 mb-6 resize-none text-sm leading-relaxed" placeholder="Type your announcement here..."></textarea>
-                            
-                            <div class="flex justify-between items-center mb-8">
-                                <input type="file" id="sched-broadcast-file" accept="image/*" class="hidden" onchange="handleSchedBroadcastImage()">
-                                <label for="sched-broadcast-file" class="btn-clay px-4 py-2.5 flex items-center gap-3 text-sm">
-                                    <i class="fas fa-image text-blue-500 text-lg"></i> <span id="sched-img-label-text">Add Image</span>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="text-xs font-black text-slate-500 uppercase tracking-widest">Target Groups</h4>
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <span class="text-[10px] font-bold text-slate-500 group-hover:text-neon-blue">SELECT ALL</span>
+                                    <input type="checkbox" id="bc-select-all" onchange="toggleSelectAllGroups(this.checked)" class="sr-only peer">
+                                    <div class="w-4 h-4 border border-neon-blue rounded peer-checked:bg-neon-blue flex items-center justify-center transition-all">
+                                        <i class="fas fa-check text-[10px] text-void opacity-0 peer-checked:opacity-100"></i>
+                                    </div>
                                 </label>
                             </div>
-
-                            <label class="block text-[11px] font-bold uppercase tracking-widest opacity-50 mb-3">Send Date & Time</label>
-                            <input type="datetime-local" id="sched-broadcast-time" class="input-clay w-full p-4 mb-8 text-sm font-bold">
-                            
-                            <button onclick="scheduleBroadcast()" class="btn-clay-primary w-full py-4 text-lg">
-                                Schedule Blast <i class="fas fa-clock ml-2"></i>
-                            </button>
-                        </div>
-
-                        <div class="panel p-0 xl:col-span-2 flex flex-col overflow-hidden min-h-[400px]">
-                            <div class="p-6 md:p-8 flex justify-between items-center border-b border-black/5 dark:border-white/5">
-                                <h3 class="font-extrabold text-xl text-bold"><i class="far fa-calendar-alt text-blue-500 mr-3"></i>Pending Queue</h3>
-                                <button onclick="loadScheduledBroadcasts()" class="btn-clay w-10 h-10 flex items-center justify-center shrink-0"><i class="fas fa-sync-alt"></i></button>
+                            <div class="relative mb-4">
+                                <i class="fas fa-search absolute left-3 top-3 text-slate-500 text-xs"></i>
+                                <input type="text" onkeyup="filterGroups(this.value)" class="input-system w-full pl-8 pr-4 py-2 rounded-lg text-xs" placeholder="Search groups...">
                             </div>
-                            <div class="flex-1 overflow-y-auto max-h-[600px] no-scrollbar p-2 md:p-4">
-                                <table class="w-full text-left text-sm">
-                                    <thead>
-                                        <tr class="text-[10px] font-bold uppercase tracking-widest opacity-40">
-                                            <th class="p-4">Scheduled For</th><th class="p-4">Content</th><th class="p-4 text-right">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="broadcast-queue-list"></tbody>
-                                </table>
+                            <div id="bc-groups-list" class="space-y-2 max-h-[350px] overflow-y-auto pr-2 no-scrollbar">
+                                <!-- Group items with checkboxes -->
                             </div>
                         </div>
                     </div>
                 </div>
-
             </div>
+
+            <!-- WRITERS -->
+            <div id="view-writers" class="hidden space-y-6">
+                <div class="flex flex-col sm:flex-row gap-4 mb-8">
+                    <div class="relative flex-1">
+                        <i class="fas fa-search absolute left-4 top-4 text-slate-500"></i>
+                        <input type="text" id="writer-search" onkeyup="searchWriters(this.value)" class="input-system w-full pl-12 pr-4 py-4 rounded-xl font-medium" placeholder="Search writers by name or ID...">
+                    </div>
+                </div>
+
+                <div id="writers-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Writer cards -->
+                </div>
+            </div>
+
+            <!-- SYSTEM -->
+            <div id="view-system" class="hidden space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                    <div class="system-panel p-8 rounded-2xl flex flex-col items-center text-center">
+                        <h3 class="font-heading font-black text-xl mb-6 tracking-tighter uppercase italic text-neon-blue">Bot Connection</h3>
+                        <div id="qr-container" class="bg-white p-4 rounded-xl mb-6 hidden">
+                            <img id="qr-image" class="w-48 h-48">
+                        </div>
+                        <div id="connection-status" class="flex flex-col items-center">
+                            <div class="w-20 h-20 rounded-full border-2 border-neon-green flex items-center justify-center text-neon-green mb-4 glow-green">
+                                <i class="fas fa-link text-3xl"></i>
+                            </div>
+                            <span class="text-xl font-bold mb-2">SYSTEM ONLINE</span>
+                            <p class="text-slate-500 text-sm">Bot is successfully linked to WhatsApp</p>
+                        </div>
+                    </div>
+
+                    <div class="system-panel p-8 rounded-2xl">
+                        <h3 class="font-heading font-black text-xl mb-6 tracking-tighter uppercase italic text-neon-purple">System Control</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
+                                <div>
+                                    <div class="font-bold">Maintenance Mode</div>
+                                    <div class="text-xs text-slate-500">Disable all bot commands</div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="maintenance-toggle" onchange="toggleMaintenance(this.checked)" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-neon-purple"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
-    <div id="writer-drawer-overlay" class="fixed inset-0 bg-black/50 z-50 hidden transition-opacity" onclick="closeDrawer()"></div>
-    <div id="writer-drawer" class="panel fixed top-4 right-4 bottom-4 w-[calc(100%-2rem)] md:w-[450px] z-50 drawer-right flex flex-col overflow-hidden !rounded-[32px]">
-        
-        <div class="panel-inset m-4 p-6 shrink-0 relative flex flex-col items-center text-center mt-6">
-            <button onclick="closeDrawer()" class="btn-clay absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center"><i class="fas fa-times"></i></button>
-            <div class="w-24 h-24 rounded-[2rem] panel flex items-center justify-center text-4xl font-black text-[#10b981] mb-4" id="profile-avatar">U</div>
-            <h3 class="text-2xl font-black tracking-tight text-bold w-full truncate px-4" id="edit-name">User Name</h3>
-            <p class="text-xs font-mono opacity-50 mt-1 truncate" id="edit-id-display">ID: ...</p>
-            <span id="profile-rank" class="mt-3 inline-block text-[10px] font-black uppercase tracking-widest panel-inset px-4 py-2 rounded-xl text-[#10b981]">Unranked</span>
-            <div id="profile-badges" class="mt-5 flex gap-2 flex-wrap justify-center px-2"></div>
-        </div>
-
-        <div class="flex-1 overflow-y-auto no-scrollbar px-6 pb-6 space-y-6">
-            <div class="grid grid-cols-3 gap-4">
-                <div class="panel-inset p-4 text-center rounded-2xl">
-                    <div class="text-2xl font-black text-bold" id="profile-streak">0</div>
-                    <div class="text-[9px] uppercase font-bold tracking-widest opacity-50 mt-1">Streak</div>
-                </div>
-                <div class="panel-inset p-4 text-center rounded-2xl">
-                    <div class="text-2xl font-black text-bold" id="profile-best">0</div>
-                    <div class="text-[9px] uppercase font-bold tracking-widest opacity-50 mt-1">Best</div>
-                </div>
-                <div class="panel-inset p-4 text-center rounded-2xl">
-                    <div class="text-2xl font-black text-[#10b981]" id="profile-total">0</div>
-                    <div class="text-[9px] uppercase font-bold tracking-widest opacity-50 mt-1">Words</div>
-                </div>
-            </div>
-
-            <input type="hidden" id="edit-id">
-
-            <div class="panel p-5">
-                <h4 class="text-[11px] font-bold uppercase tracking-widest opacity-50 mb-4"><i class="fas fa-chart-line mr-2"></i> Activity</h4>
-                <div class="panel-inset p-3 h-40 w-full"><canvas id="drawer-chart"></canvas></div>
-            </div>
-
-            <div class="panel p-5">
-                <h4 class="text-[11px] font-bold uppercase tracking-widest opacity-50 mb-4"><i class="fas fa-bolt text-yellow-500 mr-2"></i> Sprints</h4>
-                <div class="panel-inset p-4">
-                    <div class="flex justify-between text-xs font-bold mb-4 opacity-70 border-b border-black/5 dark:border-white/5 pb-3">
-                        <span>Best: <strong id="drawer-best-sprint" class="text-emerald-500 text-sm">0</strong> WPM</span> 
-                        <span>Total: <strong id="drawer-sprint-count" class="text-bold text-sm">0</strong></span>
-                    </div>
-                    <div id="drawer-sprints-list" class="space-y-3 max-h-40 overflow-y-auto no-scrollbar text-sm pr-2"></div>
-                </div>
-            </div>
-
-            <div class="panel p-5 mb-4">
-                <h4 class="text-[11px] font-bold uppercase tracking-widest opacity-50 mb-4"><i class="fas fa-edit mr-2"></i> Modify</h4>
-                <div class="space-y-4">
-                    <div class="flex gap-3">
-                        <input type="text" id="new-name" class="input-clay flex-1 p-3 text-sm font-bold" placeholder="Display Name">
-                        <button onclick="renameUser()" class="btn-clay px-5 text-sm">Save</button>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="flex gap-2">
-                            <input type="number" id="edit-amount" class="input-clay w-full p-3 text-sm font-bold text-center" placeholder="Set Total">
-                            <button onclick="updateStats('set')" class="btn-clay px-4 text-blue-500"><i class="fas fa-check"></i></button>
-                        </div>
-                        <div class="flex gap-2">
-                            <input type="number" id="add-amount" class="input-clay w-full p-3 text-sm font-bold text-center" placeholder="Add (+/-)">
-                            <button onclick="updateStats('add')" class="btn-clay px-4 text-emerald-500"><i class="fas fa-plus"></i></button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <button id="ban-btn" class="btn-clay-danger w-full py-4 text-sm flex items-center justify-center gap-3">
-                <i class="fas fa-ban"></i> Block User
-            </button>
-        </div>
-    </div>
-
-    <div id="feedback-drawer-overlay" class="fixed inset-0 bg-black/50 z-50 hidden transition-opacity" onclick="closeFeedbackDrawer()"></div>
-    <div id="feedback-drawer" class="panel fixed top-4 right-4 bottom-4 w-[calc(100%-2rem)] md:w-[400px] z-50 drawer-right flex flex-col overflow-hidden !rounded-[32px]">
-        <div class="p-6 shrink-0 relative flex justify-between items-center mb-2">
-            <h3 class="font-black text-xl text-indigo-500 flex items-center gap-3"><div class="w-10 h-10 panel-inset rounded-xl flex items-center justify-center"><i class="fas fa-inbox"></i></div> Feedback</h3>
-            <button onclick="closeFeedbackDrawer()" class="btn-clay w-10 h-10 rounded-full flex items-center justify-center"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="px-6 pb-4 flex justify-between items-center shrink-0">
-            <span class="panel-inset px-4 py-2 rounded-xl text-xs font-black text-indigo-500" id="feedback-count">0 Unread</span>
-            <button onclick="markAllFeedbackRead()" class="btn-clay px-4 py-2 text-xs font-bold text-indigo-500">Mark all read</button>
-        </div>
-        <div class="flex-1 overflow-y-auto no-scrollbar p-6 space-y-5" id="feedback-list"></div>
-    </div>
-
-    <div id="broadcast-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-        <div class="panel p-8 w-full max-w-lg animate-fade-in mx-4">
-            <h3 class="font-black text-2xl text-blue-500 mb-6 flex items-center gap-3"><i class="fas fa-bolt"></i> Instant Blast</h3>
-            <div id="broadcast-preview-container" class="hidden mb-6 relative group">
-                <div class="panel-inset p-2">
-                    <img id="broadcast-preview" class="w-full h-48 object-cover rounded-xl opacity-90">
-                </div>
-                <button onclick="removeBroadcastImage()" class="btn-clay-danger absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center"><i class="fas fa-times"></i></button>
-            </div>
-            <textarea id="broadcast-text" rows="4" class="input-clay w-full p-5 mb-6 text-sm leading-relaxed resize-none" placeholder="Type announcement..."></textarea>
-            
-            <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div class="w-full sm:w-auto">
-                    <input type="file" id="broadcast-file" accept="image/*" class="hidden" onchange="handleBroadcastImage()">
-                    <label for="broadcast-file" class="btn-clay px-5 py-3 w-full flex items-center justify-center gap-3 text-sm text-blue-500">
-                        <i class="fas fa-image text-lg"></i> <span id="img-label-text" class="font-bold">Add Image</span>
-                    </label>
-                </div>
-                <div class="flex gap-3 w-full sm:w-auto">
-                    <button onclick="document.getElementById('broadcast-modal').classList.add('hidden')" class="btn-clay px-6 py-3 text-sm flex-1">Cancel</button>
-                    <button onclick="sendBroadcast()" class="btn-clay-primary px-8 py-3 text-sm flex-1">Send <i class="fas fa-paper-plane ml-2"></i></button>
-                </div>
+    <!-- Modals -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-void/90 z-[110] flex items-center justify-center p-4">
+        <div class="system-panel p-8 w-full max-w-sm text-center">
+            <h3 class="font-heading font-bold text-xl mb-2" id="confirm-title">SYSTEM PROMPT</h3>
+            <p class="text-slate-500 text-sm mb-8" id="confirm-msg">Confirm requested action?</p>
+            <div class="flex gap-3">
+                <button onclick="closeConfirm()" class="flex-1 py-3 bg-white/5 border border-white/10 rounded-xl font-bold text-sm">CANCEL</button>
+                <button id="confirm-yes-btn" class="flex-1 py-3 bg-neon-purple text-void font-heading font-black rounded-xl">CONFIRM</button>
             </div>
         </div>
     </div>
 
-    <div id="join-group-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-        <div class="panel p-8 w-full max-w-md animate-fade-in mx-4">
-            <div class="flex items-center gap-4 mb-8">
-                <div class="w-14 h-14 panel-inset rounded-2xl flex items-center justify-center"><i class="fab fa-whatsapp text-[#10b981] text-3xl shadow-[0_0_15px_rgba(16,185,129,0.3)] rounded-full"></i></div>
-                <div>
-                    <h3 class="font-black text-2xl text-bold">Join Group</h3>
-                    <p class="text-xs font-bold opacity-50 uppercase tracking-widest mt-1">Accept Invite</p>
-                </div>
-            </div>
-            
-            <div class="relative mb-3">
-                <i class="fas fa-link absolute left-5 top-4 opacity-40"></i>
-                <input type="text" id="invite-code-input" placeholder="https://chat.whatsapp.com/..." class="input-clay w-full pl-12 pr-5 py-4 text-sm font-bold" onkeydown="if(event.key==='Enter') joinGroup()">
-            </div>
-            <p id="join-error" class="text-xs text-red-500 font-bold min-h-[1.5rem] mb-4 hidden px-2"></p>
-            
-            <div id="join-result" class="hidden mb-6 panel-inset p-4 text-center">
-                <p class="text-sm font-black text-[#10b981]"><i class="fas fa-check-circle mr-2"></i><span id="join-result-text">Joined successfully!</span></p>
-            </div>
-            
-            <div class="flex gap-4 mt-6">
-                <button onclick="closeJoinGroup()" class="btn-clay flex-1 py-4 text-sm">Cancel</button>
-                <button onclick="joinGroup()" id="join-btn" class="btn-clay-primary flex-[1.5] py-4 text-sm"><i class="fab fa-whatsapp mr-2"></i> Join</button>
-            </div>
+    <!-- Freeze Modal -->
+    <div id="freeze-modal" class="hidden fixed inset-0 bg-void/90 z-[110] flex items-center justify-center p-4">
+        <div class="system-panel p-8 w-full max-w-sm">
+            <h3 class="font-heading font-bold text-xl mb-2">GRANT FREEZE</h3>
+            <p class="text-slate-500 text-xs mb-6">User: <span id="freeze-user-name" class="text-neon-blue font-bold"></span></p>
+            <input type="number" id="freeze-amount" value="1" min="1" max="10" class="input-system w-full px-4 py-3 rounded-xl font-mono text-xl mb-4">
+            <button id="btn-grant-freeze" class="w-full py-4 bg-neon-blue text-void font-heading font-black rounded-xl">GRANT SHIELD</button>
+            <button onclick="document.getElementById('freeze-modal').classList.add('hidden')" class="w-full py-3 text-slate-500 font-bold text-sm">CANCEL</button>
         </div>
     </div>
-
-    <div id="confirm-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[70]">
-        <div class="panel p-10 w-full max-w-sm animate-fade-in mx-4 text-center">
-            <div class="w-20 h-20 panel-inset rounded-full flex items-center justify-center mx-auto mb-6 text-yellow-500 text-3xl"><i class="fas fa-exclamation-triangle"></i></div>
-            <h3 class="text-2xl font-black mb-3 text-bold">Are you sure?</h3>
-            <p id="confirm-msg" class="opacity-60 text-sm font-bold mb-8">This action cannot be undone.</p>
-            <div class="flex gap-4">
-                <button onclick="closeConfirm()" class="btn-clay flex-1 py-3.5 text-sm">Cancel</button>
-                <button id="confirm-yes-btn" class="btn-clay-danger flex-1 py-3.5 text-sm">Proceed</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="toast-container" class="fixed bottom-8 right-8 z-[80] flex flex-col gap-4 pointer-events-none"></div>
 
     <script>
         const API_URL = 'https://sprint-bot-9bll.onrender.com';
         let token = localStorage.getItem('admin_key');
-        let myChart = null; 
-        let drawerChartInstance = null;
-        let analyticsDayChart = null, analyticsHourChart = null;
-        let currentWriters = [];
-        let currentGroups = [];
-        let selectedWriters = [];
-        let sprintRefreshInterval = null;
+        let currentTab = 'overview';
+        let allGroups = [];
+        let bcImageBase64 = null;
 
-        // --- Theme & Layout ---
-        function initTheme() {
-            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-                updateThemeIcons(true);
-            } else {
-                document.documentElement.classList.remove('dark');
-                updateThemeIcons(false);
-            }
-        }
-        function toggleTheme() {
-            if (document.documentElement.classList.contains('dark')) {
-                document.documentElement.classList.remove('dark');
-                localStorage.theme = 'light'; updateThemeIcons(false);
-            } else {
-                document.documentElement.classList.add('dark');
-                localStorage.theme = 'dark'; updateThemeIcons(true);
-            }
-            if (window.lastChartData) renderChart(window.lastChartData);
-        }
-        function updateThemeIcons(isDark) {
-            const icon = document.getElementById('theme-icon');
-            if(icon) icon.className = isDark ? 'fas fa-sun text-yellow-500' : 'fas fa-moon opacity-50';
-        }
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('open');
-            document.getElementById('mobile-overlay').classList.toggle('hidden');
-        }
-        initTheme();
-
-        if (token) {
-            document.getElementById('auth-modal').classList.add('hidden');
-            document.getElementById('app').classList.remove('hidden');
-            loadSystemStats();
-            loadConnectionStatus();
-            pollFeedback();
-        }
-
-        // --- Routing ---
-        function switchTab(tabId) {
-            ['overview', 'analytics', 'dashboard', 'sprints', 'groups', 'writers', 'broadcasts'].forEach(t => {
-                document.getElementById(`view-${t}`)?.classList.add('hidden');
-                const navBtn = document.getElementById(`nav-${t}`);
-                if (navBtn) {
-                    navBtn.classList.remove('panel-inset', 'text-emerald-500', 'dark:text-emerald-400');
-                    navBtn.classList.add('opacity-70');
-                }
-            });
-
-            document.getElementById(`view-${tabId}`).classList.remove('hidden');
-            const activeNav = document.getElementById(`nav-${tabId}`);
-            if (activeNav) {
-                activeNav.classList.remove('opacity-70');
-                activeNav.classList.add('panel-inset', 'text-emerald-500', 'dark:text-emerald-400');
-            }
-
-            document.getElementById('sidebar').classList.remove('open');
-            document.getElementById('mobile-overlay').classList.add('hidden');
-
-            if (sprintRefreshInterval) clearInterval(sprintRefreshInterval);
-
-            if (tabId === 'sprints') { loadSprints(); sprintRefreshInterval = setInterval(loadSprints, 30000); }
-            if (tabId === 'groups') loadGroups();
-            if (tabId === 'dashboard') loadVisualDashboard();
-            if (tabId === 'writers') loadWritersGrid();
-            if (tabId === 'overview') { loadSystemStats(); loadConnectionStatus(); }
-            if (tabId === 'analytics') loadAnalyticsDashboard();
-            if (tabId === 'broadcasts') loadScheduledBroadcasts();
-        }
-        switchTab('overview');
-
-        // --- Auth ---
         function login() {
             const pass = document.getElementById('admin-pass').value;
-            if (!pass) return showToast("Please enter a password", "error");
-            token = pass; localStorage.setItem('admin_key', pass); location.reload();
+            if (!pass) return showToast("Enter Access Key", "error");
+            token = pass;
+            localStorage.setItem('admin_key', pass);
+            location.reload();
         }
+
         function logout() { localStorage.removeItem('admin_key'); location.reload(); }
 
-        // --- API Helper ---
         async function api(endpoint, body, method = 'POST') {
             const opts = { method, headers: { 'Content-Type': 'application/json', 'x-admin-password': token } };
             if (body) opts.body = JSON.stringify(body);
             try {
                 const res = await fetch(`${API_URL}${endpoint}`, opts);
-                if (res.status === 403) { showToast("Access Denied", "error"); logout(); return null; }
+                if (res.status === 403) { logout(); return null; }
                 return res.json();
-            } catch(e) { return null; }
+            } catch (e) { return null; }
         }
 
-        // --- Overview ---
-        async function loadSystemStats() {
-            const data = await api('/api/admin/system', null, 'GET');
+        function switchTab(tab) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`nav-${tab}`).classList.add('active');
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            currentTab = tab;
+            loadTabData();
+        }
+
+        function loadTabData() {
+            if (currentTab === 'overview') loadOverview();
+            if (currentTab === 'sprints') loadSprints();
+            if (currentTab === 'broadcast') loadGroupsForBroadcast();
+            if (currentTab === 'writers') loadWriters();
+            if (currentTab === 'system') loadSystemInfo();
+        }
+
+        function refreshData() { loadTabData(); showToast("System Data Refreshed"); }
+
+        async function loadOverview() {
+            const data = await api('/api/stats', null, 'GET');
             if (!data) return;
-            document.getElementById('sys-uptime').innerText = Math.floor(data.uptime / 60) + 'm';
-            document.getElementById('sys-mem').innerText = data.memory + ' MB';
-            document.getElementById('sys-platform').innerText = data.platform || 'Linux';
-            
-            const btn = document.getElementById('maint-btn');
-            const status = document.getElementById('maint-status');
-            if (data.maintenance) {
-                status.innerText = "ACTIVE";
-                status.className = "text-[11px] font-black uppercase tracking-widest px-4 py-2 rounded-xl bg-orange-500 text-white shadow-inner w-full sm:w-auto text-center";
-                btn.innerText = "Disable";
-            } else {
-                status.innerText = "OFF";
-                status.className = "text-[11px] font-black uppercase tracking-widest px-4 py-2 rounded-xl panel text-emerald-500 w-full sm:w-auto text-center";
-                btn.innerText = "Enable";
-            }
-            updateFeedbackBadge(data.unreadFeedback || 0);
-        }
+            document.getElementById('stat-total-words').textContent = data.totalWords.toLocaleString();
+            document.getElementById('stat-total-writers').textContent = data.totalWriters;
+            document.getElementById('stat-total-groups').textContent = data.totalGroups;
+            document.getElementById('stat-active-sprints').textContent = data.activeSprintsCount;
 
-        async function loadConnectionStatus() {
-            try {
-                const res = await fetch(`${API_URL}/api/stats`);
-                const data = await res.json();
-                const container = document.getElementById('connection-container');
-                if (data.isConnected) {
-                    container.innerHTML = `<div class="w-20 h-20 rounded-[2rem] panel-inset flex items-center justify-center text-[#10b981] text-4xl mb-5 mx-auto"><i class="fab fa-whatsapp"></i></div><h3 class="text-xl font-black text-bold">Online</h3><p class="text-[10px] uppercase font-bold tracking-widest text-[#10b981] mt-2">Synced</p>`;
-                } else if (data.qrCode) {
-                    container.innerHTML = `<div class="panel-inset p-3 inline-block rounded-3xl mb-4"><img src="${data.qrCode}" class="rounded-xl w-36 md:w-48"></div><p class="text-[11px] uppercase font-bold tracking-widest opacity-60">Scan to Connect</p>`;
-                } else {
-                    container.innerHTML = '<p class="text-orange-500 font-black animate-pulse text-lg">Initializing...</p>';
-                }
-            } catch (e) {}
-        }
-        async function toggleMaintenance() {
-            const currentText = document.getElementById('maint-status').innerText;
-            const res = await api('/api/admin/maintenance', { status: currentText === "OFF" });
-            if (res && res.success) loadSystemStats();
-        }
-
-        // --- Feedback ---
-        function pollFeedback() { setInterval(loadSystemStats, 60000); } 
-        
-        function updateFeedbackBadge(count) {
-            const badge = document.getElementById('sidebar-feedback-badge');
-            if (count > 0) {
-                badge.classList.remove('hidden');
-                badge.innerText = count;
-                document.getElementById('feedback-count').innerText = `${count} Unread`;
-            } else {
-                badge.classList.add('hidden');
-                document.getElementById('feedback-count').innerText = "0 Unread";
-            }
-        }
-
-        function openFeedbackDrawer() {
-            document.getElementById('feedback-drawer-overlay').classList.remove('hidden');
-            setTimeout(() => document.getElementById('feedback-drawer').classList.add('open'), 10);
-            loadFeedbackList();
-        }
-        function closeFeedbackDrawer() {
-            document.getElementById('feedback-drawer').classList.remove('open');
-            setTimeout(() => document.getElementById('feedback-drawer-overlay').classList.add('hidden'), 400);
-        }
-
-        async function loadFeedbackList() {
-            const listEl = document.getElementById('feedback-list');
-            listEl.innerHTML = '<div class="text-center py-10 opacity-40"><i class="fas fa-spinner fa-spin text-3xl"></i></div>';
-            const res = await api('/api/admin/feedback', null, 'GET');
-            if (!res || !res.items) { listEl.innerHTML = '<div class="text-center font-bold opacity-50">Failed to load</div>'; return; }
-            if (res.items.length === 0) { listEl.innerHTML = '<div class="text-center font-bold opacity-50 py-10">No feedback yet.</div>'; return; }
-            
-            listEl.innerHTML = res.items.map(f => `
-                <div class="panel p-5 relative group ${f.isRead ? 'opacity-50' : ''}">
-                    <div class="flex justify-between items-start mb-3">
-                        <h4 class="font-black text-bold">${f.name}</h4>
-                        <span class="text-[9px] font-bold uppercase tracking-widest opacity-40">${new Date(f.timestamp).toLocaleDateString()}</span>
-                    </div>
-                    <p class="text-sm italic font-medium leading-relaxed opacity-80">"${f.message}"</p>
-                    ${!f.isRead ? `<button onclick="markFeedbackRead('${f._id}')" class="absolute top-4 right-4 btn-clay w-8 h-8 rounded-full flex items-center justify-center text-indigo-500 opacity-0 group-hover:opacity-100 transition"><i class="fas fa-check text-xs"></i></button>` : ''}
+            const feed = document.getElementById('activity-feed');
+            feed.innerHTML = data.recentActivity.map(a => `
+                <div class="flex items-start gap-4 p-4 rounded-xl hover:bg-white/5">
+                    <div class="text-lg">${a.icon || '📝'}</div>
+                    <div><div class="text-sm font-semibold">${a.text}</div><div class="text-[10px] text-slate-500">${new Date(a.timestamp).toLocaleTimeString()}</div></div>
                 </div>
             `).join('');
-            updateFeedbackBadge(res.unreadCount);
         }
 
-        async function markFeedbackRead(id) { await api('/api/admin/feedback/read', { id }); loadFeedbackList(); loadSystemStats(); }
-        async function markAllFeedbackRead() { await api('/api/admin/feedback/read', { id: 'all' }); loadFeedbackList(); loadSystemStats(); closeFeedbackDrawer(); }
-
-        // --- Analytics ---
-        async function loadAnalyticsDashboard() {
-            try {
-                const res = await api('/api/admin/analytics', null, 'GET');
-                if (!res) return;
-
-                document.getElementById('analytics-retention').innerText = res.retentionRate + '%';
-                document.getElementById('analytics-active-week').innerText = res.activeThisWeek;
-                document.getElementById('analytics-active-prev').innerText = res.activeLastWeek;
-
-                Chart.defaults.color = document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b';
-                Chart.defaults.font.family = 'Inter';
-                Chart.defaults.font.weight = '600';
-
-                // Charts
-                const ctxVel = document.getElementById('chart-velocity').getContext('2d');
-                if (analyticsDayChart) analyticsDayChart.destroy();
-                analyticsDayChart = new Chart(ctxVel, {
-                    type: 'line',
-                    data: { labels: res.wordsByDay.labels.map(l => l.substring(5)), datasets: [{ label: 'Words', data: res.wordsByDay.data, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 3, fill: true, tension: 0.4, pointRadius: 0, pointHitRadius: 10 }] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { border: {dash: [4, 4]}, grid: { color: 'rgba(150, 150, 150, 0.1)' } } } }
-                });
-
-                const ctxHr = document.getElementById('chart-hours').getContext('2d');
-                if (analyticsHourChart) analyticsHourChart.destroy();
-                analyticsHourChart = new Chart(ctxHr, {
-                    type: 'bar',
-                    data: { labels: res.wordsByHour.map(h => h.hour + ':00'), datasets: [{ label: 'Activity', data: res.wordsByHour.map(h => h.total), backgroundColor: '#10b981', borderRadius: 8 }] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { border: {dash: [4, 4]}, grid: { color: 'rgba(150, 150, 150, 0.1)' } } } }
-                });
-
-                // Tables
-                document.getElementById('analytics-growers').innerHTML = Array.isArray(res.growers) ?
-                    res.growers.map(g => `
-                    <tr class="border-b border-black/5 dark:border-white/5 last:border-0 font-bold">
-                        <td class="p-4 text-bold">${g.name}</td><td class="p-4 text-right opacity-70">${g.thisWeek.toLocaleString()}</td><td class="p-4 text-right text-emerald-500">+${g.growth.toLocaleString()}</td>
-                    </tr>`).join('') : '';
-
-                document.getElementById('analytics-groups').innerHTML = Array.isArray(res.groupBreakdown) ? res.groupBreakdown.map(g => `
-                    <tr class="border-b border-black/5 dark:border-white/5 last:border-0 font-bold">
-                        <td class="p-4 text-bold truncate max-w-[120px]">${g.name}</td><td class="p-4 text-right opacity-70">${g.writers}</td><td class="p-4 text-right text-purple-500">${g.words.toLocaleString()}</td>
-                    </tr>`).join('') : '';
-
-            } catch(e) {}
-        }
-
-        // --- Scheduled Broadcasts ---
-        let schedBroadcastImageBase64 = null;
-        let broadcastImageBase64 = null;
-        async function loadScheduledBroadcasts() {
-            const listEl = document.getElementById('broadcast-queue-list');
-            listEl.innerHTML = '<tr><td colspan="3" class="text-center py-10 opacity-40"><i class="fas fa-spinner fa-spin text-2xl"></i></td></tr>';
-            try {
-                const items = await api('/api/admin/broadcasts/scheduled', null, 'GET');
-                if (!items || !Array.isArray(items) || items.length === 0) {
-                    listEl.innerHTML = '<tr><td colspan="3" class="text-center py-10 font-bold opacity-50">No broadcasts scheduled.</td></tr>';
-                    return;
-                }
-                listEl.innerHTML = items.map(i => {
-                    const dt = new Date(i.sendAt);
-                    return `
-                    <tr class="border-b border-black/5 dark:border-white/5 last:border-0 font-bold group">
-                        <td class="p-4"><div class="text-blue-500">${dt.toLocaleDateString()}</div><div class="text-[10px] uppercase tracking-widest opacity-50 mt-1">${dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div></td>
-                        <td class="p-4 text-sm max-w-[200px] truncate opacity-80">${i.image ? '<i class="fas fa-image text-orange-400 mr-2"></i>' : ''}${i.message || '[Image Only]'}</td>
-                        <td class="p-4 text-right"><button onclick="cancelScheduledBroadcast('${i._id}')" class="btn-clay w-10 h-10 rounded-full inline-flex items-center justify-center text-red-500 opacity-0 group-hover:opacity-100"><i class="fas fa-trash-alt"></i></button></td>
-                    </tr>`;
-                }).join('');
-                document.getElementById('sched-broadcast-time').min = new Date().toISOString().slice(0, 16);
-            } catch(e) { listEl.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-red-500 font-bold">Error loading data.</td></tr>'; }
-        }
-        function handleSchedBroadcastImage() {
-            const file = document.getElementById('sched-broadcast-file').files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    schedBroadcastImageBase64 = e.target.result;
-                    document.getElementById('sched-broadcast-preview').src = schedBroadcastImageBase64;
-                    document.getElementById('sched-preview-container').classList.remove('hidden');
-                    document.getElementById('sched-img-label-text').innerText = "Change Image";
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-        function removeSchedBroadcastImage() {
-            schedBroadcastImageBase64 = null;
-            document.getElementById('sched-broadcast-file').value = "";
-            document.getElementById('sched-preview-container').classList.add('hidden');
-            document.getElementById('sched-img-label-text').innerText = "Add Image";
-        }
-        async function scheduleBroadcast() {
-            const msg = document.getElementById('sched-broadcast-text').value;
-            const timeStr = document.getElementById('sched-broadcast-time').value;
-            if (!msg && !schedBroadcastImageBase64) return showToast("Enter text or image", "error");
-            if (!timeStr) return showToast("Select a date and time", "error");
-            const res = await api('/api/admin/broadcasts/schedule', { message: msg, image: schedBroadcastImageBase64, sendAt: new Date(timeStr) });
-            if (res && res.success) {
-                showToast("Broadcast Queued!");
-                document.getElementById('sched-broadcast-text').value = ''; document.getElementById('sched-broadcast-time').value = '';
-                removeSchedBroadcastImage(); loadScheduledBroadcasts();
-            }
-        }
-        async function cancelScheduledBroadcast(id) {
-            showConfirm("Remove this scheduled broadcast?", async () => { await api('/api/admin/broadcasts/cancel', { id }); showToast("Schedule removed."); loadScheduledBroadcasts(); });
-        }
-
-        // --- Dashboard ---
-        async function loadVisualDashboard() {
-            try {
-                const response = await fetch(`${API_URL}/api/stats`);
-                const data = await response.json();
-                window.lastChartData = data.chartData;
-                animateValue("dash-total-words", data.totalWords || 0);
-                animateValue("dash-total-writers", data.totalWriters || 0);
-                animateValue("dash-total-groups", data.totalGroups || 0);
-                document.getElementById('dash-status').innerText = data.isConnected ? "ACTIVE" : "OFFLINE";
-                document.getElementById('dash-status').className = data.isConnected ? "text-sm font-black text-emerald-500" : "text-sm font-black text-red-500";
-                
-                renderTable('all-time-list', data.topWriters); 
-                renderTable('today-list', data.todayWriters); 
-                renderTable('groups-list', data.topGroups);
-                if (data.chartData) renderChart(data.chartData);
-            } catch (error) {}
-        }
-        function renderTable(elementId, items) {
-            const container = document.getElementById(elementId);
-            if (!items || !Array.isArray(items) || items.length === 0) { container.innerHTML = '<tr><td colspan="3" class="p-6 text-center font-bold opacity-40">No data available yet</td></tr>'; return; }
-            container.innerHTML = items.map((w, i) => `
-                <tr class="border-b border-black/5 dark:border-white/5 last:border-0 font-bold group hover:bg-black/5 dark:hover:bg-white/5 transition rounded-xl">
-                    <td class="p-4 w-12 text-center text-xl">${i===0?'🥇':i===1?'🥈':i===2?'🥉':`<span class="opacity-40 text-xs font-black">#${i+1}</span>`}</td>
-                    <td class="p-4 text-bold truncate max-w-[140px]">${w.name}</td>
-                    <td class="p-4 text-right text-[#10b981]">${(w.words || 0).toLocaleString()}</td>
-                </tr>`).join('');
-        }
-        function renderChart(chartData) {
-            const ctx = document.getElementById('activityChart').getContext('2d');
-            const isDark = document.documentElement.classList.contains('dark');
-            let gradient = ctx.createLinearGradient(0, 0, 0, 400); 
-            gradient.addColorStop(0, 'rgba(16,185,129,0.3)'); gradient.addColorStop(1, 'rgba(16,185,129,0)');
-            
-            if (myChart) myChart.destroy();
-            myChart = new Chart(ctx, {
-                type: 'line',
-                data: { labels: chartData.labels || [], datasets: [{ label: 'Words', data: chartData.data || [], borderColor: '#10b981', backgroundColor: gradient, borderWidth: 4, pointBackgroundColor: '#10b981', pointBorderColor: isDark ? '#1e293b' : '#e0e5ec', pointBorderWidth: 3, pointRadius: 6, pointHoverRadius: 8, fill: true, tension: 0.4 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { border: {dash: [4, 4]}, grid: { color: 'rgba(150, 150, 150, 0.1)' } }, x: { grid: { display: false } } } }
-            });
-        }
-
-        // --- Writers & Bulk ---
-        async function loadWritersGrid() {
-            const container = document.getElementById('writers-grid');
-            container.innerHTML = '<div class="col-span-full text-center py-10 opacity-40"><i class="fas fa-spinner fa-spin text-3xl"></i></div>';
-            try {
-                const data = await api('/api/admin/search', { query: '' });
-                currentWriters = Array.isArray(data) ? data : [];
-                applyWriterSort(); updateBulkActionBar();
-            } catch(e) { container.innerHTML = '<div class="col-span-full text-center py-10 font-bold text-red-500">Error loading writers.</div>'; }
-        }
-        function applyWriterSort() {
-            const criteria = document.getElementById('sort-writers').value;
-            let sorted = [...currentWriters];
-            if (criteria === 'words') sorted.sort((a, b) => b.totalWords - a.totalWords);
-            else if (criteria === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
-            else sorted.sort((a, b) => new Date(b.lastActive || 0) - new Date(a.lastActive || 0));
-            renderWriters(sorted);
-        }
-        let allUsersCache = {}; let selectedUserForDrawer = null;
-        function renderWriters(users) {
-            const container = document.getElementById('writers-grid');
-            container.innerHTML = ''; allUsersCache = {};
-            if (!users || users.length === 0) { container.innerHTML = '<div class="col-span-full text-center p-10 font-bold opacity-50">No writers found.</div>'; return; }
-
-            users.forEach(u => {
-                allUsersCache[u._id] = u;
-                const total = u.trueTotal || u.totalWords || 0;
-                const isBanned = u.isBanned; const isSelected = selectedWriters.includes(u._id);
-                const focusClass = isSelected ? 'ring-4 ring-emerald-500/50' : '';
-                const bannedClass = isBanned ? 'opacity-50 grayscale' : '';
-                const badgeHtml = isBanned ? '<span class="text-[9px] bg-red-500 text-white px-2 py-1 rounded-lg ml-2 shadow-inner">BANNED</span>' : '';
-
-                container.innerHTML += `
-                    <div class="panel p-6 flex items-center gap-5 cursor-pointer relative ${focusClass} ${bannedClass}" onclick="openWriterDrawer('${u._id}')">
-                        
-                        <div class="absolute top-4 right-4 z-10" onclick="event.stopPropagation(); toggleWriterSelection('${u._id}')">
-                            <div class="w-6 h-6 rounded-lg ${isSelected ? 'panel-inset text-emerald-500' : 'panel opacity-50'} flex items-center justify-center transition">
-                                ${isSelected ? '<i class="fas fa-check text-xs"></i>' : ''}
-                            </div>
-                        </div>
-
-                        <div class="w-14 h-14 rounded-2xl panel-inset flex items-center justify-center text-xl font-black text-bold shrink-0">${u.name.charAt(0).toUpperCase()}</div>
-                        <div class="flex-1 min-w-0 pr-6">
-                            <h3 class="font-extrabold text-bold text-lg truncate flex items-center">${u.name} ${badgeHtml}</h3>
-                            <p class="text-[10px] uppercase font-bold tracking-widest opacity-60 mt-1">${u.rank || 'Unranked'}</p>
-                        </div>
-                        <div class="text-right shrink-0 pb-1">
-                            <div class="text-[#10b981] font-black text-2xl leading-none">${total.toLocaleString()}</div>
-                            <div class="text-[9px] uppercase font-bold tracking-widest opacity-40 mt-2">Words</div>
-                        </div>
-                    </div>`;
-            });
-            filterWriterCards();
-        }
-        function filterWriterCards() {
-            const query = document.getElementById('dash-search').value.toLowerCase();
-            document.querySelectorAll('#writers-grid > div').forEach(item => { item.classList.toggle('hidden', !item.innerText.toLowerCase().includes(query)); });
-        }
-        function toggleWriterSelection(id) { 
-            if (selectedWriters.includes(id)) selectedWriters = selectedWriters.filter(i => i !== id);
-            else selectedWriters.push(id); 
-            applyWriterSort(); updateBulkActionBar(); 
-        }
-        function clearBulkSelection() { selectedWriters = []; applyWriterSort(); updateBulkActionBar(); }
-        function updateBulkActionBar() {
-            const bar = document.getElementById('bulk-action-bar');
-            if (selectedWriters.length > 0) { 
-                document.getElementById('bulk-count').innerText = `${selectedWriters.length} Selected`; 
-                bar.classList.remove('hidden'); 
-            } else { 
-                bar.classList.add('hidden');
-            }
-        }
-        function exportWritersCSV() {
-            const selected = currentWriters.filter(w => selectedWriters.includes(w._id));
-            if(!selected.length) return;
-            let csv = "ID,Name,Total Words,Rank,Current Streak,Best Sprint Words\n";
-            selected.forEach(w => csv += `"${w._id}","${w.name}",${w.trueTotal},"${w.rank}",${w.streak},${w.bestSprintWords || 0}\n`);
-            const blob = new Blob([csv], {type: 'text/csv'}); const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url;
-            a.download = 'sprintbot_writers.csv'; a.click();
-            showToast(`Exported ${selected.length} writers.`);
-        }
-        async function bulkBanWriters() {
-            showConfirm(`Ban ${selectedWriters.length} selected writers?`, async () => {
-                for (let id of selectedWriters) { await api('/api/admin/ban', { userId: id, action: 'ban' }); }
-                showToast(`Banned ${selectedWriters.length} users.`); clearBulkSelection(); loadWritersGrid();
-            });
-        }
-
-        // --- Drawer & Modifiers ---
-        async function openWriterDrawer(userId) {
-            selectedUserForDrawer = allUsersCache[userId];
-            if (!selectedUserForDrawer) return;
-
-            document.getElementById('edit-id').value = selectedUserForDrawer._id;
-            document.getElementById('edit-name').innerText = selectedUserForDrawer.name;
-            document.getElementById('edit-id-display').innerText = 'ID: ' + selectedUserForDrawer._id;
-            document.getElementById('profile-avatar').innerText = selectedUserForDrawer.name.charAt(0).toUpperCase();
-            document.getElementById('new-name').value = selectedUserForDrawer.name;
-            document.getElementById('profile-rank').innerText = selectedUserForDrawer.rank || "Unranked";
-            document.getElementById('profile-streak').innerText = (selectedUserForDrawer.streak || 0);
-            document.getElementById('profile-best').innerText = (selectedUserForDrawer.bestStreak || 0);
-            document.getElementById('profile-total').innerText = (selectedUserForDrawer.trueTotal || selectedUserForDrawer.totalWords || 0).toLocaleString();
-            
-            const badgeContainer = document.getElementById('profile-badges');
-            if (selectedUserForDrawer.badges && Array.isArray(selectedUserForDrawer.badges) && selectedUserForDrawer.badges.length) {
-                badgeContainer.innerHTML = selectedUserForDrawer.badges.map(b => `<span class="panel-inset text-bold font-bold text-[9px] px-3 py-1.5 rounded-lg uppercase tracking-wide">${b.replace('_',' ')}</span>`).join('');
-            } else { badgeContainer.innerHTML = ''; }
-
-            updateBanButton(selectedUserForDrawer.isBanned);
-            document.getElementById('writer-drawer-overlay').classList.remove('hidden');
-            setTimeout(() => document.getElementById('writer-drawer').classList.add('open'), 10);
-
-            try {
-                const hist = await api(`/api/admin/writer/${encodeURIComponent(userId)}/history`, null, 'GET');
-                if (hist && hist.wordsByDay) {
-                    const ctx = document.getElementById('drawer-chart').getContext('2d');
-                    if(drawerChartInstance) drawerChartInstance.destroy();
-                    drawerChartInstance = new Chart(ctx, {
-                        type: 'bar',
-                        data: { labels: hist.wordsByDay.labels.map(l=>l.substring(5)), datasets: [{ label: 'Words', data: hist.wordsByDay.data, backgroundColor: '#10b981', borderRadius: 4 }] },
-                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { border: {dash: [4, 4]}, grid: { color: 'rgba(150, 150, 150, 0.1)' } } } }
-                    });
-                    
-                    document.getElementById('drawer-best-sprint').innerText = selectedUserForDrawer.bestSprintWpm || 0;
-                    document.getElementById('drawer-sprint-count').innerText = selectedUserForDrawer.sprintCount || 0;
-                    const sprintsList = document.getElementById('drawer-sprints-list');
-                    if (!hist.recentSprints || hist.recentSprints.length === 0) sprintsList.innerHTML = '<div class="text-xs font-bold opacity-40 text-center py-4">No recent sprints.</div>';
-                    else {
-                        sprintsList.innerHTML = hist.recentSprints.map(s => {
-                            const d = new Date(s.date).toLocaleDateString();
-                            return `<div class="flex justify-between items-center py-2 border-b border-black/5 dark:border-white/5 last:border-0 font-bold"><span class="opacity-60 text-xs">${d} (${s.duration}m)</span><span class="text-bold text-sm">${s.words} <span class="text-[10px] font-black text-emerald-500 ml-1 bg-emerald-500/10 px-1 rounded">@ ${s.wpm}WPM</span></span></div>`;
-                        }).join('');
-                    }
-                }
-            } catch(e) {}
-        }
-        function closeDrawer() { 
-            document.getElementById('writer-drawer').classList.remove('open');
-            setTimeout(() => document.getElementById('writer-drawer-overlay').classList.add('hidden'), 400); 
-        }
-
-        async function updateStats(type) {
-            const id = document.getElementById('edit-id').value;
-            const val = type === 'set' ? document.getElementById('edit-amount').value : document.getElementById('add-amount').value;
-            if (!val) return showToast("Please enter a number", "error");
-            const res = await api('/api/admin/update', { userId: id, amount: val, type });
-            if (res && res.success) {
-                showToast(`Updated! New Total: ${res.newTotal}`);
-                document.getElementById('edit-amount').value = ''; document.getElementById('add-amount').value = '';
-                document.getElementById('profile-total').innerText = res.newTotal.toLocaleString();
-                loadWritersGrid();
-            } else { showToast(res?.message || "Update failed", "error"); }
-        }
-        async function renameUser() {
-            const id = document.getElementById('edit-id').value;
-            const name = document.getElementById('new-name').value;
-            if (!name) return showToast("Enter new name", "error");
-            const res = await api('/api/admin/update', { userId: id, name, type: 'name' });
-            if (res && res.success) { 
-                showToast("User renamed successfully!");
-                document.getElementById('edit-name').innerText = name; loadWritersGrid(); 
-            } else { showToast("Rename failed", "error"); }
-        }
-        function updateBanButton(isBanned) {
-            const btn = document.getElementById('ban-btn');
-            if (isBanned) {
-                btn.innerHTML = '<i class="fas fa-unlock"></i> Unblock User';
-                btn.className = "btn-clay-primary w-full py-4 text-sm flex items-center justify-center gap-3";
-                btn.onclick = () => toggleBan('unban');
-            } else {
-                btn.innerHTML = '<i class="fas fa-ban"></i> Block User';
-                btn.className = "btn-clay-danger w-full py-4 text-sm flex items-center justify-center gap-3";
-                btn.onclick = () => toggleBan('ban');
-            }
-        }
-        async function toggleBan(action) {
-            if (!selectedUserForDrawer) return;
-            showConfirm(`Are you sure you want to ${action.toUpperCase()} this user?`, async () => {
-                const res = await api('/api/admin/ban', { userId: selectedUserForDrawer._id, action });
-                if (res && res.success) {
-                    showToast(action === 'ban' ? "User Blocked" : "User Unblocked", action === 'ban' ? "error" : "success");
-                    selectedUserForDrawer.isBanned = res.isBanned; updateBanButton(res.isBanned); loadWritersGrid();
-                } else { showToast("Failed to update status", "error"); }
-            });
-        }
-
-        // --- Groups ---
-        async function loadGroups() {
-            const container = document.getElementById('groups-grid');
-            container.innerHTML = '<div class="col-span-full text-center opacity-40 py-10"><i class="fas fa-spinner fa-spin text-3xl"></i></div>';
-            try {
-                const data = await api('/api/admin/groups', null, 'GET');
-                currentGroups = Array.isArray(data) ? data : [];
-                applyGroupSort();
-            } catch(e) { container.innerHTML = '<div class="col-span-full text-center text-red-500 font-bold py-10">Error loading groups</div>'; }
-        }
-        function applyGroupSort() {
-            const criteria = document.getElementById('sort-groups').value;
-            let sorted = [...currentGroups];
-            if (criteria === 'size') sorted.sort((a, b) => b.participants - a.participants); else sorted.sort((a, b) => a.name.localeCompare(b.name));
-            renderGroups(sorted);
-        }
-        function renderGroups(groups) {
-            const container = document.getElementById('groups-grid');
-            container.innerHTML = '';
-            if (!groups || groups.length === 0) { container.innerHTML = '<div class="col-span-full text-center py-10 font-bold opacity-50">No connected groups found.</div>'; return; }
-            
-            const healthColors = { 
-                Active: 'text-[#10b981]', 
-                Quiet: 'text-yellow-500', 
-                Dormant: 'opacity-40 text-bold' 
-            };
-
-            groups.forEach(g => {
-                const hColor = healthColors[g.health] || healthColors.Dormant;
-                
-                container.innerHTML += `
-                    <div class="panel p-6 flex flex-col justify-between group h-full">
-                        <div>
-                            <div class="flex justify-between items-start mb-6">
-                                <div class="w-12 h-12 rounded-2xl panel-inset text-indigo-500 flex items-center justify-center text-xl shrink-0"><i class="fas fa-hashtag"></i></div>
-                                <div class="flex items-center gap-3">
-                                    <span class="text-[10px] font-black uppercase tracking-widest ${hColor}">${g.health || 'Dormant'}</span>
-                                    <button onclick="leaveGroup('${g.id}')" class="btn-clay w-8 h-8 rounded-full flex items-center justify-center text-red-500 opacity-0 group-hover:opacity-100 transition" title="Leave Group"><i class="fas fa-sign-out-alt"></i></button>
-                                </div>
-                            </div>
-                            <h3 class="font-extrabold text-xl text-bold mb-6 truncate" title="${g.name}">${g.name}</h3>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="panel-inset p-3 text-center rounded-xl">
-                                <p class="text-[9px] font-bold uppercase tracking-widest opacity-50 mb-1">Members</p>
-                                <p class="font-black text-bold text-lg">${g.participants || 0}</p>
-                            </div>
-                            <div class="panel-inset p-3 text-center rounded-xl">
-                                <p class="text-[9px] font-bold uppercase tracking-widest opacity-50 mb-1">Active</p>
-                                <p class="font-black text-[#10b981] text-lg">${g.activeWritersToday || 0}</p>
-                            </div>
-                            <div class="panel-inset p-3 text-center rounded-xl col-span-2">
-                                <p class="text-[9px] font-bold uppercase tracking-widest opacity-50 mb-1">Words This Week</p>
-                                <p class="font-black text-blue-500 text-lg">${(g.weekWords || 0).toLocaleString()}</p>
-                            </div>
-                        </div>
-                    </div>`;
-            });
-        }
-        async function leaveGroup(chatId) { showConfirm("The bot will leave this group permanently.", async () => { await api('/api/admin/groups/leave', { chatId }); showToast("Bot left the group"); loadGroups(); }); }
-        
-        // --- Join Group ---
-        function openJoinGroup() {
-            document.getElementById('join-group-modal').classList.remove('hidden');
-            document.getElementById('invite-code-input').value = '';
-            document.getElementById('join-error').classList.add('hidden'); document.getElementById('join-result').classList.add('hidden');
-            document.getElementById('join-btn').disabled = false; document.getElementById('join-btn').innerHTML = '<i class="fab fa-whatsapp mr-2"></i> Join';
-            setTimeout(() => document.getElementById('invite-code-input').focus(), 100);
-        }
-        function closeJoinGroup() { document.getElementById('join-group-modal').classList.add('hidden'); }
-        async function joinGroup() {
-            const inviteCode = document.getElementById('invite-code-input').value.trim();
-            const errorEl = document.getElementById('join-error');
-            const resultEl = document.getElementById('join-result'); const btn = document.getElementById('join-btn');
-            errorEl.classList.add('hidden'); resultEl.classList.add('hidden');
-            
-            if (!inviteCode) { errorEl.textContent = 'Paste an invite link or code.'; errorEl.classList.remove('hidden'); return; }
-            
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
-            const res = await api('/api/admin/groups/accept', { inviteCode });
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fab fa-whatsapp mr-2"></i> Join';
-            
-            if (!res) { errorEl.textContent = 'Request failed. Check connection.'; errorEl.classList.remove('hidden'); return; }
-            if (res.success) {
-                resultEl.classList.remove('hidden');
-                document.getElementById('invite-code-input').value = ''; showToast("Bot joined the group!");
-                setTimeout(() => { loadGroups(); closeJoinGroup(); }, 2000);
-            } else { 
-                errorEl.textContent = res.error || 'Failed to join. Invalid link.'; 
-                errorEl.classList.remove('hidden');
-            }
-        }
-
-        // --- Sprints ---
         async function loadSprints() {
-            const containerActive = document.getElementById('sprints-list');
-            try {
-                const activeData = await api('/api/admin/sprints', null, 'GET');
-                containerActive.innerHTML = '';
-                if (!activeData || !Array.isArray(activeData) || activeData.length === 0) {
-                    containerActive.innerHTML = '<div class="col-span-full py-16 panel-inset flex justify-center items-center text-center font-bold opacity-40">No active sprints right now.</div>';
-                } else {
-                    activeData.forEach(s => {
-                        const pList = Array.isArray(s.participantList) ? s.participantList : [];
-                        const partsList = pList.map(p => `<span class="inline-block panel-inset font-bold text-[10px] px-3 py-1.5 rounded-lg mr-2 mb-2">@${p.uid} <span class="text-emerald-500 ml-1">${p.words}</span></span>`).join('');
-                        
-                        containerActive.innerHTML += `
-                        <div class="panel p-6 flex flex-col justify-between">
-                            <div class="flex justify-between items-start mb-5">
-                                <h3 class="font-extrabold text-xl text-bold truncate pr-4">${s.name}</h3>
-                                <button onclick="stopSprint('${s.id}')" class="btn-clay-danger px-4 py-2 rounded-xl text-xs shrink-0"><i class="fas fa-stop"></i></button>
-                            </div>
-                            <div class="flex items-center gap-4 mb-6">
-                                <div class="panel-inset px-4 py-2 rounded-xl flex items-center gap-2">
-                                    <i class="fas fa-stopwatch text-emerald-500 animate-pulse text-lg"></i>
-                                    <span class="font-black text-bold">${s.timeLeft}m</span>
-                                </div>
-                                <div class="panel-inset px-4 py-2 rounded-xl flex items-center gap-2">
-                                    <i class="fas fa-users text-blue-500 text-lg"></i>
-                                    <span class="font-black text-bold">${s.participants}</span>
-                                </div>
-                            </div>
-                            <div class="pt-5 border-t border-black/5 dark:border-white/5 min-h-[4rem]">
-                                ${pList.length ? partsList : '<span class="text-xs font-bold opacity-40">No words logged yet...</span>'}
-                            </div>
-                        </div>`;
-                    });
-                }
-            } catch(e) { containerActive.innerHTML = '<div class="col-span-full text-center py-10 font-bold text-red-500">Error loading sprints.</div>'; }
-        }
-        async function stopSprint(chatId) { showConfirm("Stop this sprint immediately?", async () => { await api('/api/admin/sprints/stop', { chatId }); showToast("Sprint stopped"); loadSprints(); }); }
-
-        // --- Instant Broadcast ---
-        function openBroadcast() { document.getElementById('broadcast-modal').classList.remove('hidden'); }
-        function handleBroadcastImage() {
-            const file = document.getElementById('broadcast-file').files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    broadcastImageBase64 = e.target.result;
-                    document.getElementById('broadcast-preview').src = broadcastImageBase64;
-                    document.getElementById('broadcast-preview-container').classList.remove('hidden'); document.getElementById('img-label-text').innerText = "Change Image";
-                }; reader.readAsDataURL(file);
-            }
-        }
-        function removeBroadcastImage() {
-            broadcastImageBase64 = null;
-            document.getElementById('broadcast-file').value = "";
-            document.getElementById('broadcast-preview-container').classList.add('hidden'); document.getElementById('img-label-text').innerText = "Add Image";
-        }
-        async function sendBroadcast() {
-            const msg = document.getElementById('broadcast-text').value;
-            if (!msg && !broadcastImageBase64) return showToast("Enter text or image", "error");
-            const btn = document.querySelector('#broadcast-modal button.btn-clay-primary');
-            const originalHTML = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Sending...';
-            try {
-                const res = await api('/api/admin/broadcast', { message: msg, image: broadcastImageBase64 });
-                if (res && res.success) {
-                    showToast(`✅ Sent to ${res.count} groups!`);
-                    document.getElementById('broadcast-modal').classList.add('hidden');
-                    document.getElementById('broadcast-text').value = '';
-                    removeBroadcastImage();
-                } else {
-                    const errMsg = res?.error || 'Unknown error';
-                    showToast(`Failed: ${errMsg}`, "error");
-                }
-            } catch(e) {
-                showToast('Request failed', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalHTML;
-            }
+            const data = await api('/api/admin/sprints', null, 'GET');
+            document.getElementById('sprints-active-list').innerHTML = data?.map(s => `
+                <div class="system-panel p-5 rounded-2xl flex justify-between items-center">
+                    <div><div class="font-bold text-sm">${s.name}</div><div class="text-[10px] text-neon-blue font-bold">${s.timeLeft}M LEFT</div></div>
+                    <button onclick="stopSprint('${s.id}')" class="w-10 h-10 rounded-xl bg-neon-red/10 text-neon-red"><i class="fas fa-stop"></i></button>
+                </div>
+            `).join('') || '<p class="text-center py-12 text-slate-500">No active sprints</p>';
         }
 
-        // --- Utils ---
-        function animateValue(id, end) {
-            const obj = document.getElementById(id);
-            if (!obj) return;
-            const current = parseInt(obj.innerText.replace(/,/g, '').replace('M','000000').replace('k','000')) || 0; if (current === end) return;
-            let start = null;
-            const duration = 1000;
-            const step = ts => {
-                if (!start) start = ts;
-                const prog = Math.min((ts - start) / duration, 1);
-                obj.innerHTML = Math.floor(prog * (end - current) + current).toLocaleString();
-                if (prog < 1) window.requestAnimationFrame(step); else obj.innerHTML = end.toLocaleString();
-            }; window.requestAnimationFrame(step);
+        async function loadGroupsForBroadcast() {
+            const data = await api('/api/admin/groups', null, 'GET');
+            if (!data) return;
+            allGroups = data.sort((a, b) => b.todayWords - a.todayWords);
+            renderGroupsList();
         }
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            
-            const baseClass = type === 'success' ? 'bg-[#10b981]' : type === 'error' ? 'bg-red-500' : 'bg-slate-800';
-            const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
-            
-            toast.className = `pointer-events-auto flex items-center gap-4 px-6 py-4 rounded-2xl shadow-[5px_5px_15px_rgba(0,0,0,0.2)] transform transition-all duration-400 translate-x-full opacity-0 ${baseClass} text-white font-bold`;
-            toast.innerHTML = `<i class="fas ${icon} text-2xl drop-shadow-md"></i><span>${message}</span>`;
-            container.appendChild(toast);
-            
-            requestAnimationFrame(() => { toast.classList.remove('translate-x-full', 'opacity-0'); });
-            setTimeout(() => { toast.classList.add('translate-x-full', 'opacity-0'); setTimeout(() => toast.remove(), 400); }, 3000);
+
+        function renderGroupsList(filter = '') {
+            const list = document.getElementById('bc-groups-list');
+            list.innerHTML = allGroups.filter(g => g.subject.toLowerCase().includes(filter.toLowerCase())).map(g => `
+                <label class="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 cursor-pointer">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <input type="checkbox" name="target-group" value="${g.groupId}" class="sr-only peer">
+                        <div class="w-5 h-5 border-2 border-white/10 rounded peer-checked:bg-neon-blue peer-checked:border-neon-blue flex items-center justify-center">
+                            <i class="fas fa-check text-[10px] text-void opacity-0 peer-checked:opacity-100"></i>
+                        </div>
+                        <div class="truncate text-xs font-bold">${g.subject}</div>
+                    </div>
+                </label>
+            `).join('');
         }
-        function showConfirm(message, callback) {
-            document.getElementById('confirm-msg').innerText = message;
-            document.getElementById('confirm-modal').classList.remove('hidden');
-            const yesBtn = document.getElementById('confirm-yes-btn'); const newBtn = yesBtn.cloneNode(true); yesBtn.parentNode.replaceChild(newBtn, yesBtn);
-            newBtn.addEventListener('click', () => { callback(); closeConfirm(); });
+
+        function filterGroups(val) { renderGroupsList(val); }
+        function toggleSelectAllGroups(checked) { document.querySelectorAll('input[name="target-group"]').forEach(cb => cb.checked = checked); }
+
+        function previewBCImage(e) {
+            const reader = new FileReader();
+            reader.onload = ev => {
+                bcImageBase64 = ev.target.result;
+                document.getElementById('bc-preview-img').src = bcImageBase64;
+                document.getElementById('bc-preview-label').classList.add('hidden');
+                document.getElementById('bc-preview-container').classList.remove('hidden');
+            };
+            reader.readAsDataURL(e.target.files[0]);
         }
+
+        function removeBCImage() {
+            bcImageBase64 = null;
+            document.getElementById('bc-preview-label').classList.remove('hidden');
+            document.getElementById('bc-preview-container').classList.add('hidden');
+        }
+
+        async function transmitBroadcast() {
+            const msg = document.getElementById('bc-message').value;
+            const selected = Array.from(document.querySelectorAll('input[name="target-group"]:checked')).map(cb => cb.value);
+            if (!msg && !bcImageBase64) return showToast("Enter message or image", "error");
+            const res = await api('/api/admin/broadcast', { message: msg, image: bcImageBase64, targetGroups: selected });
+            if (res && res.success) { showToast(`Delivered to ${res.count} groups`); document.getElementById('bc-message').value = ''; removeBCImage(); }
+        }
+
+        async function loadWriters(query = '') {
+            const data = await api('/api/admin/search', { query });
+            document.getElementById('writers-grid').innerHTML = data?.map(u => `
+                <div class="system-panel p-6 rounded-2xl">
+                    <div class="font-bold text-sm mb-4">${u.name}</div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="p-3 bg-white/5 rounded-xl text-center"><div class="text-[9px] text-slate-500 font-bold">Total</div><div class="text-xs font-mono font-bold">${(u.trueTotal || u.totalWords).toLocaleString()}</div></div>
+                        <div class="p-3 bg-white/5 rounded-xl text-center"><div class="text-[9px] text-slate-500 font-bold">Streak</div><div class="text-xs font-mono font-bold text-neon-green">${u.currentStreak || 0}🔥</div></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="openFreezeModal('${u.userId}', '${u.name}')" class="flex-1 py-2 bg-neon-blue/10 text-neon-blue text-[10px] font-black rounded-lg">FREEZE</button>
+                        <button onclick="toggleBan('${u.userId}', ${u.isBanned})" class="px-4 py-2 ${u.isBanned ? 'bg-neon-green/10 text-neon-green' : 'bg-neon-red/10 text-neon-red'} text-[10px] font-black rounded-lg">${u.isBanned ? 'UNBAN' : 'BAN'}</button>
+                    </div>
+                </div>
+            `).join('') || '<p class="text-center py-20 text-slate-500 text-sm col-span-full">Searching...</p>';
+        }
+
+        function searchWriters(val) { clearTimeout(window.searchTimer); window.searchTimer = setTimeout(() => loadWriters(val), 500); }
+
+        async function loadSystemInfo() {
+            const data = await api('/api/stats', null, 'GET');
+            if (data.qrCode) { document.getElementById('qr-image').src = data.qrCode; document.getElementById('qr-container').classList.remove('hidden'); document.getElementById('connection-status').classList.add('hidden'); }
+            else { document.getElementById('qr-container').classList.add('hidden'); document.getElementById('connection-status').classList.remove('hidden'); }
+        }
+
+        function openFreezeModal(uid, name) { document.getElementById('freeze-user-name').textContent = name; document.getElementById('freeze-modal').classList.remove('hidden'); document.getElementById('btn-grant-freeze').onclick = () => grantFreeze(uid); }
+
+        async function grantFreeze(userId) {
+            const amount = document.getElementById('freeze-amount').value;
+            const res = await api('/api/admin/writers/freeze', { userId, amount });
+            if (res && res.success) { showToast(`Granted ${amount} freeze(s)`); document.getElementById('freeze-modal').classList.add('hidden'); loadWriters(); }
+        }
+
+        function showToast(msg, type = 'success') {
+            const t = document.createElement('div');
+            t.className = `fixed top-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl border font-bold text-xs z-[200] ${type==='success'?'bg-panel border-neon-blue text-neon-blue':'bg-void border-neon-red text-neon-red'}`;
+            t.textContent = msg; document.body.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
         function closeConfirm() { document.getElementById('confirm-modal').classList.add('hidden'); }
+
+        if (token) { document.getElementById('auth-modal').classList.add('hidden'); document.getElementById('app').classList.remove('hidden'); switchTab('overview'); }
     </script>
 </body>
 </html>
