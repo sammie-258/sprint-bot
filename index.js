@@ -472,8 +472,15 @@ mongoose.connect(MONGO_URI).then(async () => {
         const messageHandler = require('./src/handlers/messageHandler');
         sock.ev.on('messages.upsert', async (m) => {
             await messageHandler(m, {
-                sock, isConnected, groupCache, maintenanceMode, activeSprints, activePomodoros, activeDuels,
-                getTodayDateGMT1, awardBadge, checkAndAwardBadges, updateStreak, updateChallenge, updateWeeklyChallenge,
+                get sock() { return sock; },
+                get isConnected() { return isConnected; },
+                get groupCache() { return groupCache; },
+                get maintenanceMode() { return maintenanceMode; },
+                get activeSprints() { return activeSprints; },
+                get activePomodoros() { return activePomodoros; },
+                get activeDuels() { return activeDuels; },
+                checkRateLimit, getTodayDateGMT1, awardBadge, checkAndAwardBadges,
+                updateStreak, updateChallenge, updateWeeklyChallenge,
                 startSprintSession, finishSprint, pushActivity
             });
         });

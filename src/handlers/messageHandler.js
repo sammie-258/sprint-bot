@@ -1,17 +1,23 @@
-const GroupMeta = require('../models/GroupMeta');
-const DailyStats = require('../models/DailyStats');
-const UserProfile = require('../models/UserProfile');
-const PersonalGoal = require('../models/PersonalGoal');
+const GroupMeta      = require('../models/GroupMeta');
+const DailyStats     = require('../models/DailyStats');
+const UserProfile    = require('../models/UserProfile');
+const PersonalGoal   = require('../models/PersonalGoal');
 const ScheduledSprint = require('../models/ScheduledSprint');
-const Blacklist = require('../models/Blacklist');
-const Feedback = require('../models/Feedback');
-const { getDurationString, getNextRank, getRank } = require('../utils/helpers');
+const Blacklist      = require('../models/Blacklist');
+const Feedback       = require('../models/Feedback');
+const SprintRecord   = require('../models/SprintRecord');
+const StreakFreeze   = require('../models/StreakFreeze');
+const { getDurationString, getNextRank, getRank, toSuperscript, BADGE_DEFS } = require('../utils/helpers');
+
+const BASE_URL     = process.env.BASE_URL || 'https://sprint-bot-9bll.onrender.com';
+const TIMEZONE     = 'Africa/Lagos';
+const OWNER_NUMBER = process.env.OWNER_NUMBER || '2349019671229';
 
 module.exports = async function(m, appState) {
     const { 
         sock, isConnected, groupCache, maintenanceMode, activeSprints, activePomodoros, activeDuels,
-        getTodayDateGMT1, awardBadge, checkAndAwardBadges, updateStreak, updateChallenge, updateWeeklyChallenge,
-        startSprintSession, finishSprint, pushActivity
+        checkRateLimit, getTodayDateGMT1, awardBadge, checkAndAwardBadges, updateStreak,
+        updateChallenge, updateWeeklyChallenge, startSprintSession, finishSprint, pushActivity
     } = appState;
 
             try {
