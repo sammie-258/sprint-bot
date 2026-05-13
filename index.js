@@ -301,6 +301,17 @@ mongoose.connect(MONGO_URI).then(async () => {
         activeSprints[chatId] = { duration, endsAt: endTime, participants: {} };
         await ActiveSprint.create({ groupId: chatId, duration, endsAt: endTime, participants: {} });
         await sock.sendMessage(chatId, { text: `🏃 *Writing Sprint Started!*\nDuration: *${duration} minutes*\n\nUse *!wc <number>* to log words.` });
+
+        // 5-minute warning
+        if (duration > 5) {
+            setTimeout(async () => {
+                if (activeSprints[chatId]) { // Only send if sprint is still active
+                    try { await sock.sendMessage(chatId, { text: `⏰ *5 MINUTES LEFT!*\n\nWrap up your thoughts — the sprint ends soon!\nGet ready to submit with *!wc [number]* 🖊️` }); } catch (e) {}
+                }
+            }, (duration - 5) * 60000);
+        }
+
+        // End-of-sprint message
         setTimeout(async () => {
             if (activeSprints[chatId]) {
                 try { await sock.sendMessage(chatId, { text: `🛑 *TIME'S UP!*\n\nSubmit with *!wc [number]* now.\nType *!finish* to see results.` }); } catch (e) {}

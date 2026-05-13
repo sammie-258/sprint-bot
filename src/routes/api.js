@@ -14,6 +14,7 @@ const Blacklist = require('../models/Blacklist');
 const Feedback = require('../models/Feedback');
 const ScheduledBroadcast = require('../models/ScheduledBroadcast');
 const SprintRecord = require('../models/SprintRecord');
+const StreakFreeze = require('../models/StreakFreeze');
 
 const { getRank, getNextRank, getDurationString } = require('../utils/helpers');
 
@@ -288,18 +289,26 @@ router.post('/api/admin/ban', requireAdmin, async (req, res) => {
 
 router.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
     try {
-        const { message, image } = req.body;
+        const { message, image, targetGroups } = req.body;
         if (!message && !image) return res.status(400).json({ error: "Need text or image" });
         if (!appState.sock || !appState.isConnected) {
             console.log("❌ Broadcast failed: Bot not connected");
             return res.status(503).json({ error: "Bot not connected" });
         }
 
-        const groups = await appState.sock.groupFetchAllParticipating();
-        let count = 0;
-        console.log(`📣 Starting broadcast to ${Object.keys(groups).length} groups...`);
+        // If targetGroups provided, use them; otherwise send to all
+        let gids;
+        if (targetGroups && Array.isArray(targetGroups) && targetGroups.length > 0) {
+            gids = targetGroups;
+            console.log(`📣 Targeted broadcast to ${gids.length} selected groups...`);
+        } else {
+            const groups = await appState.sock.groupFetchAllParticipating();
+            gids = Object.keys(groups);
+            console.log(`📣 Broadcasting to all ${gids.length} groups...`);
+        }
 
-        for (const gid of Object.keys(groups)) {
+        let count = 0;
+        for (const gid of gids) {
             try {
                 if (image) {
                     const buffer = Buffer.from(image.split(",")[1], 'base64');
@@ -308,7 +317,6 @@ router.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
                     await appState.sock.sendMessage(gid, { text: message });
                 }
                 count++;
-                // Small delay to prevent rate limits
                 await new Promise(r => setTimeout(r, 500));
             } catch (e) {
                 console.log(`⚠️ Failed to send to ${gid}:`, e.message);
@@ -320,6 +328,20 @@ router.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
         console.error("❌ Broadcast error:", e);
         res.status(500).json({ error: e.message }); 
     }
+});
+
+// Admin: Grant streak freeze to a writer
+router.post('/api/admin/writers/freeze', requireAdmin, async (req, res) => {
+    try {
+        const { userId, amount = 1 } = req.body;
+        if (!userId) return res.status(400).json({ error: 'userId required' });
+        let freeze = await StreakFreeze.findOne({ userId });
+        if (!freeze) freeze = await StreakFreeze.create({ userId, freezesAvailable: 0 });
+        freeze.freezesAvailable += Number(amount);
+        await freeze.save();
+        console.log(`🛡️ Admin granted ${amount} freeze(s) to ${userId}. New total: ${freeze.freezesAvailable}`);
+        res.json({ success: true, newTotal: freeze.freezesAvailable });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Groups: enriched with health data
