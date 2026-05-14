@@ -82,11 +82,18 @@ const checkRateLimit = (userId) => {
 };
 
 const updateGroupCache = async (force = false) => {
-    if (!force) return;
-    if (sock && isConnected) {
+    // Always reload from DB into local cache
+    try {
+        const dbGroups = await GroupMeta.find({});
+        dbGroups.forEach(g => { groupCache[g.groupId] = { subject: g.subject, size: g.size }; });
+    } catch (e) { console.log('⚠️ GroupCache DB read failed:', e.message); }
+    
+    // If forced (e.g. on connect), also sync from WhatsApp API into DB
+    if (force && sock && isConnected) {
         try {
             const groups = await sock.groupFetchAllParticipating();
             for (const [jid, data] of Object.entries(groups)) {
+                groupCache[jid] = { subject: data.subject, size: data.participants?.length || 0 };
                 await GroupMeta.updateOne(
                     { groupId: jid },
                     { $set: { subject: data.subject, size: data.participants?.length || 0, lastActive: Date.now() } },
@@ -132,6 +139,7 @@ app.use('/', apiRoutes({
     get activeDuels() { return activeDuels; },
     get activePomodoros() { return activePomodoros; },
     get recentActivity() { return recentActivity; },
+    get groupCache() { return groupCache; },
     pushActivity,
     updateGroupCache
 }));
