@@ -437,29 +437,45 @@ router.post('/api/admin/feedback/read', requireAdmin, async (req, res) => {
 // Analytics
 router.get('/api/admin/analytics', requireAdmin, async (req, res) => {
     try {
-        const now          = new Date();
-        const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const sevenDaysAgo  = new Date(now); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const prevSevenStart = new Date(sevenDaysAgo.getTime() - 7 * 86400000);
+        const range = req.query.range || 'weekly';
+        const now = new Date();
+        let currentStart, prevStart, windowMs;
 
-        const [wordsByDay, wordsByHour, activeThisWeek, activeLastWeek, thisWeekWords, lastWeekWords, groupBreakdown, dbGroups] = await Promise.all([
+        if (range === 'daily') {
+            currentStart = new Date(now); currentStart.setDate(currentStart.getDate() - 1); currentStart.setHours(0,0,0,0);
+            prevStart = new Date(currentStart); prevStart.setDate(prevStart.getDate() - 1);
+            windowMs = 24 * 60 * 60 * 1000;
+        } else if (range === 'monthly') {
+            currentStart = new Date(now); currentStart.setDate(currentStart.getDate() - 30); currentStart.setHours(0,0,0,0);
+            prevStart = new Date(currentStart); prevStart.setDate(prevStart.getDate() - 30);
+            windowMs = 30 * 24 * 60 * 60 * 1000;
+        } else {
+            // Default Weekly
+            currentStart = new Date(now); currentStart.setDate(currentStart.getDate() - 7); currentStart.setHours(0,0,0,0);
+            prevStart = new Date(currentStart); prevStart.setDate(prevStart.getDate() - 7);
+            windowMs = 7 * 24 * 60 * 60 * 1000;
+        }
+
+        const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const [wordsByDay, wordsByHour, activeCurrent, activePrev, currentWords, prevWords, groupBreakdown, dbGroups] = await Promise.all([
             DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo } } }, { $group: { _id: "$date", total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
             DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo } } }, { $group: { _id: { $hour: "$timestamp" }, total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
-            DailyStats.distinct("userId", { timestamp: { $gte: sevenDaysAgo } }),
-            DailyStats.distinct("userId", { timestamp: { $gte: prevSevenStart, $lt: sevenDaysAgo } }),
-            DailyStats.aggregate([{ $match: { timestamp: { $gte: sevenDaysAgo } } }, { $group: { _id: "$userId", total: { $sum: "$words" }, name: { $first: "$name" } } }]),
-            DailyStats.aggregate([{ $match: { timestamp: { $gte: prevSevenStart, $lt: sevenDaysAgo } } }, { $group: { _id: "$userId", total: { $sum: "$words" } } }]),
-            DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo }, groupId: { $ne: "Manual_Correction" } } }, { $group: { _id: "$groupId", total: { $sum: "$words" }, writers: { $addToSet: "$userId" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
+            DailyStats.distinct("userId", { timestamp: { $gte: currentStart } }),
+            DailyStats.distinct("userId", { timestamp: { $gte: prevStart, $lt: currentStart } }),
+            DailyStats.aggregate([{ $match: { timestamp: { $gte: currentStart } } }, { $group: { _id: "$userId", total: { $sum: "$words" }, name: { $first: "$name" } } }]),
+            DailyStats.aggregate([{ $match: { timestamp: { $gte: prevStart, $lt: currentStart } } }, { $group: { _id: "$userId", total: { $sum: "$words" } } }]),
+            DailyStats.aggregate([{ $match: { timestamp: { $gte: currentStart }, groupId: { $ne: "Manual_Correction" } } }, { $group: { _id: "$groupId", total: { $sum: "$words" }, writers: { $addToSet: "$userId" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
             GroupMeta.find({})
         ]);
 
-        const retained      = activeThisWeek.filter(u => activeLastWeek.includes(u));
-        const retentionRate = activeLastWeek.length > 0 ? Math.round((retained.length / activeLastWeek.length) * 100) : 0;
+        const retained      = activeCurrent.filter(u => activePrev.includes(u));
+        const retentionRate = activePrev.length > 0 ? Math.round((retained.length / activePrev.length) * 100) : 0;
 
-        const lastWeekMap = {};
-        lastWeekWords.forEach(w => lastWeekMap[w._id] = w.total);
-        const growers = thisWeekWords
-            .map(w => ({ name: w.name, thisWeek: w.total, lastWeek: lastWeekMap[w._id] || 0, growth: w.total - (lastWeekMap[w._id] || 0) }))
+        const prevMap = {};
+        prevWords.forEach(w => prevMap[w._id] = w.total);
+        const growers = currentWords
+            .map(w => ({ name: w.name, thisPeriod: w.total, lastPeriod: prevMap[w._id] || 0, growth: w.total - (prevMap[w._id] || 0) }))
             .filter(w => w.growth > 0).sort((a, b) => b.growth - a.growth).slice(0, 10);
 
         const groupMap = {};
@@ -468,7 +484,7 @@ router.get('/api/admin/analytics', requireAdmin, async (req, res) => {
         res.json({
             wordsByDay: { labels: wordsByDay.map(d => d._id), data: wordsByDay.map(d => d.total) },
             wordsByHour: Array.from({ length: 24 }, (_, h) => ({ hour: h, total: wordsByHour.find(x => x._id === h)?.total || 0 })),
-            retentionRate, activeThisWeek: activeThisWeek.length, activeLastWeek: activeLastWeek.length,
+            retentionRate, activeCurrent: activeCurrent.length, activePrev: activePrev.length,
             growers,
             groupBreakdown: groupBreakdown.map(g => ({ name: groupMap[g._id] || g._id, words: g.total, writers: g.writers.length }))
         });

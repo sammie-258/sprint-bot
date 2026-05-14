@@ -130,10 +130,18 @@
                 </div>
 
                 <div id="view-analytics" class="hidden space-y-6 md:space-y-8">
+                    <div class="flex justify-between items-center mb-8">
+                        <h3 class="font-heading font-black text-2xl italic tracking-tighter uppercase">Market Intelligence</h3>
+                        <select id="ana-range" onchange="loadAnalytics(this.value)" class="bg-void border border-white/10 px-6 py-3 font-black text-[10px] uppercase tracking-widest outline-none focus:border-neon-blue">
+                            <option value="daily">DAILY (YESTERDAY VS DAY BEFORE)</option>
+                            <option value="weekly" selected>WEEKLY (LAST 7D VS PREV 7D)</option>
+                            <option value="monthly">MONTHLY (LAST 30D VS PREV 30D)</option>
+                        </select>
+                    </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
                         <div class="hud-border p-8 md:p-10 text-center"><div class="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-4 uppercase">Retention</div><div id="ana-retention" class="text-4xl md:text-6xl font-black italic text-neon-blue uppercase">0%</div></div>
-                        <div class="hud-border p-8 md:p-10 text-center"><div class="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-4 uppercase">Weekly Active</div><div id="ana-active-7" class="text-4xl md:text-6xl font-black italic text-neon-green uppercase">0</div></div>
-                        <div class="hud-border p-8 md:p-10 text-center"><div class="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-4 uppercase">Prev Weekly</div><div id="ana-active-prev" class="text-4xl md:text-6xl font-black italic text-slate-700 uppercase">0</div></div>
+                        <div class="hud-border p-8 md:p-10 text-center"><div class="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-4 uppercase">Current Active</div><div id="ana-active-current" class="text-4xl md:text-6xl font-black italic text-neon-green uppercase">0</div></div>
+                        <div class="hud-border p-8 md:p-10 text-center"><div class="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-4 uppercase">Prev Active</div><div id="ana-active-prev" class="text-4xl md:text-6xl font-black italic text-slate-700 uppercase">0</div></div>
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                         <div class="hud-border p-6 md:p-8"><h3 class="font-black italic text-sm mb-8 tracking-widest text-neon-blue uppercase">Word Velocity Map</h3><div class="h-60 md:h-80"><canvas id="chart-velocity"></canvas></div></div>
@@ -351,7 +359,7 @@
 
         function loadTabData() {
             if (currentTab === 'overview') loadOverview();
-            if (currentTab === 'analytics') loadAnalytics();
+            if (currentTab === 'analytics') loadAnalytics(document.getElementById('ana-range')?.value || 'weekly');
             if (currentTab === 'live') loadLive();
             if (currentTab === 'sprints') loadSprints();
             if (currentTab === 'writers') loadWritersGrid();
@@ -393,15 +401,15 @@
             }
         }
 
-        async function loadAnalytics() {
-            const data = await api('/api/admin/analytics', null, 'GET');
+        async function loadAnalytics(range = 'weekly') {
+            const data = await api(`/api/admin/analytics?range=${range}`, null, 'GET');
             if (!data) return;
             document.getElementById('ana-retention').textContent = `${data.retentionRate || 0}%`;
-            document.getElementById('ana-active-7').textContent = data.activeThisWeek || 0;
-            document.getElementById('ana-active-prev').textContent = data.activeLastWeek || 0;
+            document.getElementById('ana-active-current').textContent = data.activeCurrent || 0;
+            document.getElementById('ana-active-prev').textContent = data.activePrev || 0;
             renderVelocityChart(data.wordsByDay);
             renderHoursChart(data.wordsByHour);
-            document.getElementById('ana-growers').innerHTML = (data.growers || []).map(g => `<tr class="border-b border-white/5"><td class="py-4 font-bold text-sm italic">${g.name}</td><td class="py-4 text-right font-mono text-neon-blue">${g.thisWeek.toLocaleString()}</td><td class="py-4 text-right text-neon-green font-black uppercase">↑ ${g.growth.toLocaleString()}</td></tr>`).join('');
+            document.getElementById('ana-growers').innerHTML = (data.growers || []).map(g => `<tr class="border-b border-white/5"><td class="py-4 font-bold text-sm italic">${g.name}</td><td class="py-4 text-right font-mono text-neon-blue">${g.thisPeriod.toLocaleString()}</td><td class="py-4 text-right text-neon-green font-black uppercase">↑ ${g.growth.toLocaleString()}</td></tr>`).join('');
             document.getElementById('ana-groups').innerHTML = (data.groupBreakdown || []).map(g => `<tr class="border-b border-white/5"><td class="py-4 font-bold text-sm italic">${g.name}</td><td class="py-4 text-right text-slate-500 font-bold uppercase">${g.writers} Hunters</td><td class="py-4 text-right font-mono text-neon-purple font-bold">${g.words.toLocaleString()}</td></tr>`).join('');
         }
 
