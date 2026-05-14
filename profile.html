@@ -14,11 +14,15 @@
             --bg:      #060b12;
             --card-bg: rgba(255,255,255,0.04);
             --card-border: rgba(255,255,255,0.08);
+            --text:    #ffffff;
+            --sub:     #94a3b8;
         }
         body.light {
             --bg:      #eef2f7;
             --card-bg: rgba(255,255,255,0.85);
             --card-border: rgba(0,0,0,0.08);
+            --text:    #1e293b;
+            --sub:     #64748b;
         }
         
         * { box-sizing: border-box; }
@@ -26,11 +30,10 @@
             font-family: 'DM Sans', sans-serif;
             background: var(--bg);
             min-height: 100vh;
-            color: #fff;
+            color: var(--text);
             transition: background .3s;
             overflow-x: hidden;
         }
-        body.light { color: #1e293b; }
 
         /* Mesh background */
         body::before {
@@ -70,7 +73,7 @@
         body.light .hero-stat { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.05); }
 
         .stat-value { font-family: 'Syne', sans-serif; font-weight: 800; line-height: 1; }
-        .stat-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; color: #94a3b8; margin-top: 8px; text-transform: uppercase; }
+        .stat-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; color: var(--sub); margin-top: 8px; text-transform: uppercase; }
 
         /* Bars */
         .progress-track { height: 8px; border-radius: 99px; background: rgba(255,255,255,0.08); overflow: hidden; position: relative; }
@@ -113,12 +116,27 @@
         }
         .btn-primary:active, .btn-secondary:active { transform: scale(0.98); }
 
+        /* Theme Toggle */
+        .theme-btn {
+            position: fixed; top: 20px; right: 20px; z-index: 100;
+            width: 44px; height: 44px; border-radius: 50%;
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            backdrop-filter: blur(10px);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: transform 0.2s;
+        }
+        .theme-btn:hover { transform: scale(1.1); }
+
         /* Animation */
         .fade-in { opacity: 0; transform: translateY(20px); animation: fadeIn 0.6s forwards; }
         @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
+
+<div class="theme-btn" onclick="toggleTheme()">
+    <i id="theme-icon" class="fas fa-sun" style="color:#fbbf24"></i>
+</div>
 
 <script>
 const USER_DATA = {
@@ -160,16 +178,18 @@ const BADGE_DEFS = [
 
 <div class="dashboard-container">
     
-    <!-- Header -->
-    <div class="flex flex-col items-center mb-8 fade-in" style="animation-delay: 0.1s">
-        <div class="w-24 h-24 rounded-full bg-gradient-to-br from-[#22d3a0] to-[#6366f1] p-1 shadow-xl mb-4">
-            <div class="w-full h-full rounded-full bg-[#0d1425] flex items-center justify-center font-bold text-4xl text-[#22d3a0]" style="font-family:'Syne'">
+    <!-- Left-Aligned Header -->
+    <div class="flex items-center gap-5 mb-8 fade-in" style="animation-delay: 0.1s">
+        <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#22d3a0] to-[#6366f1] p-0.5 shadow-xl shrink-0">
+            <div class="w-full h-full rounded-2xl bg-[#0d1425] flex items-center justify-center font-bold text-3xl text-[#22d3a0]" style="font-family:'Syne'">
                 <span id="ui-initial"></span>
             </div>
         </div>
-        <h1 id="ui-name" class="text-3xl font-extrabold mb-2" style="font-family:'Syne'"></h1>
-        <div class="px-4 py-1.5 rounded-full bg-[#22d3a01a] border border-[#22d3a04d] text-[#22d3a0] text-xs font-bold tracking-wider uppercase">
-             👑 <span id="ui-rank"></span>
+        <div class="flex-1">
+            <h1 id="ui-name" class="text-2xl font-extrabold" style="font-family:'Syne'"></h1>
+            <div class="text-[#22d3a0] text-[10px] font-bold tracking-widest uppercase mt-1">
+                👑 <span id="ui-rank"></span>
+            </div>
         </div>
     </div>
 
@@ -183,19 +203,19 @@ const BADGE_DEFS = [
             <div class="stat-value text-2xl text-orange-500">
                 <span id="ui-streak"></span>🔥
             </div>
-            <div class="stat-label">Day Streak</div>
+            <div class="stat-label">Streak</div>
         </div>
     </div>
 
     <!-- Mini Stats Row -->
-    <div class="panel grid grid-cols-2 gap-8 fade-in" style="animation-delay: 0.3s; padding: 20px;">
+    <div class="panel grid grid-cols-2 gap-8 fade-in" style="animation-delay: 0.3s; padding: 18px;">
         <div class="text-center">
             <div id="ui-daily" class="font-bold text-xl" style="font-family:'Syne'"></div>
-            <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Today's Words</div>
+            <div class="stat-label !mt-1">Today</div>
         </div>
         <div class="text-center border-l border-white/5">
             <div id="ui-best" class="font-bold text-xl text-indigo-400" style="font-family:'Syne'">—</div>
-            <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Best Sprint</div>
+            <div class="stat-label !mt-1">Best</div>
         </div>
     </div>
 
@@ -203,50 +223,48 @@ const BADGE_DEFS = [
     <div class="panel fade-in" style="animation-delay: 0.4s">
         <div class="mb-6">
             <div class="flex justify-between items-center mb-2">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Rank Progress</span>
-                <span id="ui-next-rank" class="text-xs font-bold text-[#22d3a0]"></span>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Rank Progress</span>
+                <span id="ui-next-rank" class="text-[10px] font-bold text-[#22d3a0]"></span>
             </div>
             <div class="progress-track">
                 <div id="rank-bar" class="progress-fill" style="width: 0%"></div>
             </div>
-            <div id="ui-words-to-go" class="text-[10px] text-slate-500 mt-2 text-right"></div>
         </div>
 
         <div id="goal-section" class="hidden">
             <div class="flex justify-between items-center mb-2">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Daily Goal</span>
-                <span id="ui-goal-count" class="text-xs font-bold"></span>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daily Goal</span>
+                <span id="ui-goal-count" class="text-[10px] font-bold"></span>
             </div>
             <div class="progress-track">
                 <div id="goal-bar" class="progress-fill" style="width: 0%"></div>
             </div>
-            <div id="ui-goal-pct" class="text-[10px] text-slate-500 mt-2 text-right"></div>
         </div>
     </div>
 
     <!-- Activity Panel -->
     <div class="panel fade-in" style="animation-delay: 0.5s">
-        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">35-Day Activity</h3>
-        <div id="heatmap" class="flex flex-wrap gap-2 justify-center"></div>
+        <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">35-Day Activity</h3>
+        <div id="heatmap" class="flex flex-wrap gap-1.5 justify-center"></div>
     </div>
 
     <!-- Badges Panel -->
     <div id="badge-panel" class="panel fade-in hidden" style="animation-delay: 0.6s">
-        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Achievements</h3>
+        <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Badges</h3>
         <div id="badge-wrap" class="flex flex-wrap gap-2"></div>
     </div>
 
     <!-- Actions -->
-    <div class="flex flex-col gap-3 mt-8 fade-in" style="animation-delay: 0.7s">
+    <div class="flex flex-col gap-3 mt-4 fade-in" style="animation-delay: 0.7s">
         <button onclick="downloadImage()" class="btn-primary flex items-center justify-center gap-2">
             <i class="fas fa-download"></i> Download Card
         </button>
         <button onclick="shareImage()" class="btn-secondary flex items-center justify-center gap-2">
-            <i class="fas fa-share-alt"></i> Share Profile
+            <i class="fas fa-share-alt"></i> Share
         </button>
     </div>
 
-    <div class="text-center mt-8 text-slate-600 text-xs font-bold tracking-widest flex items-center justify-center gap-2">
+    <div class="text-center mt-12 text-slate-600 text-[10px] font-bold tracking-widest flex items-center justify-center gap-2">
         <i class="fas fa-robot"></i> SPRINT BOT
     </div>
 
@@ -255,6 +273,14 @@ const BADGE_DEFS = [
 <canvas id="exportCanvas" style="display:none;"></canvas>
 
 <script>
+function toggleTheme() {
+    const isLight = document.body.classList.toggle('light');
+    document.getElementById('theme-icon').className = isLight ? 'fas fa-moon' : 'fas fa-sun';
+    document.getElementById('theme-icon').style.color = isLight ? '#1e293b' : '#fbbf24';
+    localStorage.setItem('sb-theme', isLight ? 'light' : 'dark');
+}
+if(localStorage.getItem('sb-theme') === 'light') toggleTheme();
+
 function initUI() {
     document.getElementById('ui-initial').textContent = USER_DATA.initial;
     document.getElementById('ui-name').textContent    = USER_DATA.name;
@@ -267,22 +293,16 @@ function initUI() {
         document.getElementById('ui-best').textContent = USER_DATA.bestSprintWpm + ' WPM';
     }
 
-    // Bars
     setTimeout(() => {
         document.getElementById('rank-bar').style.width = USER_DATA.nextRankPct + '%';
         document.getElementById('ui-next-rank').textContent = USER_DATA.nextRankName;
-        const wordsLeft = (parseInt(USER_DATA.nextRankThreshold.replace(/,/g,'')) || 0) - (parseInt(USER_DATA.total.replace(/,/g,'')) || 0);
-        if (wordsLeft > 0) document.getElementById('ui-words-to-go').textContent = wordsLeft.toLocaleString() + ' words to go';
-        
         if (USER_DATA.goalActive) {
             document.getElementById('goal-section').classList.remove('hidden');
             document.getElementById('goal-bar').style.width = USER_DATA.goalPercent + '%';
             document.getElementById('ui-goal-count').textContent = USER_DATA.goalCurrent + ' / ' + USER_DATA.goalTarget;
-            document.getElementById('ui-goal-pct').textContent = USER_DATA.goalPercent + '%';
         }
     }, 400);
 
-    // Heatmap
     const heatWrap = document.getElementById('heatmap');
     const bits = (USER_DATA.activityLog || '0'.repeat(35)).split('').reverse();
     bits.forEach(bit => {
@@ -291,7 +311,6 @@ function initUI() {
         heatWrap.appendChild(d);
     });
 
-    // Badges
     const badgeWrap = document.getElementById('badge-wrap');
     if (USER_DATA.badges?.length) {
         document.getElementById('badge-panel').classList.remove('hidden');
@@ -307,7 +326,7 @@ function initUI() {
 }
 
 // ════════════════════════════════════════════════
-//  CANVAS EXPORT (RE-DESIGNED)
+//  CANVAS EXPORT (PRECISION ENGINEERED)
 // ════════════════════════════════════════════════
 function rr(ctx, x, y, w, h, r, fill, stroke, lw) {
     ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
@@ -316,153 +335,136 @@ function rr(ctx, x, y, w, h, r, fill, stroke, lw) {
 }
 
 async function drawCanvas(cb) {
-    // Wait for fonts to be ready
     await document.fonts.ready;
-    
     const canvas = document.getElementById('exportCanvas');
     const ctx    = canvas.getContext('2d');
-    const W = 1080, H = 2200; // Extra tall for spacing
+    const W = 1080, H = 2400; // Even taller to be safe
     canvas.width = W; canvas.height = H;
 
+    const light = document.body.classList.contains('light');
     const p = {
-        bg: '#060b12',
-        card: '#0d1425',
-        border: 'rgba(255,255,255,0.1)',
-        text: '#ffffff',
-        sub: '#94a3b8',
-        accent: '#22d3a0',
+        bg:      light ? '#eef2f7' : '#060b12',
+        card:    light ? '#ffffff' : '#0d1425',
+        border:  light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)',
+        text:    light ? '#1e293b' : '#ffffff',
+        sub:     light ? '#64748b' : '#94a3b8',
+        accent:  '#22d3a0',
         accent2: '#6366f1'
     };
 
-    // Background
     ctx.fillStyle = p.bg; ctx.fillRect(0,0,W,H);
     const gl = ctx.createRadialGradient(200,300,0,200,300,1200);
-    gl.addColorStop(0, 'rgba(34,211,160,0.1)'); gl.addColorStop(1, 'transparent');
+    gl.addColorStop(0, light ? 'rgba(34,211,160,0.08)' : 'rgba(34,211,160,0.1)'); gl.addColorStop(1, 'transparent');
     ctx.fillStyle = gl; ctx.fillRect(0,0,W,H);
 
-    // Profile Section
-    let curY = 160;
-    
-    // Avatar
-    const AX = W/2, AY = curY + 100, AR = 110;
-    const ag = ctx.createLinearGradient(AX-AR, AY-AR, AX+AR, AY+AR);
-    ag.addColorStop(0, p.accent); ag.addColorStop(1, p.accent2);
-    ctx.beginPath(); ctx.arc(AX, AY, AR+12, 0, Math.PI*2); ctx.fillStyle = ag; ctx.fill();
-    ctx.beginPath(); ctx.arc(AX, AY, AR, 0, Math.PI*2); ctx.fillStyle = '#0d1425'; ctx.fill();
-    
-    ctx.fillStyle = p.accent; ctx.font = "bold 96px 'Syne', sans-serif"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(USER_DATA.initial, AX, AY+8);
-    curY = AY + AR + 100;
-
-    // Name
-    ctx.fillStyle = p.text; ctx.font = "800 90px 'Syne', sans-serif";
-    ctx.fillText(USER_DATA.name, AX, curY);
-    curY += 100;
-
-    // Rank Pill
-    const rt = '👑 ' + USER_DATA.rank;
-    ctx.font = "bold 38px 'DM Sans', sans-serif";
-    const rw = ctx.measureText(rt).width + 80;
-    rr(ctx, AX-rw/2, curY-35, rw, 70, 35, 'rgba(34,211,160,0.15)', 'rgba(34,211,160,0.3)', 2);
-    ctx.fillStyle = p.accent; ctx.fillText(rt, AX, curY);
-    curY += 180;
-
-    // Hero Stats (Large Panels)
-    const PW = 440, PH = 220, PGAP = 40;
-    const startX = (W - (2*PW + PGAP))/2;
-    
-    // Total Words
-    rr(ctx, startX, curY, PW, PH, 30, 'rgba(255,255,255,0.03)', 'rgba(255,255,255,0.08)', 2);
-    ctx.fillStyle = p.text; ctx.font = "800 64px 'Syne', sans-serif";
-    ctx.fillText(USER_DATA.total, startX + PW/2, curY + PH/2 - 15);
-    ctx.fillStyle = p.sub; ctx.font = "bold 24px 'DM Sans', sans-serif";
-    ctx.fillText("TOTAL WORDS", startX + PW/2, curY + PH/2 + 45);
-
-    // Streak
-    rr(ctx, startX + PW + PGAP, curY, PW, PH, 30, 'rgba(255,255,255,0.03)', 'rgba(255,255,255,0.08)', 2);
-    ctx.fillStyle = '#f97316'; ctx.font = "800 64px 'Syne', sans-serif";
-    ctx.fillText(USER_DATA.streak + '🔥', startX + PW + PGAP + PW/2, curY + PH/2 - 15);
-    ctx.fillStyle = p.sub; ctx.font = "bold 24px 'DM Sans', sans-serif";
-    ctx.fillText("DAY STREAK", startX + PW + PGAP + PW/2, curY + PH/2 + 45);
-    
-    curY += PH + 120;
-
-    // Content Cards Container Width
+    let curY = 140;
     const BX = 100, BW = W - 200;
 
-    // Progress Section
-    rr(ctx, BX, curY, BW, 380, 40, 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0.08)', 2);
-    let py = curY + 70;
+    // ── Header ──
+    const AX = BX + 80, AY = curY + 80, AR = 100;
+    const ag = ctx.createLinearGradient(AX-AR, AY-AR, AX+AR, AY+AR);
+    ag.addColorStop(0, p.accent); ag.addColorStop(1, p.accent2);
+    rr(ctx, AX-AR, AY-AR, AR*2, AR*2, 40, '#0d1425', ag, 4);
+    ctx.fillStyle = p.accent; ctx.font = "bold 84px 'Syne', sans-serif"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(USER_DATA.initial, AX, AY+5);
+
+    ctx.textAlign = 'left'; ctx.fillStyle = p.text; ctx.font = "800 76px 'Syne', sans-serif";
+    ctx.fillText(USER_DATA.name, AX + AR + 50, AY - 20);
+    ctx.fillStyle = p.accent; ctx.font = "bold 32px 'DM Sans', sans-serif";
+    ctx.fillText("👑 " + USER_DATA.rank.toUpperCase(), AX + AR + 50, AY + 50);
     
-    // Rank Progress
-    ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 30px 'DM Sans', sans-serif";
-    ctx.fillText("Rank Progress", BX + 60, py);
+    curY = AY + AR + 100;
+
+    // ── Hero Stats ──
+    const PW = 420, PH = 200, PGAP = 40;
+    const sX = (W - (2*PW + PGAP))/2;
+    rr(ctx, sX, curY, PW, PH, 35, 'rgba(255,255,255,0.03)', p.border, 2);
+    ctx.fillStyle = p.text; ctx.font = "800 64px 'Syne', sans-serif"; ctx.textAlign = 'center';
+    ctx.fillText(USER_DATA.total, sX + PW/2, curY + PH/2 - 15);
+    ctx.fillStyle = p.sub; ctx.font = "bold 22px 'DM Sans', sans-serif";
+    ctx.fillText("TOTAL WORDS", sX + PW/2, curY + PH/2 + 45);
+
+    rr(ctx, sX + PW + PGAP, curY, PW, PH, 35, 'rgba(255,255,255,0.03)', p.border, 2);
+    ctx.fillStyle = '#f97316'; ctx.font = "800 64px 'Syne', sans-serif";
+    ctx.fillText(USER_DATA.streak + '🔥', sX + PW + PGAP + PW/2, curY + PH/2 - 15);
+    ctx.fillStyle = p.sub; ctx.font = "bold 22px 'DM Sans', sans-serif";
+    ctx.fillText("DAY STREAK", sX + PW + PGAP + PW/2, curY + PH/2 + 45);
+    
+    curY += PH + 80;
+
+    // ── Progress ──
+    rr(ctx, BX, curY, BW, 340, 45, p.card, p.border, 2);
+    let py = curY + 70;
+    ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 28px 'DM Sans', sans-serif";
+    ctx.fillText("RANK PROGRESS", BX + 60, py);
     ctx.textAlign = 'right'; ctx.fillStyle = p.accent;
     ctx.fillText(USER_DATA.nextRankName, BX + BW - 60, py);
-    py += 40;
-    rr(ctx, BX + 60, py, BW - 120, 20, 10, 'rgba(255,255,255,0.1)', '', 0);
-    rr(ctx, BX + 60, py, (BW - 120) * (USER_DATA.nextRankPct/100), 20, 10, p.accent, '', 0);
+    py += 45;
+    rr(ctx, BX + 60, py, BW - 120, 24, 12, 'rgba(255,255,255,0.08)', '', 0);
+    rr(ctx, BX + 60, py, (BW - 120) * (USER_DATA.nextRankPct/100), 24, 12, p.accent, '', 0);
     
-    py += 100;
-    
-    // Daily Goal
-    ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 30px 'DM Sans', sans-serif";
-    ctx.fillText("Daily Goal", BX + 60, py);
+    py += 90;
+    ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 28px 'DM Sans', sans-serif";
+    ctx.fillText("DAILY GOAL", BX + 60, py);
     ctx.textAlign = 'right'; ctx.fillStyle = p.text;
     ctx.fillText(USER_DATA.goalCurrent + ' / ' + USER_DATA.goalTarget, BX + BW - 60, py);
-    py += 40;
-    rr(ctx, BX + 60, py, BW - 120, 20, 10, 'rgba(255,255,255,0.1)', '', 0);
-    rr(ctx, BX + 60, py, (BW - 120) * (USER_DATA.goalPercent/100), 20, 10, p.accent, '', 0);
+    py += 45;
+    rr(ctx, BX + 60, py, BW - 120, 24, 12, 'rgba(255,255,255,0.08)', '', 0);
+    rr(ctx, BX + 60, py, (BW - 120) * (USER_DATA.goalPercent/100), 24, 12, p.accent, '', 0);
     
-    curY += 380 + 60;
+    curY += 340 + 60;
 
-    // Activity
-    rr(ctx, BX, curY, BW, 220, 40, 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0.08)', 2);
-    ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 30px 'DM Sans', sans-serif";
-    ctx.fillText("35-Day Activity", BX + 60, curY + 65);
+    // ── Activity ──
+    rr(ctx, BX, curY, BW, 200, 45, p.card, p.border, 2);
+    ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 28px 'DM Sans', sans-serif";
+    ctx.fillText("35-DAY ACTIVITY", BX + 60, curY + 65);
     
     const bits = (USER_DATA.activityLog || '0'.repeat(35)).split('').reverse();
-    const CS = 28, CG = 8;
+    const CS = 19, CG = 5; // Smaller to definitely fit
     let hx = BX + 60;
-    let hy = curY + 110;
     bits.forEach(bit => {
-        ctx.fillStyle = bit === '1' ? p.accent : 'rgba(255,255,255,0.1)';
-        ctx.beginPath(); ctx.roundRect(hx, hy, CS, CS, 6); ctx.fill();
+        ctx.fillStyle = bit === '1' ? p.accent : 'rgba(255,255,255,0.08)';
+        ctx.beginPath(); ctx.roundRect(hx, curY + 105, CS, CS, 5); ctx.fill();
         hx += CS + CG;
     });
     
-    curY += 220 + 60;
+    curY += 200 + 60;
 
-    // Badges
+    // ── Badges ──
     const earned = USER_DATA.badges || [];
     if(earned.length) {
-        const BH = Math.max(220, 100 + Math.ceil(earned.length/4)*80);
-        rr(ctx, BX, curY, BW, BH, 40, 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0.08)', 2);
-        ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 30px 'DM Sans', sans-serif";
-        ctx.fillText("Achievements", BX + 60, curY + 65);
+        const rowCount = Math.ceil(earned.length/3);
+        const BH = 140 + (rowCount * 80);
+        rr(ctx, BX, curY, BW, BH, 45, p.card, p.border, 2);
+        ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 28px 'DM Sans', sans-serif";
+        ctx.fillText("BADGES", BX + 60, curY + 65);
         
         let bx = BX + 60;
-        let by = curY + 120;
-        earned.forEach((key, idx) => {
+        let by = curY + 125;
+        earned.forEach((key) => {
             const def = BADGE_DEFS.find(b => b.key === key); if(!def) return;
-            ctx.font = "bold 24px 'DM Sans', sans-serif";
-            const labelWidth = ctx.measureText(def.label).width;
-            const chipW = labelWidth + 80;
-            if(bx + chipW > BX + BW - 60) { bx = BX + 60; by += 80; }
-            rr(ctx, bx, by - 40, chipW, 60, 30, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.1)', 1.5);
-            ctx.font = '34px serif'; ctx.fillText(def.icon, bx + 18, by);
+            ctx.font = "bold 22px 'DM Sans', sans-serif";
+            const chipW = ctx.measureText(def.label).width + 90;
+            if(bx + chipW > BX + BW - 60) { bx = BX + 60; by += 85; }
+            rr(ctx, bx, by - 40, chipW, 62, 31, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.1)', 1.5);
+            ctx.font = '34px serif'; ctx.fillText(def.icon, bx + 22, by + 4);
             ctx.fillStyle = p.text; ctx.font = "bold 22px 'DM Sans', sans-serif";
-            ctx.fillText(def.label, bx + 65, by);
-            bx += chipW + 15;
+            ctx.fillText(def.label, bx + 72, by + 4);
+            bx += chipW + 18;
         });
         curY += BH + 60;
     }
 
-    // Footer
-    ctx.textAlign = 'center'; ctx.fillStyle = p.sub; ctx.font = "bold 36px 'Syne', sans-serif";
-    ctx.fillText("🤖 SPRINT BOT", W/2, H - 120);
+    // Footer (Positioned relative to curY)
+    ctx.textAlign = 'center'; ctx.fillStyle = p.sub; ctx.font = "bold 32px 'Syne', sans-serif";
+    ctx.fillText("🤖 SPRINT BOT", W/2, curY + 40);
 
-    if(cb) cb(canvas);
+    // Crop canvas to actual content height
+    const finalH = curY + 150;
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = W; tempCanvas.height = finalH;
+    tempCanvas.getContext('2d').drawImage(canvas, 0, 0);
+    cb(tempCanvas);
 }
 
 function downloadImage(){
@@ -477,7 +479,7 @@ function shareImage(){
         c.toBlob(async blob => {
             const file = new File([blob], 'profile.png', {type:'image/png'});
             if(navigator.canShare && navigator.canShare({files:[file]})){
-                try { await navigator.share({files:[file], title:'My Writer Profile'}); } catch(e){}
+                try { await navigator.share({files:[file], title:'My Profile'}); } catch(e){}
             } else { downloadImage(); }
         });
     });
