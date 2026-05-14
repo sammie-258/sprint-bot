@@ -7,7 +7,7 @@ const Blacklist      = require('../models/Blacklist');
 const Feedback       = require('../models/Feedback');
 const SprintRecord   = require('../models/SprintRecord');
 const StreakFreeze   = require('../models/StreakFreeze');
-const { getDurationString, getNextRank, getRank, toSuperscript, BADGE_DEFS } = require('../utils/helpers');
+const { getDurationString, getNextRank, getRank, getMaxFreezes, toSuperscript, BADGE_DEFS } = require('../utils/helpers');
 
 const BASE_URL     = process.env.BASE_URL || 'https://sprint-bot-9bll.onrender.com';
 const TIMEZONE     = 'Africa/Lagos';
