@@ -41,7 +41,7 @@
             position:fixed; inset:0; z-index:0; pointer-events:none;
             background:
                 radial-gradient(ellipse 80% 50% at 15% 5%,  rgba(34,211,160,.08) 0%, transparent 60%),
-                radial-gradient(ellipse 60% 40% at 85% 85%, rgba(99,102,241,.06) 0%, transparent 55%);
+                radial-gradient(ellipse 60% 40% at 85% 85%, rgba(99,102,241,.10) 0%, transparent 55%);
         }
 
         .dashboard-container {
@@ -50,7 +50,6 @@
             margin: 0 auto; padding: 30px 20px;
         }
 
-        /* Modular Panels */
         .panel {
             background: var(--card-bg);
             border: 1px solid var(--card-border);
@@ -61,7 +60,6 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.05);
         }
 
-        /* Hero Stats */
         .hero-stat {
             background: rgba(255,255,255,0.02);
             border: 1px solid rgba(255,255,255,0.04);
@@ -75,7 +73,6 @@
         .stat-value { font-family: 'Syne', sans-serif; font-weight: 800; line-height: 1.1; }
         .stat-label { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; color: var(--sub); margin-top: 6px; text-transform: uppercase; }
 
-        /* Bars */
         .progress-track { height: 10px; border-radius: 99px; background: rgba(255,255,255,0.06); overflow: hidden; position: relative; }
         body.light .progress-track { background: rgba(0,0,0,0.08); }
         .progress-fill {
@@ -84,12 +81,12 @@
             transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* Heatmap - 7x5 Grid */
+        /* Heatmap - 3 Lines */
         .heatmap-grid {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
+            grid-template-columns: repeat(12, 1fr);
             gap: 6px;
-            max-width: 200px;
+            max-width: 340px;
             margin: 0 auto;
         }
         .hcell {
@@ -100,16 +97,14 @@
         body.light .hcell { background: rgba(0,0,0,0.1); }
         .hcell.on { background: var(--accent); box-shadow: 0 0 8px rgba(34,211,160,0.3); }
 
-        /* Badges */
         .badge-chip {
             display: inline-flex; align-items:center; gap: 8px;
             padding: 7px 14px; border-radius: 99px;
             background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
             font-size: 0.7rem; font-weight: 700;
         }
-        body.light .badge-chip { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        body.light .badge-chip { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); }
 
-        /* Buttons */
         .btn-primary {
             background: linear-gradient(135deg, var(--accent), #0d9488);
             color: #fff; font-weight: 700; border-radius: 14px; padding: 14px;
@@ -189,7 +184,7 @@ const BADGE_DEFS = [
             </div>
         </div>
         <div class="flex-1 min-w-0">
-            <h1 id="ui-name" class="text-xl font-extrabold leading-tight truncate" style="font-family:'Syne'; word-break: break-all;"></h1>
+            <h1 id="ui-name" class="text-xl font-extrabold leading-tight truncate" style="font-family:'Syne'"></h1>
             <div class="text-[#22d3a0] text-[10px] font-bold tracking-widest uppercase mt-0.5">
                 👑 <span id="ui-rank"></span>
             </div>
@@ -206,7 +201,7 @@ const BADGE_DEFS = [
             <div class="stat-value text-xl text-orange-500">
                 <span id="ui-streak"></span>🔥
             </div>
-            <div class="stat-label">Day Streak</div>
+            <div class="stat-label">Streak</div>
         </div>
     </div>
 
@@ -245,7 +240,7 @@ const BADGE_DEFS = [
         </div>
     </div>
 
-    <!-- Activity Panel (7x5 Grid) -->
+    <!-- Activity Panel (3 Lines) -->
     <div class="panel fade-in text-center" style="animation-delay: 0.5s">
         <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">35-Day Activity</h3>
         <div id="heatmap" class="heatmap-grid"></div>
@@ -329,7 +324,7 @@ function initUI() {
 }
 
 // ════════════════════════════════════════════════
-//  CANVAS EXPORT (RE-ENGINEERED v5)
+//  CANVAS EXPORT (RE-ENGINEERED v6)
 // ════════════════════════════════════════════════
 function rr(ctx, x, y, w, h, r, fill, stroke, lw) {
     ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
@@ -372,14 +367,12 @@ async function drawCanvas(cb) {
     ctx.fillText(USER_DATA.initial, AX, AY+6);
 
     ctx.textAlign = 'left'; ctx.fillStyle = p.text;
-    // Auto-shrink name font
     let nameSize = 84;
     ctx.font = `800 ${nameSize}px 'Syne', sans-serif`;
     while(ctx.measureText(USER_DATA.name).width > (BW - 280) && nameSize > 40) {
         nameSize -= 2; ctx.font = `800 ${nameSize}px 'Syne', sans-serif`;
     }
     ctx.fillText(USER_DATA.name, AX + AR + 50, AY - 20);
-    
     ctx.fillStyle = p.accent; ctx.font = "bold 32px 'DM Sans', sans-serif";
     ctx.fillText("👑 " + USER_DATA.rank.toUpperCase(), AX + AR + 50, AY + 55);
     
@@ -390,7 +383,6 @@ async function drawCanvas(cb) {
     const sX = (W - (2*PW + PGAP))/2;
     rr(ctx, sX, curY, PW, PH, 30, light ? 'rgba(0,0,0,0.01)' : 'rgba(255,255,255,0.02)', p.border, 2);
     ctx.fillStyle = p.text; 
-    // Auto-shrink Word Count if too long
     let totalSize = 60;
     ctx.font = `800 ${totalSize}px 'Syne', sans-serif`;
     while(ctx.measureText(USER_DATA.total).width > (PW - 40)) {
@@ -405,7 +397,7 @@ async function drawCanvas(cb) {
     ctx.fillStyle = '#f97316'; ctx.font = "800 60px 'Syne', sans-serif";
     ctx.fillText(USER_DATA.streak + '🔥', sX + PW + PGAP + PW/2, curY + PH/2 - 15);
     ctx.fillStyle = p.sub; ctx.font = "bold 20px 'DM Sans', sans-serif";
-    ctx.fillText("DAY STREAK", sX + PW + PGAP + PW/2, curY + PH/2 + 45);
+    ctx.fillText("STREAK", sX + PW + PGAP + PW/2, curY + PH/2 + 45);
     
     curY += PH + 80;
 
@@ -431,21 +423,21 @@ async function drawCanvas(cb) {
     
     curY += 320 + 60;
 
-    // ── Activity (7x5 Grid) ──
-    const AH = 280;
+    // ── Activity (3 Lines: 12 + 12 + 11) ──
+    const AH = 220;
     rr(ctx, BX, curY, BW, AH, 40, p.card, p.border, 2);
     ctx.textAlign = 'center'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif";
     ctx.fillText("35-DAY ACTIVITY", W/2, curY + 65);
     
     const bits = (USER_DATA.activityLog || '0'.repeat(35)).split('').reverse();
-    const CS = 28, CG = 10;
-    const gridW = 7 * CS + 6 * CG;
+    const CS = 32, CG = 12;
+    const gridW = 12 * CS + 11 * CG;
     let hx0 = (W - gridW)/2;
-    let hy0 = curY + 105;
+    let hy0 = curY + 100;
     
     bits.forEach((bit, i) => {
-        const col = i % 7;
-        const row = Math.floor(i / 7);
+        const col = i % 12;
+        const row = Math.floor(i / 12);
         ctx.fillStyle = bit === '1' ? p.accent : light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
         ctx.beginPath(); ctx.roundRect(hx0 + col*(CS+CG), hy0 + row*(CS+CG), CS, CS, 5); ctx.fill();
     });
@@ -468,13 +460,9 @@ async function drawCanvas(cb) {
             ctx.font = "bold 22px 'DM Sans', sans-serif";
             const chipW = ctx.measureText(def.label).width + 100;
             if(bx + chipW > BX + BW - 60) { bx = BX + 60; by += 90; }
-            
             rr(ctx, bx, by - 45, chipW, 66, 33, light ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.04)', p.border, 1.5);
-            
-            // Emoji drawing with full opacity
             ctx.font = '36px serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
             ctx.fillText(def.icon, bx + 22, by - 12);
-            
             ctx.fillStyle = p.text; ctx.font = "bold 22px 'DM Sans', sans-serif";
             ctx.fillText(def.label, bx + 75, by - 12);
             bx += chipW + 20;
