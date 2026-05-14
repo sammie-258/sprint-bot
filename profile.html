@@ -229,7 +229,7 @@ const BADGE_DEFS = [
 
         <div id="goal-section" class="hidden">
             <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daily Goal</span>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Current Goal</span>
                 <span id="ui-goal-count" class="text-[10px] font-bold"></span>
             </div>
             <div class="progress-track">
@@ -319,7 +319,7 @@ function initUI() {
 }
 
 // ════════════════════════════════════════════════
-//  CANVAS EXPORT (PRECISION v8)
+//  CANVAS EXPORT (PRECISION v9)
 // ════════════════════════════════════════════════
 function rr(ctx, x, y, w, h, r, fill, stroke, lw) {
     ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
@@ -331,7 +331,7 @@ async function drawCanvas(cb) {
     await document.fonts.ready;
     const canvas = document.getElementById('exportCanvas');
     const ctx    = canvas.getContext('2d');
-    const W = 1080, H = 3200; // Increased to handle any expansion
+    const W = 1080, H = 3200;
     canvas.width = W; canvas.height = H;
 
     const light = document.body.classList.contains('light');
@@ -383,26 +383,29 @@ async function drawCanvas(cb) {
     ctx.fillStyle = p.sub; ctx.font = "bold 20px 'DM Sans', sans-serif"; ctx.fillText("STREAK", sX + PW + PGAP + PW/2, curY + PH/2 + 45);
     curY += PH + 80;
 
-    // Progress
-    rr(ctx, BX, curY, BW, 320, 40, p.card, p.border, 2);
+    // Progress Section (DYNAMIC GOAL)
+    const goalH = USER_DATA.goalActive ? 320 : 180;
+    rr(ctx, BX, curY, BW, goalH, 40, p.card, p.border, 2);
     let py = curY + 70;
     ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.fillText("RANK PROGRESS", BX + 60, py);
     ctx.textAlign = 'right'; ctx.fillStyle = p.accent; ctx.fillText(USER_DATA.nextRankName, BX + BW - 60, py);
     py += 40; rr(ctx, BX + 60, py, BW - 120, 20, 10, light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)', '', 0);
     rr(ctx, BX + 60, py, (BW - 120) * (USER_DATA.nextRankPct/100), 20, 10, p.accent, '', 0);
-    py += 80; ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.fillText("DAILY GOAL", BX + 60, py);
-    ctx.textAlign = 'right'; ctx.fillStyle = p.text; ctx.fillText(USER_DATA.goalCurrent + ' / ' + USER_DATA.goalTarget, BX + BW - 60, py);
-    py += 40; rr(ctx, BX + 60, py, BW - 120, 20, 10, light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)', '', 0);
-    rr(ctx, BX + 60, py, (BW - 120) * (USER_DATA.goalPercent/100), 20, 10, p.accent, '', 0);
-    curY += 320 + 60;
+    
+    if(USER_DATA.goalActive) {
+        py += 80; ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.fillText("CURRENT GOAL", BX + 60, py);
+        ctx.textAlign = 'right'; ctx.fillStyle = p.text; ctx.fillText(USER_DATA.goalCurrent + ' / ' + USER_DATA.goalTarget, BX + BW - 60, py);
+        py += 40; rr(ctx, BX + 60, py, BW - 120, 20, 10, light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)', '', 0);
+        rr(ctx, BX + 60, py, (BW - 120) * (USER_DATA.goalPercent/100), 20, 10, p.accent, '', 0);
+    }
+    curY += goalH + 60;
 
-    // Activity (FIXED HEIGHT)
-    const AH = 280; // Increased from 220 to avoid clipping
-    rr(ctx, BX, curY, BW, AH, 40, p.card, p.border, 2);
+    // Activity
+    const AH = 280; rr(ctx, BX, curY, BW, AH, 40, p.card, p.border, 2);
     ctx.textAlign = 'center'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.fillText("35-DAY ACTIVITY", W/2, curY + 65);
     const bits = (USER_DATA.activityLog || '0'.repeat(35)).split('').reverse();
     const CS = 32, CG = 12, gW = 12 * CS + 11 * CG;
-    let hx0 = (W - gW)/2, hy0 = curY + 110; // Slightly lower start
+    let hx0 = (W - gW)/2, hy0 = curY + 110;
     bits.forEach((bit, i) => {
         const col = i % 12, row = Math.floor(i / 12);
         ctx.fillStyle = bit === '1' ? p.accent : light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
@@ -410,47 +413,36 @@ async function drawCanvas(cb) {
     });
     curY += AH + 60;
 
-    // Badges (DYNAMIC HEIGHT CALCULATION)
+    // Badges
     const earned = USER_DATA.badges || [];
     if(earned.length) {
-        // Simulation to find row count and total height
-        let testBx = BX + 60;
-        let testBy = curY + 130;
-        let finalBy = testBy;
+        let testBx = BX + 60, testBy = curY + 130, finalBy = testBy;
         earned.forEach((key) => {
             const def = BADGE_DEFS.find(b => b.key === key); if(!def) return;
             ctx.font = "bold 24px 'DM Sans', sans-serif";
             const cW = ctx.measureText(def.label).width + 120;
             if(testBx + cW > BX + BW - 60) { testBx = BX + 60; testBy += 100; }
-            testBx += cW + 20;
-            finalBy = testBy;
+            testBx += cW + 20; finalBy = testBy;
         });
-        
-        const BH = (finalBy - curY) + 80; // Dynamic height with padding
+        const BH = (finalBy - curY) + 80;
         rr(ctx, BX, curY, BW, BH, 40, p.card, p.border, 2);
-        ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif";
-        ctx.fillText("ACHIEVEMENTS", BX + 60, curY + 65);
-        
+        ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.fillText("ACHIEVEMENTS", BX + 60, curY + 65);
         let bx = BX + 60, by = curY + 130;
         earned.forEach((key) => {
             const def = BADGE_DEFS.find(b => b.key === key); if(!def) return;
             ctx.font = "bold 24px 'DM Sans', sans-serif";
             const cW = ctx.measureText(def.label).width + 120;
             if(bx + cW > BX + BW - 60) { bx = BX + 60; by += 100; }
-            
-            ctx.save();
-            ctx.globalAlpha = 1.0; ctx.shadowBlur = 0;
+            ctx.save(); ctx.globalAlpha = 1.0; ctx.shadowBlur = 0;
             rr(ctx, bx, by - 45, cW, 74, 37, light ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)', p.border, 1.5);
-            ctx.fillStyle = "#000"; 
-            ctx.font = '48px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", serif';
+            ctx.fillStyle = "#000"; ctx.font = '48px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", serif';
             ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
             ctx.fillText(def.icon, bx + 28, by - 8);
             ctx.fillStyle = p.text; ctx.font = "bold 24px 'DM Sans', sans-serif";
             ctx.fillText(def.label, bx + 92, by - 8);
-            ctx.restore();
-            bx += cW + 20;
+            ctx.restore(); bx += cW + 20;
         });
-        curY += BH + 80; // Extra padding before footer
+        curY += BH + 80;
     }
 
     // Footer
@@ -464,7 +456,7 @@ async function drawCanvas(cb) {
 }
 
 function downloadImage(){ drawCanvas(c => { const a = document.createElement('a'); a.download = `sprint-bot-${USER_DATA.name}.png`; a.href = c.toDataURL('image/png'); a.click(); }); }
-function shareImage(){ drawCanvas(c => { c.toBlob(async blob => { const file = new File([blob], 'profile.png', {type:'type/png'}); if(navigator.canShare && navigator.canShare({files:[file]})){ try { await navigator.share({files:[file], title:'My Profile'}); } catch(e){} } else { downloadImage(); } }); }); }
+function shareImage(){ drawCanvas(c => { c.toBlob(async blob => { const file = new File([blob], 'profile.png', {type:'image/png'}); if(navigator.canShare && navigator.canShare({files:[file]})){ try { await navigator.share({files:[file], title:'My Profile'}); } catch(e){} } else { downloadImage(); } }); }); }
 initUI();
 </script>
 </body>
