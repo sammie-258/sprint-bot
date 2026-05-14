@@ -169,7 +169,7 @@ router.get('/api/admin/sprints', requireAdmin, async (req, res) => {
             name: appState.groupCache[chatId]?.subject || chatId,
             timeLeft: Math.ceil(Math.max(0, sprint.endsAt - Date.now()) / 60000),
             participants: Object.keys(sprint.participants).length,
-            participantList: Object.entries(sprint.participants).map(([uid, d]) => ({ uid: uid.split('@')[0], words: d.words || 0 }))
+            participantList: Object.entries(sprint.participants).map(([uid, d]) => ({ uid: uid.split('@')[0], name: d.name || uid.split('@')[0], words: d.words || 0 }))
         }));
         res.json(sprints);
     } catch (e) { res.status(500).json({ error: e.message }); }
