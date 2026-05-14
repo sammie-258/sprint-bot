@@ -319,7 +319,7 @@ function initUI() {
 }
 
 // ════════════════════════════════════════════════
-//  CANVAS EXPORT (PRECISION v7)
+//  CANVAS EXPORT (PRECISION v8)
 // ════════════════════════════════════════════════
 function rr(ctx, x, y, w, h, r, fill, stroke, lw) {
     ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
@@ -331,7 +331,7 @@ async function drawCanvas(cb) {
     await document.fonts.ready;
     const canvas = document.getElementById('exportCanvas');
     const ctx    = canvas.getContext('2d');
-    const W = 1080, H = 2600;
+    const W = 1080, H = 3200; // Increased to handle any expansion
     canvas.width = W; canvas.height = H;
 
     const light = document.body.classList.contains('light');
@@ -396,12 +396,13 @@ async function drawCanvas(cb) {
     rr(ctx, BX + 60, py, (BW - 120) * (USER_DATA.goalPercent/100), 20, 10, p.accent, '', 0);
     curY += 320 + 60;
 
-    // Activity
-    const AH = 220; rr(ctx, BX, curY, BW, AH, 40, p.card, p.border, 2);
+    // Activity (FIXED HEIGHT)
+    const AH = 280; // Increased from 220 to avoid clipping
+    rr(ctx, BX, curY, BW, AH, 40, p.card, p.border, 2);
     ctx.textAlign = 'center'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.fillText("35-DAY ACTIVITY", W/2, curY + 65);
     const bits = (USER_DATA.activityLog || '0'.repeat(35)).split('').reverse();
     const CS = 32, CG = 12, gW = 12 * CS + 11 * CG;
-    let hx0 = (W - gW)/2, hy0 = curY + 100;
+    let hx0 = (W - gW)/2, hy0 = curY + 110; // Slightly lower start
     bits.forEach((bit, i) => {
         const col = i % 12, row = Math.floor(i / 12);
         ctx.fillStyle = bit === '1' ? p.accent : light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
@@ -409,11 +410,23 @@ async function drawCanvas(cb) {
     });
     curY += AH + 60;
 
-    // Badges (FIXED FADED ICONS)
+    // Badges (DYNAMIC HEIGHT CALCULATION)
     const earned = USER_DATA.badges || [];
     if(earned.length) {
-        const rowCount = Math.ceil(earned.length/3);
-        const BH = 140 + (rowCount * 90);
+        // Simulation to find row count and total height
+        let testBx = BX + 60;
+        let testBy = curY + 130;
+        let finalBy = testBy;
+        earned.forEach((key) => {
+            const def = BADGE_DEFS.find(b => b.key === key); if(!def) return;
+            ctx.font = "bold 24px 'DM Sans', sans-serif";
+            const cW = ctx.measureText(def.label).width + 120;
+            if(testBx + cW > BX + BW - 60) { testBx = BX + 60; testBy += 100; }
+            testBx += cW + 20;
+            finalBy = testBy;
+        });
+        
+        const BH = (finalBy - curY) + 80; // Dynamic height with padding
         rr(ctx, BX, curY, BW, BH, 40, p.card, p.border, 2);
         ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif";
         ctx.fillText("ACHIEVEMENTS", BX + 60, curY + 65);
@@ -423,30 +436,21 @@ async function drawCanvas(cb) {
             const def = BADGE_DEFS.find(b => b.key === key); if(!def) return;
             ctx.font = "bold 24px 'DM Sans', sans-serif";
             const cW = ctx.measureText(def.label).width + 120;
-            if(bx + cW > BX + BW - 60) { bx = BX + 60; by += 90; }
+            if(bx + cW > BX + BW - 60) { bx = BX + 60; by += 100; }
             
             ctx.save();
-            // Reset opacity and state to ensure clean render
-            ctx.globalAlpha = 1.0; 
-            ctx.shadowBlur = 0;
-            
-            // Chip Background
-            rr(ctx, bx, by - 45, cW, 70, 35, light ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)', p.border, 1.5);
-            
-            // Native Emoji Rendering (RESET FILLSTYLE)
-            ctx.fillStyle = "#000000"; // Some browsers need this for native emoji color preservation
-            ctx.font = '48px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Android Emoji", "EmojiSymbols", serif';
+            ctx.globalAlpha = 1.0; ctx.shadowBlur = 0;
+            rr(ctx, bx, by - 45, cW, 74, 37, light ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)', p.border, 1.5);
+            ctx.fillStyle = "#000"; 
+            ctx.font = '48px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", serif';
             ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-            ctx.fillText(def.icon, bx + 25, by - 10);
-            
-            // Label Rendering
+            ctx.fillText(def.icon, bx + 28, by - 8);
             ctx.fillStyle = p.text; ctx.font = "bold 24px 'DM Sans', sans-serif";
-            ctx.fillText(def.label, bx + 85, by - 10);
+            ctx.fillText(def.label, bx + 92, by - 8);
             ctx.restore();
-            
             bx += cW + 20;
         });
-        curY += BH + 60;
+        curY += BH + 80; // Extra padding before footer
     }
 
     // Footer
@@ -460,7 +464,7 @@ async function drawCanvas(cb) {
 }
 
 function downloadImage(){ drawCanvas(c => { const a = document.createElement('a'); a.download = `sprint-bot-${USER_DATA.name}.png`; a.href = c.toDataURL('image/png'); a.click(); }); }
-function shareImage(){ drawCanvas(c => { c.toBlob(async blob => { const file = new File([blob], 'profile.png', {type:'image/png'}); if(navigator.canShare && navigator.canShare({files:[file]})){ try { await navigator.share({files:[file], title:'My Profile'}); } catch(e){} } else { downloadImage(); } }); }); }
+function shareImage(){ drawCanvas(c => { c.toBlob(async blob => { const file = new File([blob], 'profile.png', {type:'type/png'}); if(navigator.canShare && navigator.canShare({files:[file]})){ try { await navigator.share({files:[file], title:'My Profile'}); } catch(e){} } else { downloadImage(); } }); }); }
 initUI();
 </script>
 </body>
