@@ -200,7 +200,14 @@ router.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
 });
 
 router.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
-    try { await ScheduledSprint.findByIdAndDelete(req.body.id); res.json({ success: true }); }
+    try {
+        const sprint = await ScheduledSprint.findById(req.body.id);
+        if (sprint && appState.sock && appState.isConnected) {
+            try { await appState.sock.sendMessage(sprint.groupId, { text: `🚫 *SCHEDULED SPRINT CANCELLED*\n\nThe upcoming ${sprint.duration}-minute sprint has been cancelled by Admin.` }); } catch (e) {}
+        }
+        await ScheduledSprint.findByIdAndDelete(req.body.id);
+        res.json({ success: true });
+    }
     catch (e) { res.status(500).json({ error: e.message }); }
 });
 

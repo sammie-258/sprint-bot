@@ -38,7 +38,12 @@ module.exports = async function(m, appState) {
 
                 const isOwner = senderId.includes(OWNER_NUMBER);
 
-                const body = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+                // Unwrap ephemeral/viewOnce message wrappers
+                const rawMsg = msg.message.ephemeralMessage?.message 
+                    || msg.message.viewOnceMessage?.message 
+                    || msg.message.documentWithCaptionMessage?.message
+                    || msg.message;
+                const body = rawMsg.conversation || rawMsg.extendedTextMessage?.text || rawMsg.imageMessage?.caption || rawMsg.videoMessage?.caption || '';
                 if (!body.startsWith("!")) return;
 
                 if (maintenanceMode && !isOwner) {

@@ -168,8 +168,11 @@
                 </div>
 
                 <div id="view-sprints" class="hidden space-y-8">
-                    <h3 class="font-black italic text-2xl text-neon-blue uppercase tracking-tighter">Active Missions</h3>
-                    <div id="sprints-grid" class="grid grid-cols-1 md:grid-cols-2 gap-8"></div>
+                    <h3 class="font-black italic text-xl md:text-2xl text-neon-blue uppercase tracking-tighter">Active Missions</h3>
+                    <div id="sprints-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8"></div>
+                    
+                    <h3 class="font-black italic text-xl md:text-2xl text-neon-purple uppercase tracking-tighter mt-12">Scheduled Missions</h3>
+                    <div id="scheduled-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8"></div>
                 </div>
 
                 <div id="view-writers" class="hidden space-y-8">
@@ -447,8 +450,43 @@
                     </div>
                 </div>
             `;}).join('');
+            loadScheduledSprints();
         }
 
+        async function loadScheduledSprints() {
+            const data = await api('/api/admin/scheduled', null, 'GET');
+            const items = Array.isArray(data) ? data : [];
+            if (items.length === 0) {
+                document.getElementById('scheduled-grid').innerHTML = '<div class="col-span-full text-center py-12 text-slate-700 font-black uppercase">No missions scheduled</div>';
+                return;
+            }
+            document.getElementById('scheduled-grid').innerHTML = items.map(s => {
+                const time = new Date(s.startTime).toLocaleString();
+                return `
+                <div class="hud-border p-6 md:p-8 relative overflow-hidden border-neon-purple/30">
+                    <div class="hud-corner hud-corner-tl"></div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="min-w-0 flex-1 mr-4">
+                            <div class="font-black italic text-lg text-neon-purple mb-1 uppercase truncate">${s.groupName || 'Unknown Node'}</div>
+                            <div class="text-[9px] font-black text-slate-500 tracking-[0.2em] mb-4">SCHEDULED MISSION</div>
+                        </div>
+                        <button onclick="cancelScheduledSprint('${s.id}')" class="w-12 h-12 border border-neon-red/30 text-neon-red flex items-center justify-center hover:bg-neon-red hover:text-void shrink-0" title="Cancel Schedule"><i class="fas fa-times-circle"></i></button>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <div><div class="text-[8px] font-black text-slate-600 mb-1 uppercase">Duration</div><div class="font-mono font-bold text-sm">${s.duration}M</div></div>
+                        <div><div class="text-[8px] font-black text-slate-600 mb-1 uppercase">Starts At</div><div class="font-mono font-bold text-xs text-neon-purple">${time}</div></div>
+                        <div><div class="text-[8px] font-black text-slate-600 mb-1 uppercase">By</div><div class="font-mono font-bold text-xs text-slate-400">${s.createdBy || '?'}</div></div>
+                    </div>
+                </div>
+            `;}).join('');
+        }
+
+        async function cancelScheduledSprint(id) {
+            showConfirm("Cancel this scheduled sprint? A notification will be sent to the group.", async () => {
+                const res = await api('/api/admin/scheduled/cancel', { id });
+                if (res?.success) { showToast("SCHEDULE CANCELLED"); loadSprints(); }
+            });
+        }
         async function loadWritersGrid() {
             const query = document.getElementById('writer-search').value;
             const sort = document.getElementById('writer-sort').value;
