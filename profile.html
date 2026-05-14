@@ -436,220 +436,215 @@ function rr(ctx, x, y, w, h, r, fill, stroke, lw) {
 function drawCanvas(cb) {
     const canvas = document.getElementById('exportCanvas');
     const ctx    = canvas.getContext('2d');
-    const W = 1080, H = 1660;
+    
+    // Increased height to allow for more breathing room
+    const W = 1080, H = 1920; 
+    canvas.height = H;
+    
     const light  = document.body.classList.contains('light');
 
     const p = {
         bg:      light ? '#eef2f7'                : '#060b12',
         card:    light ? '#ffffff'                : '#0d1425',
-        cBorder: light ? 'rgba(0,0,0,.07)'        : 'rgba(255,255,255,.09)',
-        text:    light ? '#1e293b'                : '#f8fafc',
+        cBorder: light ? 'rgba(0,0,0,.08)'        : 'rgba(255,255,255,.1)',
+        text:    light ? '#0f172a'                : '#ffffff',
         sub:     light ? '#64748b'                : '#94a3b8',
         faint:   light ? 'rgba(0,0,0,.03)'        : 'rgba(255,255,255,.04)',
         fBorder: light ? 'rgba(0,0,0,.06)'        : 'rgba(255,255,255,.08)',
         track:   light ? 'rgba(0,0,0,.08)'        : 'rgba(255,255,255,.08)',
         hOn:     light ? '#0d9488'                : '#22d3a0',
-        hOff:    light ? 'rgba(0,0,0,.08)'        : 'rgba(255,255,255,.08)',
+        hOff:    light ? 'rgba(0,0,0,.1)'         : 'rgba(255,255,255,.07)',
         accent:  '#22d3a0', accent2: '#6366f1',
     };
 
-    // Fill Background
+    // 1. Fill Background
     ctx.fillStyle = p.bg; ctx.fillRect(0,0,W,H);
     
-    // Background Glows
-    const gl1 = ctx.createRadialGradient(200,250,0,200,250,900);
-    gl1.addColorStop(0, light ? 'rgba(13,148,136,.08)' : 'rgba(34,211,160,.07)');
+    // 2. Background Glows
+    const gl1 = ctx.createRadialGradient(200,300,0,200,300,1000);
+    gl1.addColorStop(0, light ? 'rgba(13,148,136,.1)' : 'rgba(34,211,160,.08)');
     gl1.addColorStop(1, 'transparent');
     ctx.fillStyle = gl1; ctx.fillRect(0,0,W,H);
 
-    const gl2 = ctx.createRadialGradient(880,1400,0,880,1400,800);
-    gl2.addColorStop(0, light ? 'rgba(99,102,241,.06)' : 'rgba(99,102,241,.05)');
-    gl2.addColorStop(1, 'transparent');
-    ctx.fillStyle = gl2; ctx.fillRect(0,0,W,H);
-
-    // Card Shadow
-    ctx.shadowColor = 'rgba(0,0,0,0.4)';
-    ctx.shadowBlur = 60;
-    ctx.shadowOffsetY = 30;
-
-    // Card Container
-    const CX=80, CY=90, CW=920, CH=1490, CR=64;
-    rr(ctx, CX, CY, CW, CH, CR, p.card, p.cBorder, 2);
+    // 3. Card Container
+    const CX=80, CY=100, CW=920, CH=1720, CR=70;
     
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
+    // Card Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 80;
+    ctx.shadowOffsetY = 40;
+    rr(ctx, CX, CY, CW, CH, CR, p.card, p.cBorder, 2);
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
 
-    // Banner
-    const bannerHeight = 260;
+    // 4. Banner
+    const bannerHeight = 300;
     const bg = ctx.createLinearGradient(CX, CY, CX+CW, CY+bannerHeight);
-    bg.addColorStop(0,'#0d9488'); bg.addColorStop(.45,'#6366f1'); bg.addColorStop(1,'#8b5cf6');
+    bg.addColorStop(0,'#0d9488'); bg.addColorStop(.5,'#6366f1'); bg.addColorStop(1,'#8b5cf6');
     ctx.save(); ctx.beginPath(); ctx.roundRect(CX, CY, CW, bannerHeight, [CR,CR,0,0]); ctx.clip();
     ctx.fillStyle = bg; ctx.fillRect(CX, CY, CW, bannerHeight);
     
-    // Banner Polka Dots
-    for(let x=CX; x<CX+CW+40; x+=40) {
-        for(let y=CY; y<CY+bannerHeight+40; y+=40) {
-            ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI*2);
-            ctx.fillStyle='rgba(255,255,255,.15)'; ctx.fill();
+    // Pattern
+    ctx.globalAlpha = 0.15;
+    for(let x=CX; x<CX+CW+60; x+=60) {
+        for(let y=CY; y<CY+bannerHeight+60; y+=60) {
+            ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI*2);
+            ctx.fillStyle='#fff'; ctx.fill();
         }
     }
     ctx.restore();
 
-    // Avatar
-    const AX = CX + CW/2, AY = CY + bannerHeight, AR = 100;
-    ctx.beginPath(); ctx.arc(AX, AY, AR+14, 0, Math.PI*2); ctx.fillStyle=p.card; ctx.fill();
+    // 5. Avatar
+    const AX = CX + CW/2, AY = CY + bannerHeight, AR = 110;
+    ctx.beginPath(); ctx.arc(AX, AY, AR+16, 0, Math.PI*2); ctx.fillStyle=p.card; ctx.fill();
     
     const ag=ctx.createLinearGradient(AX-AR, AY-AR, AX+AR, AY+AR);
     ag.addColorStop(0,'#22d3a0'); ag.addColorStop(1,'#6366f1');
-    ctx.beginPath(); ctx.arc(AX, AY, AR+6, 0, Math.PI*2); ctx.fillStyle=ag; ctx.fill();
+    ctx.beginPath(); ctx.arc(AX, AY, AR+8, 0, Math.PI*2); ctx.fillStyle=ag; ctx.fill();
     
     ctx.beginPath(); ctx.arc(AX, AY, AR, 0, Math.PI*2);
     ctx.fillStyle = light ? '#dde6f0' : '#111c2b'; ctx.fill();
     
     ctx.fillStyle = light ? '#0d9488' : '#22d3a0';
-    ctx.font="bold 80px 'Syne', sans-serif"; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(USER_DATA.initial, AX, AY+5);
+    ctx.font="bold 90px 'Syne', sans-serif"; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(USER_DATA.initial, AX, AY+6);
 
-    let curY = AY + AR + 90;
+    let curY = AY + AR + 110;
 
-    // Name
-    ctx.fillStyle=p.text; ctx.font="bold 76px 'Syne', sans-serif"; ctx.textBaseline='middle';
+    // 6. Name
+    ctx.fillStyle=p.text; ctx.font="800 84px 'Syne', sans-serif"; 
     ctx.fillText(USER_DATA.name, AX, curY);
-    curY += 85;
+    curY += 95;
 
-    // Rank Pill
+    // 7. Rank Pill
     const rt = '👑 ' + USER_DATA.rank;
-    ctx.font = "bold 34px 'DM Sans', sans-serif";
-    const rw = ctx.measureText(rt).width + 64;
-    rr(ctx, AX - rw/2, curY - 32, rw, 64, 32, 'rgba(34,211,160,.12)', 'rgba(34,211,160,.3)', 1.5);
+    ctx.font = "bold 36px 'DM Sans', sans-serif";
+    const rw = ctx.measureText(rt).width + 80;
+    rr(ctx, AX - rw/2, curY - 35, rw, 70, 35, 'rgba(34,211,160,.12)', 'rgba(34,211,160,.3)', 2);
     ctx.fillStyle = light ? '#0d9488' : '#22d3a0';
     ctx.fillText(rt, AX, curY);
-    curY += 130;
+    curY += 160;
 
-    // Stat boxes
-    const SW = 205, SH = 160, SGAP = 20;
-    const STOT = (4*SW + 3*SGAP);
-    const SX0 = CX + (CW - STOT)/2;
+    // 8. Stats Grid (2x2 for more space)
+    const SW = 380, SH = 180, SGAP = 40;
+    const gridX = CX + (CW - (2*SW + SGAP))/2;
     
     const stats = [
-        { v: USER_DATA.total,               lab: 'TOTAL WORDS', col: p.text },
-        { v: USER_DATA.streak + '🔥',       lab: 'STREAK',      col: '#f97316' },
-        { v: USER_DATA.dailyWords,          lab: "TODAY",       col: p.text },
+        { v: USER_DATA.total,               lab: 'ALL-TIME WORDS', col: p.text },
+        { v: USER_DATA.streak + '🔥',       lab: 'DAY STREAK',     col: '#f97316' },
+        { v: USER_DATA.dailyWords,          lab: "TODAY'S WORDS",  col: p.text },
         { v: USER_DATA.bestSprintWpm > 0 ? USER_DATA.bestSprintWpm + ' WPM' : '—', lab: 'BEST SPRINT', col: '#818cf8' },
     ];
     
     stats.forEach((s, i) => {
-        const sx = SX0 + i*(SW + SGAP);
-        rr(ctx, sx, curY, SW, SH, 24, p.faint, p.fBorder, 1.5);
-        ctx.fillStyle = s.col; ctx.font = "bold 44px 'Syne', sans-serif"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(s.v, sx + SW/2, curY + SH/2 - 15);
-        ctx.fillStyle = p.sub; ctx.font = "bold 18px 'DM Sans', sans-serif";
-        ctx.fillText(s.lab, sx + SW/2, curY + SH/2 + 35);
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const sx = gridX + col*(SW + SGAP);
+        const sy = curY + row*(SH + SGAP);
+        
+        rr(ctx, sx, sy, SW, SH, 30, p.faint, p.fBorder, 2);
+        ctx.fillStyle = s.col; ctx.font = "800 52px 'Syne', sans-serif";
+        ctx.fillText(s.v, sx + SW/2, sy + SH/2 - 20);
+        ctx.fillStyle = p.sub; ctx.font = "800 20px 'DM Sans', sans-serif";
+        ctx.fillText(s.lab, sx + SW/2, sy + SH/2 + 40);
     });
-    curY += SH + 90;
+    curY += (2*SH + 2*SGAP) + 80;
 
-    // Content area width
-    const BX = CX + 65, BW = CW - 130;
+    // 9. Progress Sections
+    const BX = CX + 80, BW = CW - 160;
 
     // Rank Progress
-    if (USER_DATA.nextRankPct < 100) {
-        ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.textAlign = 'left';
-        ctx.fillText('Rank Progress', BX, curY);
-        ctx.textAlign = 'right';
-        ctx.fillText(USER_DATA.nextRankName, BX + BW, curY);
-        curY += 30;
-        
-        rr(ctx, BX, curY, BW, 16, 8, p.track, 'transparent', 0);
-        const fw = Math.max(0, USER_DATA.nextRankPct / 100 * BW);
-        if(fw > 0) {
-            const fg = ctx.createLinearGradient(BX, 0, BX + fw, 0);
-            fg.addColorStop(0, '#22d3a0'); fg.addColorStop(1, '#6366f1');
-            rr(ctx, BX, curY, fw, 16, 8, fg, 'transparent', 0);
-        }
-        ctx.fillStyle = p.sub; ctx.font = "500 22px 'DM Mono', monospace"; ctx.textAlign = 'center';
-        ctx.fillText(USER_DATA.nextRankPct + '% to goal', BX + BW/2, curY + 50);
-        curY += 100;
-    } else {
-        ctx.fillStyle = '#22d3a0'; ctx.font = "bold 28px 'Syne', sans-serif"; ctx.textAlign = 'center';
-        ctx.fillText('⚡ Maximum Rank — Novel God!', CX + CW/2, curY);
-        curY += 70;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = p.sub; ctx.font = "bold 28px 'DM Sans', sans-serif";
+    ctx.fillText('Rank Progress', BX, curY);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = p.text;
+    ctx.fillText(USER_DATA.nextRankName, BX + BW, curY);
+    curY += 35;
+    
+    rr(ctx, BX, curY, BW, 18, 9, p.track, 'transparent', 0);
+    const fw = Math.max(0, USER_DATA.nextRankPct / 100 * BW);
+    if(fw > 0) {
+        const fg = ctx.createLinearGradient(BX, 0, BX + fw, 0);
+        fg.addColorStop(0, '#22d3a0'); fg.addColorStop(1, '#6366f1');
+        rr(ctx, BX, curY, fw, 18, 9, fg, 'transparent', 0);
     }
+    curY += 110;
 
     // Daily Goal
     if(USER_DATA.goalActive) {
-        ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.textAlign = 'left';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = p.sub; ctx.font = "bold 28px 'DM Sans', sans-serif";
         ctx.fillText('Daily Goal', BX, curY);
         ctx.textAlign = 'right';
         ctx.fillStyle = p.text;
         ctx.fillText(USER_DATA.goalCurrent + ' / ' + USER_DATA.goalTarget, BX + BW, curY);
-        curY += 30;
+        curY += 35;
         
-        rr(ctx, BX, curY, BW, 14, 7, p.track, 'transparent', 0);
+        rr(ctx, BX, curY, BW, 18, 9, p.track, 'transparent', 0);
         const gfw = Math.max(0, USER_DATA.goalPercent / 100 * BW);
         if(gfw > 0) {
             const gfg = ctx.createLinearGradient(BX, 0, BX + gfw, 0);
             gfg.addColorStop(0, '#22d3a0'); gfg.addColorStop(1, '#6366f1');
-            rr(ctx, BX, curY, gfw, 14, 7, gfg, 'transparent', 0);
+            rr(ctx, BX, curY, gfw, 18, 9, gfg, 'transparent', 0);
         }
-        curY += 90;
+        curY += 120;
     }
 
-    // Heatmap
-    ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.textAlign = 'left';
+    // 10. Activity
+    ctx.textAlign = 'left';
+    ctx.fillStyle = p.sub; ctx.font = "bold 28px 'DM Sans', sans-serif";
     ctx.fillText('35-Day Activity', BX, curY);
-    curY += 25;
+    curY += 35;
     
     const log = USER_DATA.activityLog || '0'.repeat(35);
     const bits = log.split('').reverse();
-    const CS = 20, CG = 6, HTOT = bits.length * CS + (bits.length - 1) * CG;
+    const CS = 22, CG = 7, HTOT = bits.length * CS + (bits.length - 1) * CG;
     let hx = CX + (CW - HTOT)/2;
     
     bits.forEach(bit => {
         ctx.fillStyle = bit === '1' ? p.hOn : p.hOff;
-        ctx.beginPath(); ctx.roundRect(hx, curY, CS, CS, 4); ctx.fill();
-        
+        ctx.beginPath(); ctx.roundRect(hx, curY, CS, CS, 5); ctx.fill();
         if(bit === '1') {
-            ctx.shadowColor = 'rgba(34,211,160,0.5)';
-            ctx.shadowBlur = 8;
-            ctx.fill();
-            ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+            ctx.shadowColor = 'rgba(34,211,160,0.6)'; ctx.shadowBlur = 10;
+            ctx.fill(); ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
         }
         hx += CS + CG;
     });
-    curY += CS + 100;
+    curY += 140;
 
-    // Badges (Fixed: Now draws icons AND labels)
+    // 11. Badges
     const earned = USER_DATA.badges || [];
     if(earned.length) {
-        ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.textAlign = 'left';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = p.sub; ctx.font = "bold 28px 'DM Sans', sans-serif";
         ctx.fillText('Badges Earned', BX, curY);
-        curY += 40;
+        curY += 50;
         
         let bx = BX;
         earned.forEach(key => {
             const def = BADGE_DEFS.find(b => b.key === key); if(!def) return;
             
-            ctx.font = "600 20px 'DM Sans', sans-serif";
+            ctx.font = "bold 20px 'DM Sans', sans-serif";
             const labelWidth = ctx.measureText(def.label).width;
-            const chipWidth = labelWidth + 70;
+            const chipWidth = labelWidth + 80;
             
-            rr(ctx, bx, curY - 30, chipWidth, 50, 25, p.faint, p.fBorder, 1);
+            if(bx + chipWidth > BX + BW) { bx = BX; curY += 75; }
             
-            ctx.font = '28px serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-            ctx.fillText(def.icon, bx + 14, curY - 5);
+            rr(ctx, bx, curY - 35, chipWidth, 60, 30, p.faint, p.fBorder, 2);
             
-            ctx.fillStyle = p.text; ctx.font = "bold 18px 'DM Sans', sans-serif";
-            ctx.fillText(def.label, bx + 52, curY - 5);
+            ctx.font = '32px serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            ctx.fillText(def.icon, bx + 20, curY - 5);
             
-            bx += chipWidth + 12;
-            if(bx + 150 > BX + BW) { bx = BX; curY += 65; }
+            ctx.fillStyle = p.text; ctx.font = "bold 20px 'DM Sans', sans-serif";
+            ctx.fillText(def.label, bx + 65, curY - 5);
+            
+            bx += chipWidth + 18;
         });
     }
 
-    // Footer
-    ctx.fillStyle = p.sub; ctx.font = "bold 30px 'Syne', sans-serif"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('🤖 SPRINT BOT', W/2, H - 65);
+    // 12. Footer
+    ctx.fillStyle = p.sub; ctx.font = "bold 34px 'Syne', sans-serif"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🤖 SPRINT BOT', W/2, H - 100);
 
     if(cb) cb(canvas);
 }
