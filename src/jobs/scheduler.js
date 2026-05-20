@@ -75,7 +75,8 @@ module.exports = function(appState) {
             const activeToday = new Set(await DailyStats.distinct("userId", { date: today }));
             const atRiskProfiles = await UserProfile.find({ 
                 currentStreak: { $gt: 0 },
-                lastActiveDate: { $ne: today } // Haven't updated streak today
+                lastActiveDate: { $ne: today }, // Haven't updated streak today
+                isInactive: { $ne: true }       // Skip inactive writers
             });
 
             console.log(`🔥 Streak Reminder: Checking ${atRiskProfiles.length} potential authors...`);

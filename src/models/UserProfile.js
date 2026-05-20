@@ -13,6 +13,7 @@ const userProfileSchema = new mongoose.Schema({
     bestSprintWpm:     { type: Number,   default: 0 },
     sprintCount:       { type: Number,   default: 0 },
     totalSprintWords:  { type: Number,   default: 0 },
+    isInactive:        { type: Boolean,  default: false }
 });
 
 module.exports = mongoose.model("UserProfile", userProfileSchema);

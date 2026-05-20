@@ -171,7 +171,17 @@ router.get('/api/admin/sprints', requireAdmin, async (req, res) => {
             participants: Object.keys(sprint.participants).length,
             participantList: Object.entries(sprint.participants).map(([uid, d]) => ({ uid: uid.split('@')[0], name: d.name || uid.split('@')[0], words: d.words || 0 }))
         }));
-        res.json(sprints);
+        const duels = Object.entries(appState.activeDuels).map(([chatId, duel]) => ({
+            id: chatId,
+            name: `⚔️ DUEL: ${duel.challengerName} vs ${duel.opponentName}`,
+            timeLeft: Math.ceil(Math.max(0, duel.endsAt - Date.now()) / 60000),
+            participants: 2,
+            participantList: [
+                { uid: duel.challenger.split('@')[0], name: duel.challengerName, words: duel.words[duel.challenger] || 0 },
+                { uid: duel.opponent.split('@')[0], name: duel.opponentName, words: duel.words[duel.opponent] || 0 }
+            ]
+        }));
+        res.json([...sprints, ...duels]);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -194,7 +204,7 @@ router.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
             id: s._id,
             groupName: appState.groupCache[s.groupId]?.subject || s.groupId,
             startTime: s.startTime, duration: s.duration,
-            createdBy: s.createdBy.split('@')[0]
+            createdBy: s.createdBy ? s.createdBy.split('@')[0] : 'Admin'
         })));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -227,6 +237,7 @@ router.post('/api/admin/search', requireAdmin, async (req, res) => {
                 rank: getRank(p.totalWordsAllTime), streak: p.currentStreak,
                 bestStreak: p.bestStreak, trueTotal: p.totalWordsAllTime,
                 isBanned: !!isBanned,
+                isInactive: !!p.isInactive,
                 badges: p.badges || [],
                 bestSprintWords: p.bestSprintWords, bestSprintWpm: p.bestSprintWpm,
                 sprintCount: p.sprintCount, activityLog: p.activityLog
@@ -268,6 +279,11 @@ router.get('/api/admin/writer/:userId/history', requireAdmin, async (req, res) =
 router.post('/api/admin/update', requireAdmin, async (req, res) => {
     const { userId, amount, type, name } = req.body;
     try {
+        if (type === 'streak') {
+            const { currentStreak, bestStreak } = req.body;
+            await UserProfile.findOneAndUpdate({ userId }, { currentStreak, bestStreak });
+            return res.json({ success: true });
+        }
         if (type === 'name') {
             await UserProfile.findOneAndUpdate({ userId }, { name });
             await DailyStats.updateMany({ userId }, { name });
@@ -295,6 +311,14 @@ router.post('/api/admin/ban', requireAdmin, async (req, res) => {
         if (action === 'ban') await Blacklist.findOneAndUpdate({ userId }, { userId }, { upsert: true });
         else await Blacklist.deleteMany({ userId });
         res.json({ success: true, isBanned: action === 'ban' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/writers/inactive', requireAdmin, async (req, res) => {
+    const { userId, isInactive } = req.body;
+    try {
+        await UserProfile.findOneAndUpdate({ userId }, { isInactive });
+        res.json({ success: true, isInactive });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

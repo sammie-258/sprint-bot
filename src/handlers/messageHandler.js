@@ -3,6 +3,8 @@ const DailyStats     = require('../models/DailyStats');
 const UserProfile    = require('../models/UserProfile');
 const PersonalGoal   = require('../models/PersonalGoal');
 const ScheduledSprint = require('../models/ScheduledSprint');
+const GroupChallenge = require('../models/GroupChallenge');
+const WeeklyChallenge = require('../models/WeeklyChallenge');
 const Blacklist      = require('../models/Blacklist');
 const Feedback       = require('../models/Feedback');
 const SprintRecord   = require('../models/SprintRecord');
@@ -305,16 +307,18 @@ module.exports = async function(m, appState) {
                         mentions: [senderId, opponentId]
                     });
 
+                    pushActivity('duel', `Duel started by @${senderName}`, '⚔️');
+
                     setTimeout(async () => {
                         const duel = activeDuels[chatId];
                         if (!duel) return; // Might have been cancelled
                         
                         // Enter Grace Period
                         duel.isGracePeriod = true;
-                        duel.endsAt = Date.now() + (2 * 60000); // Add 2 minutes to the clock for logging
+                        duel.endsAt = Date.now() + (5 * 60000); // Add 5 minutes to the clock for logging
 
                         await sock.sendMessage(chatId, { 
-                            text: `🛑 *DUEL TIME'S UP!*\n\n@${duel.challenger.split('@')[0]} and @${duel.opponent.split('@')[0]}, put your pens down!\n\nYou have *2 minutes* to submit your final words using *!wc [number]*!`, 
+                            text: `🛑 *DUEL TIME'S UP!*\n\n@${duel.challenger.split('@')[0]} and @${duel.opponent.split('@')[0]}, put your pens down!\n\nYou have *5 minutes* to submit your final words using *!wc [number]*!`, 
                             mentions: [duel.challenger, duel.opponent] 
                         });
 
@@ -352,7 +356,7 @@ module.exports = async function(m, appState) {
 
                             await sock.sendMessage(chatId, { text: txt, mentions: [finalDuel.challenger, finalDuel.opponent] });
                             pushActivity('duel', `Duel ended in ${groupCache[chatId]?.subject || chatId}`, '⚔️');
-                        }, 2 * 60000); // 2 minutes later
+                        }, 5 * 60000); // 5 minutes later
                         
                     }, duration * 60000);
                 }
@@ -367,7 +371,10 @@ module.exports = async function(m, appState) {
                     const isAdd  = args[1] === 'add' || args[1] === '+';
                     const rawNum = isAdd ? args[2] : args[1];
                     const c      = parseInt(rawNum);
-                    if (isNaN(c) || c <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!wc 500`" }, { quoted: msg });
+                    if (isNaN(c) || c < 0) return sock.sendMessage(chatId, { text: "❌ Use: `!wc 500`" }, { quoted: msg });
+                    
+                    // Reactivate user if they log words
+                    await UserProfile.findOneAndUpdate({ userId: senderId }, { isInactive: false });
 
                     if (duel && !sprint) {
                         if (senderId !== duel.challenger && senderId !== duel.opponent) {
@@ -634,6 +641,7 @@ module.exports = async function(m, appState) {
                     if (isNaN(dur) || isNaN(wait)) return sock.sendMessage(chatId, { text: "❌ Invalid numbers." }, { quoted: msg });
                     const startAt = new Date(Date.now() + wait * 60000);
                     await ScheduledSprint.create({ groupId: chatId, startTime: startAt, duration: dur, createdBy: senderId });
+                    pushActivity('schedule', `Sprint scheduled by @${senderName}`, '📅');
                     const timeStr = startAt.toLocaleTimeString('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit' });
                     return sock.sendMessage(chatId, { text: `📅 *Sprint Scheduled!*\nDuration: ${dur} mins\nStart: In ${wait} mins (~${timeStr} GMT+1)` }, { quoted: msg });
                 }
@@ -641,6 +649,7 @@ module.exports = async function(m, appState) {
                 // ── !UNSCHEDULE ─────────────────────────────────────────────────────
                 if (command === "!unschedule") {
                     const r = await ScheduledSprint.deleteMany({ groupId: chatId });
+                    if (r.deletedCount > 0) pushActivity('schedule', `Sprint cancelled by @${senderName}`, '🚫');
                     return sock.sendMessage(chatId, { text: r.deletedCount > 0 ? `✅ Scheduled sprint cancelled.` : "🤷 None found." }, { quoted: msg });
                 }
 
@@ -653,7 +662,8 @@ module.exports = async function(m, appState) {
                     const r      = target.endsAt - Date.now();
                     if (r <= 0) return sock.sendMessage(chatId, { text: "🛑 Time's up!" }, { quoted: msg });
                     const label  = sprint ? "Sprint" : (duel.isGracePeriod ? "Duel (Grace Period)" : "Duel");
-                    return sock.sendMessage(chatId, { text: `⏳ *${label}:* ${Math.floor(r / 60000)}m ${Math.floor((r / 1000) % 60)}s remaining` }, { quoted: msg });
+                    const endStr = new Date(target.endsAt).toLocaleTimeString('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit' });
+                    return sock.sendMessage(chatId, { text: `⏳ *${label}:* ${Math.floor(r / 60000)}m ${Math.floor((r / 1000) % 60)}s remaining\n*(Ends at ~${endStr} GMT+1)*` }, { quoted: msg });
                 }
 
                 // ── !CANCEL ─────────────────────────────────────────────────────────

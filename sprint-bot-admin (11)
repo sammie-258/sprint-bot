@@ -298,10 +298,16 @@
                     <input type="number" id="dr-add-val" class="bg-white/5 border border-white/10 px-4 py-3 text-xs font-mono outline-none focus:border-neon-green" placeholder="Add/Sub Words">
                     <button onclick="updateStats('add')" class="bg-neon-green/10 border border-neon-green/20 text-[9px] font-black uppercase">Apply Add</button>
                 </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <input type="number" id="dr-streak-val" class="bg-white/5 border border-white/10 px-4 py-3 text-xs font-mono outline-none focus:border-neon-purple" placeholder="Current">
+                    <input type="number" id="dr-best-streak-val" class="bg-white/5 border border-white/10 px-4 py-3 text-xs font-mono outline-none focus:border-neon-purple" placeholder="Best">
+                    <button onclick="updateStats('streak')" class="bg-neon-purple/10 border border-neon-purple/20 text-[9px] font-black uppercase">Apply Streaks</button>
+                </div>
                 <div class="grid grid-cols-2 gap-6">
                     <button onclick="openFreezeGrant()" class="bg-neon-blue/10 border border-neon-blue/30 py-5 font-black text-xs italic tracking-widest text-neon-blue uppercase">Grant Freeze</button>
                     <button id="dr-ban-btn" class="bg-neon-red/10 border border-neon-red/30 py-5 font-black text-xs italic tracking-widest text-neon-red uppercase">Block Node</button>
                 </div>
+                <button id="dr-inactive-btn" class="w-full bg-slate-800/50 border border-slate-600 py-4 font-black text-xs italic tracking-widest text-slate-400 uppercase">Mark Inactive</button>
                 <div class="space-y-3">
                     <input type="text" id="dr-rename-val" class="w-full bg-white/5 border border-white/10 px-6 py-4 text-sm font-bold outline-none focus:border-neon-blue uppercase" placeholder="New Name">
                     <button onclick="renameWriter()" class="w-full border border-white/10 py-4 font-black text-[10px] uppercase hover:bg-neon-blue/10 transition-all">Apply Identity Rewrite</button>
@@ -661,12 +667,20 @@
             document.getElementById('dr-total').textContent = (u.trueTotal || u.totalWords).toLocaleString();
             document.getElementById('dr-rank').textContent = u.rank || "Unranked";
             
+            document.getElementById('dr-streak-val').value = u.streak || 0;
+            document.getElementById('dr-best-streak-val').value = u.bestStreak || 0;
+
             const badgeEl = document.getElementById('dr-badges');
             badgeEl.innerHTML = (u.badges || []).map(b => `<span class="px-3 py-1 bg-neon-purple/10 border border-neon-purple/20 text-[8px] font-black text-neon-purple uppercase italic tracking-widest">${b.replace('_',' ')}</span>`).join('');
 
             const bBtn = document.getElementById('dr-ban-btn');
             bBtn.textContent = u.isBanned ? 'UNBLOCK' : 'BLOCK';
             bBtn.onclick = () => toggleBan(u._id, u.isBanned);
+
+            const iBtn = document.getElementById('dr-inactive-btn');
+            iBtn.textContent = u.isInactive ? 'MARK ACTIVE' : 'MARK INACTIVE';
+            iBtn.className = u.isInactive ? 'w-full bg-neon-green/10 border border-neon-green/30 py-4 font-black text-xs italic tracking-widest text-neon-green uppercase' : 'w-full bg-slate-800/50 border border-slate-600 py-4 font-black text-xs italic tracking-widest text-slate-400 uppercase';
+            iBtn.onclick = () => toggleInactive(u._id, u.isInactive);
             
             document.getElementById('drawer-overlay').classList.remove('hidden');
             document.getElementById('writer-drawer').classList.add('open');
@@ -690,13 +704,38 @@
         }
 
         async function updateStats(type) {
-            const val = document.getElementById(type === 'set' ? 'dr-set-val' : 'dr-add-val').value;
-            if (!val) return;
-            const res = await api('/api/admin/update', { userId: selectedWriterId, amount: val, type });
+            let body = { userId: selectedWriterId, type };
+            if (type === 'streak') {
+                const cStreak = document.getElementById('dr-streak-val').value;
+                const bStreak = document.getElementById('dr-best-streak-val').value;
+                if (cStreak === '' || bStreak === '') return showToast("Provide both streaks", "error");
+                body.currentStreak = parseInt(cStreak);
+                body.bestStreak = parseInt(bStreak);
+            } else {
+                const val = document.getElementById(type === 'set' ? 'dr-set-val' : 'dr-add-val').value;
+                if (!val) return;
+                body.amount = val;
+            }
+            
+            const res = await api('/api/admin/update', body);
             if (res?.success) {
-                showToast(`STATS UPDATED: ${res.newTotal}`);
-                document.getElementById('dr-total').textContent = res.newTotal.toLocaleString();
-                document.getElementById(type === 'set' ? 'dr-set-val' : 'dr-add-val').value = '';
+                showToast(`STATS UPDATED`);
+                if (type !== 'streak') document.getElementById('dr-total').textContent = res.newTotal.toLocaleString();
+                else {
+                    document.getElementById('dr-streak').textContent = body.currentStreak;
+                    document.getElementById('dr-best').textContent = body.bestStreak;
+                }
+                if (type === 'set') document.getElementById('dr-set-val').value = '';
+                if (type === 'add') document.getElementById('dr-add-val').value = '';
+                loadWritersGrid();
+            }
+        }
+
+        async function toggleInactive(userId, isInactive) {
+            const res = await api('/api/admin/writers/inactive', { userId, isInactive: !isInactive });
+            if (res?.success) {
+                showToast(res.isInactive ? "MARKED INACTIVE" : "MARKED ACTIVE");
+                openWriterDrawer(userId);
                 loadWritersGrid();
             }
         }
