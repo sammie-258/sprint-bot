@@ -437,36 +437,54 @@ mongoose.connect(MONGO_URI).then(async () => {
     // =======================
     const { state, saveCreds } = await useMultiFileAuthState('.auth_info_baileys');
 
+    let isInitializing = false;
     const initializeBot = async () => {
-        const { version } = await fetchLatestBaileysVersion();
-        sock = makeWASocket({
-            version, auth: state, printQRInTerminal: true,
-            browser: ['Sprint Bot', 'Chrome', '120.0'],
-            msgRetryCounterMax: 15, defaultQueryTimeoutMs: 60000,
-            shouldIgnoreJid: jid => !jid || jid === 'status@broadcast' || jid.includes('broadcast'),
-            syncFullHistory: false, generateHighQualityLinkPreview: true,
-        });
-
-        sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-            if (qr) { qrCodeData = qr; console.log('⚠️ New QR Code'); }
-            if (connection === 'open') {
-                isConnected = true; qrCodeData = null;
-                updateGroupCache(true);
-                console.log('✅ Bot Connected!');
-                pushActivity('connect', 'Bot connected to WhatsApp', '✅');
-            } else if (connection === 'close') {
-                isConnected = false;
-                const code = lastDisconnect?.error?.output?.statusCode;
-                if (code === DisconnectReason.loggedOut) {
-                    console.log("🛑 Logged out. Delete .auth_info_baileys and restart.");
-                } else {
-                    console.log('🔄 Reconnecting...'); setTimeout(() => initializeBot(), 3000);
+        if (isInitializing) return;
+        isInitializing = true;
+        try {
+            if (sock) {
+                console.log('🔄 Cleaning up previous socket instance...');
+                try {
+                    sock.ev.removeAllListeners('connection.update');
+                    sock.ev.removeAllListeners('messages.upsert');
+                    sock.ev.removeAllListeners('creds.update');
+                    sock.ev.removeAllListeners('groups.upsert');
+                    sock.end(undefined);
+                } catch (e) {
+                    console.log('⚠️ Error closing old socket:', e.message);
                 }
             }
-        });
 
-        sock.ev.on('creds.update', saveCreds);
+            const { version } = await fetchLatestBaileysVersion();
+            sock = makeWASocket({
+                version, auth: state, printQRInTerminal: true,
+                browser: ['Sprint Bot', 'Chrome', '120.0'],
+                msgRetryCounterMax: 15, defaultQueryTimeoutMs: 60000,
+                shouldIgnoreJid: jid => !jid || jid === 'status@broadcast' || jid.includes('broadcast'),
+                syncFullHistory: false, generateHighQualityLinkPreview: true,
+            });
+
+            sock.ev.on('connection.update', async (update) => {
+                const { connection, lastDisconnect, qr } = update;
+                if (qr) { qrCodeData = qr; console.log('⚠️ New QR Code'); }
+                if (connection === 'open') {
+                    isConnected = true; qrCodeData = null;
+                    updateGroupCache(true);
+                    console.log('✅ Bot Connected!');
+                    pushActivity('connect', 'Bot connected to WhatsApp', '✅');
+                } else if (connection === 'close') {
+                    isConnected = false;
+                    const code = lastDisconnect?.error?.output?.statusCode;
+                    if (code === DisconnectReason.loggedOut) {
+                        console.log("🛑 Logged out. Delete .auth_info_baileys and restart.");
+                    } else {
+                        console.log('🔄 Reconnecting...');
+                        setTimeout(() => initializeBot(), 3000);
+                    }
+                }
+            });
+
+            sock.ev.on('creds.update', saveCreds);
 
         // Welcome message when bot joins a new group
         sock.ev.on('groups.upsert', async (newGroups) => {
@@ -504,6 +522,15 @@ mongoose.connect(MONGO_URI).then(async () => {
                 startSprintSession, finishSprint, pushActivity
             });
         });
+        } catch (e) {
+            console.error('🔄 Connection initialization failed:', e.message);
+            setTimeout(() => {
+                isInitializing = false;
+                initializeBot();
+            }, 5000);
+            return;
+        }
+        isInitializing = false;
     };
 
     initializeBot();

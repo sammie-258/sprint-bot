@@ -15,6 +15,8 @@ const BASE_URL     = process.env.BASE_URL || 'https://sprint-bot-9bll.onrender.c
 const TIMEZONE     = 'Africa/Lagos';
 const OWNER_NUMBER = process.env.OWNER_NUMBER || '2349019671229';
 
+const processedMessages = new Set();
+
 module.exports = async function(m, appState) {
     const { 
         sock, isConnected, groupCache, maintenanceMode, activeSprints, activePomodoros, activeDuels,
@@ -23,8 +25,28 @@ module.exports = async function(m, appState) {
     } = appState;
 
             try {
+                if (!m.messages || !m.messages.length) return;
                 const msg = m.messages[0];
-                if (!msg.message || msg.key.fromMe) return;
+                if (!msg || !msg.message || msg.key.fromMe) return;
+
+                // 1. Deduplicate by message ID
+                const msgId = msg.key.id;
+                if (processedMessages.has(msgId)) return;
+                processedMessages.add(msgId);
+                if (processedMessages.size > 1000) {
+                    const firstKey = processedMessages.keys().next().value;
+                    processedMessages.delete(firstKey);
+                }
+
+                // 2. Ignore messages older than 2 minutes (120 seconds) to prevent replay/history processing on reconnect
+                let timestampSec = msg.messageTimestamp;
+                if (timestampSec && typeof timestampSec === 'object' && 'low' in timestampSec) {
+                    timestampSec = timestampSec.low;
+                }
+                timestampSec = Number(timestampSec);
+                if (timestampSec && (Date.now() / 1000 - timestampSec > 120)) {
+                    return;
+                }
 
                 const chatId   = msg.key.remoteJid;
                 const isGroup  = chatId.endsWith('@g.us');
