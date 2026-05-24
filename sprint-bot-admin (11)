@@ -311,6 +311,7 @@
                 <div class="space-y-3">
                     <input type="text" id="dr-rename-val" class="w-full bg-white/5 border border-white/10 px-6 py-4 text-sm font-bold outline-none focus:border-neon-blue uppercase" placeholder="New Name">
                     <button onclick="renameWriter()" class="w-full border border-white/10 py-4 font-black text-[10px] uppercase hover:bg-neon-blue/10 transition-all">Apply Identity Rewrite</button>
+                    <button onclick="openMigrateDrawer()" class="w-full bg-neon-purple/10 border border-neon-purple/30 py-4 font-black text-xs italic tracking-widest text-neon-purple uppercase hover:bg-neon-purple/20 transition-all">Migrate Identity</button>
                 </div>
             </div>
         </div>
@@ -804,6 +805,61 @@
         async function testComms(chatId) { const res = await api('/api/admin/broadcast', { targetGroups: [chatId], message: "System Ping: Connection Stable." }); if (res?.success) showToast("PING DELIVERED"); }
         function confirmLeaveGroup(chatId) { showConfirm(`TERMINATE NODE ${chatId.split('@')[0]}?`, async () => { const res = await api('/api/admin/groups/leave', { chatId }); if (res?.success) { showToast("NODE DISCONNECTED"); loadGroups(); } }); }
         async function renameWriter() { const name = document.getElementById('dr-rename-val').value; if (!name) return; const res = await api('/api/admin/update', { userId: selectedWriterId, type: 'name', name }); if (res?.success) { showToast("NAME REWRITTEN"); document.getElementById('dr-name').textContent = name; } }
+        
+        function openMigrateDrawer() {
+            if (!selectedWriterId) return;
+            const currentWriterName = document.getElementById('dr-name').textContent;
+            
+            const options = writersCache
+                .filter(w => w._id !== selectedWriterId)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(w => `<option value="${w._id}">${w.name} (${w._id.split('@')[0]})</option>`)
+                .join('');
+
+            if (!options) {
+                return showToast("No other writers available to merge with.", "error");
+            }
+
+            showModal(`
+                <h3 class="font-black italic text-xl mb-6 text-neon-purple uppercase">Migrate Writer Identity</h3>
+                <p class="text-[10px] font-black text-slate-500 mb-6 uppercase">
+                    Migrate all stats, streaks, badges, and history from <strong>${currentWriterName}</strong> into another writer's profile.
+                </p>
+                <div class="mb-8">
+                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-2">Target Profile</label>
+                    <select id="dr-migrate-target" class="w-full bg-void border border-white/10 p-4 text-xs font-bold text-slate-200 outline-none focus:border-neon-purple uppercase">
+                        ${options}
+                    </select>
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="closeModal()" class="flex-1 py-4 border border-white/10 font-black text-[10px] uppercase">Abort</button>
+                    <button onclick="executeMigration()" class="flex-1 py-4 bg-neon-purple text-void font-black italic uppercase">Execute Merge</button>
+                </div>
+            `);
+        }
+
+        async function executeMigration() {
+            const targetId = document.getElementById('dr-migrate-target').value;
+            if (!targetId) return showToast("Select target profile", "error");
+            
+            const oldName = document.getElementById('dr-name').textContent;
+            const selectEl = document.getElementById('dr-migrate-target');
+            const newName = selectEl.options[selectEl.selectedIndex].text.split(' (')[0];
+
+            showConfirm(`MERGE ${oldName} INTO ${newName}?\nThis action cannot be undone.`, async () => {
+                closeModal();
+                showToast("Merging profiles...", "info");
+                const res = await api('/api/admin/writers/merge', { oldUserId: selectedWriterId, newUserId: targetId });
+                if (res?.success) {
+                    showToast("IDENTITIES MERGED SUCCESSFULLY");
+                    closeDrawer();
+                    loadWritersGrid();
+                } else {
+                    showToast(res?.error || "MIGRATION FAILED", "error");
+                }
+            });
+        }
+
         async function toggleBan(userId, isBanned) { const res = await api('/api/admin/ban', { userId, action: isBanned ? 'unban' : 'ban' }); if (res?.success) { showToast(isBanned ? "NODE UNBLOCKED" : "NODE BLOCKED"); openWriterDrawer(userId); loadWritersGrid(); } }
         function openFreezeGrant() { showModal(`<h3 class="font-black italic text-xl mb-6 text-neon-blue uppercase">Grant Freeze</h3><input type="number" id="mod-freeze-val" value="1" min="1" class="w-full bg-void border border-white/10 p-6 rounded text-center text-3xl font-mono mb-8 outline-none focus:border-neon-blue"><div class="flex gap-4"><button onclick="closeModal()" class="flex-1 py-4 border border-white/10 font-black text-[10px] uppercase">Abort</button><button onclick="grantFreeze()" class="flex-1 py-4 bg-neon-blue text-void font-black italic uppercase">Confirm</button></div>`); }
         async function grantFreeze() { const amount = document.getElementById('mod-freeze-val').value; const res = await api('/api/admin/writers/freeze', { userId: selectedWriterId, amount }); if (res?.success) { showToast(`GRANTED ${amount} FREEZES`); closeModal(); } }

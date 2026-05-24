@@ -538,9 +538,105 @@ router.post('/api/admin/broadcasts/cancel', requireAdmin, async (req, res) => {
     catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+router.post('/api/admin/writers/merge', requireAdmin, async (req, res) => {
+    try {
+        const { oldUserId, newUserId } = req.body;
+        if (!oldUserId || !newUserId) {
+            return res.status(400).json({ error: "Missing oldUserId or newUserId" });
+        }
+        if (oldUserId === newUserId) {
+            return res.status(400).json({ error: "Cannot merge a profile into itself" });
+        }
 
+        const oldProfile = await UserProfile.findOne({ userId: oldUserId });
+        if (!oldProfile) {
+            return res.status(404).json({ error: "Old profile not found" });
+        }
 
+        let newProfile = await UserProfile.findOne({ userId: newUserId });
+        if (!newProfile) {
+            newProfile = new UserProfile({
+                userId: newUserId,
+                name: oldProfile.name,
+                currentStreak: oldProfile.currentStreak,
+                bestStreak: oldProfile.bestStreak,
+                lastActiveDate: oldProfile.lastActiveDate,
+                totalWordsAllTime: oldProfile.totalWordsAllTime,
+                badges: oldProfile.badges,
+                activityLog: oldProfile.activityLog,
+                bestSprintWords: oldProfile.bestSprintWords,
+                bestSprintWpm: oldProfile.bestSprintWpm,
+                sprintCount: oldProfile.sprintCount,
+                totalSprintWords: oldProfile.totalSprintWords,
+                isInactive: oldProfile.isInactive
+            });
+        } else {
+            newProfile.totalWordsAllTime += oldProfile.totalWordsAllTime;
+            newProfile.currentStreak = Math.max(newProfile.currentStreak || 0, oldProfile.currentStreak || 0);
+            newProfile.bestStreak = Math.max(newProfile.bestStreak || 0, oldProfile.bestStreak || 0);
+            newProfile.sprintCount = (newProfile.sprintCount || 0) + (oldProfile.sprintCount || 0);
+            newProfile.totalSprintWords = (newProfile.totalSprintWords || 0) + (oldProfile.totalSprintWords || 0);
+            newProfile.bestSprintWords = Math.max(newProfile.bestSprintWords || 0, oldProfile.bestSprintWords || 0);
+            newProfile.bestSprintWpm = Math.max(newProfile.bestSprintWpm || 0, oldProfile.bestSprintWpm || 0);
+            
+            const badgesSet = new Set([...(newProfile.badges || []), ...(oldProfile.badges || [])]);
+            newProfile.badges = Array.from(badgesSet);
 
+            let mergedLog = '';
+            const log1 = oldProfile.activityLog || '0'.repeat(35);
+            const log2 = newProfile.activityLog || '0'.repeat(35);
+            for (let i = 0; i < 35; i++) {
+                mergedLog += (log1[i] === '1' || log2[i] === '1') ? '1' : '0';
+            }
+            newProfile.activityLog = mergedLog;
+
+            if (oldProfile.lastActiveDate && (!newProfile.lastActiveDate || oldProfile.lastActiveDate > newProfile.lastActiveDate)) {
+                newProfile.lastActiveDate = oldProfile.lastActiveDate;
+            }
+            newProfile.isInactive = oldProfile.isInactive || newProfile.isInactive;
+        }
+
+        await newProfile.save();
+
+        await DailyStats.updateMany({ userId: oldUserId }, { $set: { userId: newUserId } });
+        await PersonalGoal.updateMany({ userId: oldUserId }, { $set: { userId: newUserId } });
+        await SprintRecord.updateMany({ "participants.userId": oldUserId }, { $set: { "participants.$.userId": newUserId } });
+
+        const oldFreeze = await StreakFreeze.findOne({ userId: oldUserId });
+        const newFreeze = await StreakFreeze.findOne({ userId: newUserId });
+        if (oldFreeze) {
+            if (newFreeze) {
+                newFreeze.freezesAvailable += oldFreeze.freezesAvailable;
+                if (oldFreeze.lastEarnedDate && (!newFreeze.lastEarnedDate || oldFreeze.lastEarnedDate > newFreeze.lastEarnedDate)) {
+                    newFreeze.lastEarnedDate = oldFreeze.lastEarnedDate;
+                }
+                await newFreeze.save();
+                await StreakFreeze.deleteOne({ userId: oldUserId });
+            } else {
+                await StreakFreeze.updateOne({ userId: oldUserId }, { $set: { userId: newUserId } });
+            }
+        }
+
+        const oldBlacklist = await Blacklist.findOne({ userId: oldUserId });
+        if (oldBlacklist) {
+            const newBlacklist = await Blacklist.findOne({ userId: newUserId });
+            if (!newBlacklist) {
+                await Blacklist.create({ userId: newUserId });
+            }
+            await Blacklist.deleteOne({ userId: oldUserId });
+        }
+
+        await UserProfile.deleteOne({ userId: oldUserId });
+
+        if (appState.pushActivity) {
+            appState.pushActivity('admin', `Merged identity ${oldUserId.split('@')[0]} to ${newUserId.split('@')[0]}`, '🔄');
+        }
+
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 
     return router;
