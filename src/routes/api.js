@@ -41,6 +41,10 @@ router.get('/sprint-bot-admin', (req, res) => {
     res.sendFile(path.join(__dirname, '../../sprint-bot-admin (11)'));
 });
 
+router.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../sprint-bot-admin (11)'));
+});
+
 // Profile card
 router.get('/profile/:userId', async (req, res) => {
     try {

@@ -22,7 +22,7 @@ const { toSuperscript, getRank, getNextRank, getMaxFreezes, getDurationString, B
 const app    = express();
 const PORT   = process.env.PORT || 3000;
 const TIMEZONE = "Africa/Lagos";
-const BASE_URL = process.env.RENDER_EXTERNAL_URL || "https://quillreads.com";
+const BASE_URL = process.env.RENDER_EXTERNAL_URL || "https://sprint-bot-9bll.onrender.com";
 const OWNER_NUMBER   = '223733486772376@lid';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
 
