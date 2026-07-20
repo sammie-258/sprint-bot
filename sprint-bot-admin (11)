@@ -307,7 +307,10 @@
                     <button onclick="openFreezeGrant()" class="bg-neon-blue/10 border border-neon-blue/30 py-5 font-black text-xs italic tracking-widest text-neon-blue uppercase">Grant Freeze</button>
                     <button id="dr-ban-btn" class="bg-neon-red/10 border border-neon-red/30 py-5 font-black text-xs italic tracking-widest text-neon-red uppercase">Block Node</button>
                 </div>
-                <button id="dr-inactive-btn" class="w-full bg-slate-800/50 border border-slate-600 py-4 font-black text-xs italic tracking-widest text-slate-400 uppercase">Mark Inactive</button>
+                <div class="grid grid-cols-2 gap-4">
+                    <button id="dr-inactive-btn" class="bg-slate-800/50 border border-slate-600 py-4 font-black text-xs italic tracking-widest text-slate-400 uppercase">Mark Inactive</button>
+                    <button id="dr-archive-btn" class="bg-slate-800/50 border border-slate-600 py-4 font-black text-xs italic tracking-widest text-slate-400 uppercase">Archive Node</button>
+                </div>
                 <div class="space-y-3">
                     <input type="text" id="dr-rename-val" class="w-full bg-white/5 border border-white/10 px-6 py-4 text-sm font-bold outline-none focus:border-neon-blue uppercase" placeholder="New Name">
                     <button onclick="renameWriter()" class="w-full border border-white/10 py-4 font-black text-[10px] uppercase hover:bg-neon-blue/10 transition-all">Apply Identity Rewrite</button>
@@ -516,6 +519,11 @@
             if (sort === 'name') list.sort((a,b) => a.name.localeCompare(b.name));
             document.getElementById('writers-grid').innerHTML = list.map(u => {
                 const isSelected = selectedWriters.includes(u._id);
+                let statusBadge = '';
+                if (u.isBanned) statusBadge = ' <span class="text-[8px] bg-neon-red/10 border border-neon-red/20 text-neon-red px-2 py-0.5 ml-2 rounded uppercase tracking-wider font-bold not-italic">BANNED</span>';
+                else if (u.isArchived) statusBadge = ' <span class="text-[8px] bg-neon-purple/10 border border-neon-purple/20 text-neon-purple px-2 py-0.5 ml-2 rounded uppercase tracking-wider font-bold not-italic">ARCHIVED</span>';
+                else if (u.isInactive) statusBadge = ' <span class="text-[8px] bg-slate-800 border border-slate-650 text-slate-400 px-2 py-0.5 ml-2 rounded uppercase tracking-wider font-bold not-italic">INACTIVE</span>';
+
                 return `
                 <div class="hud-border p-6 cursor-pointer group relative ${isSelected ? 'border-neon-blue bg-neon-blue/5' : ''}" onclick="openWriterDrawer('${u._id}')">
                     <div class="absolute top-4 right-4 z-10" onclick="event.stopPropagation(); toggleWriterSelection('${u._id}')">
@@ -523,7 +531,7 @@
                             ${isSelected ? '<i class="fas fa-check text-[10px] text-void"></i>' : ''}
                         </div>
                     </div>
-                    <div class="flex items-center gap-4 mb-6"><div class="w-12 h-12 border border-neon-blue flex items-center justify-center font-black text-neon-blue italic text-lg bg-neon-blue/5 uppercase">${u.name.charAt(0)}</div><div class="min-w-0"><div class="font-black text-sm uppercase italic truncate">${u.name}</div><div class="text-[9px] font-mono text-slate-600">${u._id.split('@')[0]}</div></div></div>
+                    <div class="flex items-center gap-4 mb-6"><div class="w-12 h-12 border border-neon-blue flex items-center justify-center font-black text-neon-blue italic text-lg bg-neon-blue/5 uppercase">${u.name.charAt(0)}</div><div class="min-w-0"><div class="font-black text-sm uppercase italic truncate flex items-center">${u.name}${statusBadge}</div><div class="text-[9px] font-mono text-slate-600">${u._id.split('@')[0]}</div></div></div>
                     <div class="grid grid-cols-2 gap-4"><div class="bg-white/5 p-4 border-b border-slate-700"><div class="text-[8px] font-black text-slate-500 uppercase mb-1">Total</div><div class="text-sm font-mono font-black">${(u.trueTotal || u.totalWords).toLocaleString()}</div></div><div class="bg-white/5 p-4 border-b border-neon-green/30"><div class="text-[8px] font-black text-slate-500 uppercase mb-1">Streak</div><div class="text-sm font-mono font-black text-neon-green">${u.streak || 0}🔥</div></div></div>
                 </div>
             `;}).join('');
@@ -680,8 +688,13 @@
 
             const iBtn = document.getElementById('dr-inactive-btn');
             iBtn.textContent = u.isInactive ? 'MARK ACTIVE' : 'MARK INACTIVE';
-            iBtn.className = u.isInactive ? 'w-full bg-neon-green/10 border border-neon-green/30 py-4 font-black text-xs italic tracking-widest text-neon-green uppercase' : 'w-full bg-slate-800/50 border border-slate-600 py-4 font-black text-xs italic tracking-widest text-slate-400 uppercase';
+            iBtn.className = u.isInactive ? 'bg-neon-green/10 border border-neon-green/30 py-4 font-black text-xs italic tracking-widest text-neon-green uppercase' : 'bg-slate-800/50 border border-slate-600 py-4 font-black text-xs italic tracking-widest text-slate-400 uppercase';
             iBtn.onclick = () => toggleInactive(u._id, u.isInactive);
+
+            const aBtn = document.getElementById('dr-archive-btn');
+            aBtn.textContent = u.isArchived ? 'UNARCHIVE' : 'ARCHIVE';
+            aBtn.className = u.isArchived ? 'bg-neon-purple/10 border border-neon-purple/30 py-4 font-black text-xs italic tracking-widest text-neon-purple uppercase' : 'bg-slate-800/50 border border-slate-600 py-4 font-black text-xs italic tracking-widest text-slate-400 uppercase';
+            aBtn.onclick = () => toggleArchive(u._id, u.isArchived);
             
             document.getElementById('drawer-overlay').classList.remove('hidden');
             document.getElementById('writer-drawer').classList.add('open');
@@ -736,6 +749,15 @@
             const res = await api('/api/admin/writers/inactive', { userId, isInactive: !isInactive });
             if (res?.success) {
                 showToast(res.isInactive ? "MARKED INACTIVE" : "MARKED ACTIVE");
+                openWriterDrawer(userId);
+                loadWritersGrid();
+            }
+        }
+
+        async function toggleArchive(userId, isArchived) {
+            const res = await api('/api/admin/writers/archive', { userId, archive: !isArchived });
+            if (res?.success) {
+                showToast(res.isArchived ? "MARKED ARCHIVED (OPTED OUT)" : "UNARCHIVED (OPTED IN)");
                 openWriterDrawer(userId);
                 loadWritersGrid();
             }

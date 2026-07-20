@@ -76,7 +76,8 @@ module.exports = function(appState) {
             const atRiskProfiles = await UserProfile.find({ 
                 currentStreak: { $gt: 0 },
                 lastActiveDate: { $ne: today }, // Haven't updated streak today
-                isInactive: { $ne: true }       // Skip inactive writers
+                isInactive: { $ne: true },      // Skip inactive writers
+                isArchived: { $ne: true }       // Skip archived writers
             });
 
             console.log(`🔥 Streak Reminder: Checking ${atRiskProfiles.length} potential authors...`);
@@ -246,7 +247,7 @@ module.exports = function(appState) {
                 return d.toLocaleDateString('en-CA', { timeZone: TIMEZONE }); 
             })();
 
-            const allProfiles = await UserProfile.find({ currentStreak: { $gt: 0 } });
+            const allProfiles = await UserProfile.find({ currentStreak: { $gt: 0 }, isArchived: { $ne: true } });
             const activeYest  = new Set(await DailyStats.distinct("userId", { date: yesterday }));
 
             console.log(`🛡️ Freeze Processor: Checking streaks for ${allProfiles.length} users...`);
@@ -277,6 +278,11 @@ module.exports = function(appState) {
                         }
                     }
                 } else {
+                    // Manual freeze check: if they manual-froze or wrote today, lastActiveDate is already yesterday or today
+                    if (profile.lastActiveDate === yesterday || profile.lastActiveDate === today) {
+                        continue;
+                    }
+
                     // Missed yesterday — auto-burn freeze
                     const freeze = await StreakFreeze.findOne({ userId: profile.userId });
                     if (freeze && freeze.freezesAvailable > 0) {
@@ -288,11 +294,15 @@ module.exports = function(appState) {
                             const recent = await DailyStats.findOne({ userId: profile.userId }).sort({ timestamp: -1 });
                             if (recent?.groupId) {
                                 await appState.sock.sendMessage(recent.groupId, {
-                                    text: `🛡️ *FREEZE AUTO-USED!*\n\n@${profile.userId.split('@')[0]}, a freeze protected your *${profile.currentStreak}-day streak!*\n${freeze.freezesAvailable} freeze${freeze.freezesAvailable !== 1 ? 's' : ''} remaining.`,
+                                    text: `🛡️ *FREEZE AUTO-USED!* \n\n@${profile.userId.split('@')[0]}, a freeze protected your *${profile.currentStreak}-day streak!*\n${freeze.freezesAvailable} freeze${freeze.freezesAvailable !== 1 ? 's' : ''} remaining.`,
                                     mentions: [profile.userId]
                                 });
                             }
                         } catch (e) {}
+                    } else {
+                        // NO FREEZES LEFT — Streak is broken! Reset to 0
+                        profile.currentStreak = 0;
+                        await profile.save();
                     }
                 }
             }

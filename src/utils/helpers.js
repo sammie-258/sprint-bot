@@ -4,6 +4,9 @@ const toSuperscript = (num) => {
 };
 
 const getRank = (total) => {
+    if (total >= 20000000) return "Cosmic Creator 🌌";
+    if (total >= 10000000) return "Mythic Wordsmith 👑";
+    if (total >= 5000000)  return "Legendary Scribe 🌟";
     if (total >= 1000000) return "Novel God ⚡";
     if (total >= 500000)  return "Word Expert 🎓";
     if (total >= 250000)  return "Word Architect 🏗️";
@@ -14,23 +17,24 @@ const getRank = (total) => {
 };
 
 const getNextRank = (total) => {
-    if (total < 10000)   return { name: "Aspiring Author ✍️", threshold: 10000 };
-    if (total < 50000)   return { name: "Novelist 📘",         threshold: 50000 };
-    if (total < 100000)  return { name: "Prolific Writer 📚",  threshold: 100000 };
-    if (total < 250000)  return { name: "Word Architect 🏗️",  threshold: 250000 };
-    if (total < 500000)  return { name: "Word Expert 🎓",      threshold: 500000 };
-    if (total < 1000000) return { name: "Novel God ⚡",         threshold: 1000000 };
+    if (total < 10000)    return { name: "Aspiring Author ✍️", threshold: 10000 };
+    if (total < 50000)    return { name: "Novelist 📘",         threshold: 50000 };
+    if (total < 100000)   return { name: "Prolific Writer 📚",  threshold: 100000 };
+    if (total < 250000)   return { name: "Word Architect 🏗️",  threshold: 250000 };
+    if (total < 500000)   return { name: "Word Expert 🎓",      threshold: 500000 };
+    if (total < 1000000)  return { name: "Novel God ⚡",         threshold: 1000000 };
+    if (total < 5000000)  return { name: "Legendary Scribe 🌟",  threshold: 5000000 };
+    if (total < 10000000) return { name: "Mythic Wordsmith 👑",  threshold: 10000000 };
+    if (total < 20000000) return { name: "Cosmic Creator 🌌",  threshold: 20000000 };
     return null;
 };
 
 // Max streak freezes by rank
 const getMaxFreezes = (rank) => {
-    if (rank === "Novel God ⚡")        return 5;
-    if (rank === "Word Expert 🎓")      return 3;
-    if (rank === "Word Architect 🏗️")  return 3;
-    if (rank === "Prolific Writer 📚")  return 2;
-    if (rank === "Novelist 📘")         return 2;
-    if (rank === "Aspiring Author ✍️")  return 1;
+    if (rank === "Cosmic Creator 🌌" || rank === "Mythic Wordsmith 👑" || rank === "Legendary Scribe 🌟" || rank === "Novel God ⚡") return 5;
+    if (rank === "Word Expert 🎓" || rank === "Word Architect 🏗️") return 3;
+    if (rank === "Prolific Writer 📚" || rank === "Novelist 📘") return 2;
+    if (rank === "Aspiring Author ✍️") return 1;
     return 0; // Unranked gets 0
 };
 
@@ -54,6 +58,10 @@ const BADGE_DEFS = [
     { key: 'words_250k',    icon: '🏗️',  label: '250K Club',      desc: 'Wrote 250,000 total words' },
     { key: 'words_500k',    icon: '🎓',  label: '500K Club',      desc: 'Wrote 500,000 total words' },
     { key: 'novel_god',     icon: '⚡',  label: 'Novel God',      desc: 'Reached 1,000,000 words' },
+    { key: 'words_5m',      icon: '🌟',  label: '5M Club',        desc: 'Wrote 5,000,000 total words' },
+    { key: 'words_10m',     icon: '👑',  label: '10M Club',       desc: 'Wrote 10,000,000 total words' },
+    { key: 'words_20m',     icon: '🌌',  label: '20M Club',       desc: 'Wrote 20,000,000 total words' },
+    { key: 'bot_anniversary', icon: '🎂', label: 'Bot Anniversary', desc: '1 year of using the bot' },
     { key: 'challenge_mvp', icon: '🏆',  label: 'Challenge MVP',  desc: 'Top contributor in a challenge' },
     { key: 'daily_first',   icon: '🥇',  label: 'Daily Champ',    desc: 'Topped the daily leaderboard' },
     { key: 'duel_win',      icon: '⚔️',  label: 'Duelist',        desc: 'Won a word duel' },

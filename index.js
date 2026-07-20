@@ -202,6 +202,15 @@ mongoose.connect(MONGO_URI).then(async () => {
         if (t >= 250000) await awardBadge(profile, 'words_250k', groupId);
         if (t >= 500000) await awardBadge(profile, 'words_500k', groupId);
         if (t >= 1000000) await awardBadge(profile, 'novel_god', groupId);
+        if (t >= 5000000)  await awardBadge(profile, 'words_5m',  groupId);
+        if (t >= 10000000) await awardBadge(profile, 'words_10m', groupId);
+        if (t >= 20000000) await awardBadge(profile, 'words_20m', groupId);
+
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        if (profile.joinedAt && profile.joinedAt <= oneYearAgo) {
+            await awardBadge(profile, 'bot_anniversary', groupId);
+        }
     };
 
     // =======================
@@ -306,25 +315,26 @@ mongoose.connect(MONGO_URI).then(async () => {
     const startSprintSession = async (chatId, duration) => {
         if (activeSprints[chatId]) return false;
         const endTime = Date.now() + duration * 60000;
-        activeSprints[chatId] = { duration, endsAt: endTime, participants: {} };
-        await ActiveSprint.create({ groupId: chatId, duration, endsAt: endTime, participants: {} });
-        await sock.sendMessage(chatId, { text: `🏃 *Writing Sprint Started!*\nDuration: *${duration} minutes*\n\nUse *!wc <number>* to log words.` });
-
-        // 5-minute warning
+        
+        let warningTimer = null;
         if (duration > 5) {
-            setTimeout(async () => {
+            warningTimer = setTimeout(async () => {
                 if (activeSprints[chatId]) { // Only send if sprint is still active
                     try { await sock.sendMessage(chatId, { text: `⏰ *5 MINUTES LEFT!*\n\nWrap up your thoughts — the sprint ends soon!\nGet ready to submit with *!wc [number]* 🖊️` }); } catch (e) {}
                 }
             }, (duration - 5) * 60000);
         }
 
-        // End-of-sprint message
-        setTimeout(async () => {
+        const endTimer = setTimeout(async () => {
             if (activeSprints[chatId]) {
                 try { await sock.sendMessage(chatId, { text: `🛑 *TIME'S UP!*\n\nSubmit with *!wc [number]* now.\nType *!finish* to see results.` }); } catch (e) {}
             }
         }, duration * 60000);
+
+        activeSprints[chatId] = { duration, endsAt: endTime, participants: {}, warningTimer, endTimer };
+        await ActiveSprint.create({ groupId: chatId, duration, endsAt: endTime, participants: {} });
+        await sock.sendMessage(chatId, { text: `🏃 *Writing Sprint Started!*\nDuration: *${duration} minutes*\n\nUse *!wc <number>* to log words.` });
+        
         pushActivity('sprint', `Sprint started in ${groupCache[chatId]?.subject || chatId}`, '🏃');
         return true;
     };
@@ -335,6 +345,10 @@ mongoose.connect(MONGO_URI).then(async () => {
     const finishSprint = async (chatId, todayStr) => {
         const s = activeSprints[chatId];
         if (!s) return null;
+
+        if (s.warningTimer) clearTimeout(s.warningTimer);
+        if (s.endTimer) clearTimeout(s.endTimer);
+
         const l = Object.entries(s.participants).map(([u, d]) => ({ ...d, uid: u })).sort((a, b) => b.words - a.words);
         delete activeSprints[chatId];
         await ActiveSprint.deleteOne({ groupId: chatId });
@@ -352,7 +366,7 @@ mongoose.connect(MONGO_URI).then(async () => {
             const p   = l[i];
             const wpm = Math.round(p.words / s.duration);
             mentions.push(p.uid);
-            txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎖️'} @${p.uid.split('@')[0]}: ${p.words.toLocaleString()} words (${wpm} WPM)\n`;
+            txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.'} @${p.uid.split('@')[0]}: ${p.words.toLocaleString()} words (${wpm} WPM)\n`;
             sprintParticipants.push({ userId: p.uid, name: p.name, words: p.words, wpm });
 
             try {

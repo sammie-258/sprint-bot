@@ -187,7 +187,10 @@ router.get('/api/admin/sprints', requireAdmin, async (req, res) => {
 
 router.post('/api/admin/sprints/stop', requireAdmin, async (req, res) => {
     const { chatId } = req.body;
-    if (appState.activeSprints[chatId]) {
+    const sprint = appState.activeSprints[chatId];
+    if (sprint) {
+        if (sprint.warningTimer) clearTimeout(sprint.warningTimer);
+        if (sprint.endTimer) clearTimeout(sprint.endTimer);
         delete appState.activeSprints[chatId];
         await ActiveSprint.deleteOne({ groupId: chatId });
         try { if (appState.sock && appState.isConnected) await appState.sock.sendMessage(chatId, { text: "🛑 *ADMIN STOP*: Sprint cancelled by Admin." }); } catch(e) {}
@@ -229,19 +232,22 @@ router.post('/api/admin/search', requireAdmin, async (req, res) => {
         if (exact) filter = { userId: query };
 
         const profiles = await UserProfile.find(filter);
-        const enriched = await Promise.all(profiles.map(async p => {
-            const isBanned = await Blacklist.exists({ userId: p.userId });
-            return {
-                _id: p.userId, name: p.name,
-                totalWords: p.totalWordsAllTime, lastActive: p.lastActiveDate,
-                rank: getRank(p.totalWordsAllTime), streak: p.currentStreak,
-                bestStreak: p.bestStreak, trueTotal: p.totalWordsAllTime,
-                isBanned: !!isBanned,
-                isInactive: !!p.isInactive,
-                badges: p.badges || [],
-                bestSprintWords: p.bestSprintWords, bestSprintWpm: p.bestSprintWpm,
-                sprintCount: p.sprintCount, activityLog: p.activityLog
-            };
+        const blacklisted = new Set(
+            (await Blacklist.find({ userId: { $in: profiles.map(p => p.userId) } }, 'userId'))
+            .map(b => b.userId)
+        );
+
+        const enriched = profiles.map(p => ({
+            _id: p.userId, name: p.name,
+            totalWords: p.totalWordsAllTime, lastActive: p.lastActiveDate,
+            rank: getRank(p.totalWordsAllTime), streak: p.currentStreak,
+            bestStreak: p.bestStreak, trueTotal: p.totalWordsAllTime,
+            isBanned: blacklisted.has(p.userId),
+            isInactive: !!p.isInactive,
+            isArchived: !!p.isArchived,
+            badges: p.badges || [],
+            bestSprintWords: p.bestSprintWords, bestSprintWpm: p.bestSprintWpm,
+            sprintCount: p.sprintCount, activityLog: p.activityLog
         }));
         res.json(enriched);
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -319,6 +325,14 @@ router.post('/api/admin/writers/inactive', requireAdmin, async (req, res) => {
     try {
         await UserProfile.findOneAndUpdate({ userId }, { isInactive });
         res.json({ success: true, isInactive });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/writers/archive', requireAdmin, async (req, res) => {
+    const { userId, archive } = req.body;
+    try {
+        const profile = await UserProfile.findOneAndUpdate({ userId }, { isArchived: !!archive }, { new: true });
+        res.json({ success: true, isArchived: profile.isArchived });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

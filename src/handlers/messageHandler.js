@@ -57,6 +57,9 @@ module.exports = async function(m, appState) {
 
                 if (await Blacklist.exists({ userId: senderId })) return;
 
+                const senderProfile = await UserProfile.findOne({ userId: senderId });
+                if (senderProfile && senderProfile.isArchived) return;
+
                 // Rate limit
                 if (!checkRateLimit(senderId)) return;
 
@@ -379,8 +382,9 @@ module.exports = async function(m, appState) {
                             await sock.sendMessage(chatId, { text: txt, mentions: [finalDuel.challenger, finalDuel.opponent] });
                             pushActivity('duel', `Duel ended in ${groupCache[chatId]?.subject || chatId}`, '⚔️');
                         }, 5 * 60000); // 5 minutes later
-                        
+                        duel.graceTimer = graceTimer;
                     }, duration * 60000);
+                    activeDuels[chatId].timer = timer;
                 }
 
                 // ── !WC ─────────────────────────────────────────────────────────────
@@ -428,7 +432,7 @@ module.exports = async function(m, appState) {
                         } else {
                             const round = pomo.totalRounds - pomo.roundsLeft + 1;
                             await sock.sendMessage(chatId, { text: `☕ *Break Time!* ${pomo.breakTime} minutes.\nRound ${round}/${pomo.totalRounds} starts after.` });
-                            setTimeout(async () => {
+                            const breakTimer = setTimeout(async () => {
                                 if (activePomodoros[chatId]) {
                                     await sock.sendMessage(chatId, {
                                         text: `🍅 *Break Over!* Round ${round}/${pomo.totalRounds} starting NOW! ${pomo.lastParticipants.map(id => '@' + id.split('@')[0]).join(' ')}`,
@@ -437,6 +441,7 @@ module.exports = async function(m, appState) {
                                     await startSprintSession(chatId, pomo.sprintTime);
                                 }
                             }, pomo.breakTime * 60000);
+                            pomo.breakTimer = breakTimer;
                         }
                     }
                 }
@@ -449,7 +454,7 @@ module.exports = async function(m, appState) {
                     ]);
                     if (!top.length) return sock.sendMessage(chatId, { text: "📉 No data." }, { quoted: msg });
                     let txt = `🌎 *ALL-TIME HALL OF FAME*\n\n`;
-                    top.forEach((w, i) => { txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎖️'} ${w._id}: ${w.total.toLocaleString()} words\n`; });
+                    top.forEach((w, i) => { txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.'} ${w._id}: ${w.total.toLocaleString()} words\n`; });
                     await sock.sendMessage(chatId, { text: txt });
                 }
 
@@ -688,12 +693,44 @@ module.exports = async function(m, appState) {
                     return sock.sendMessage(chatId, { text: `⏳ *${label}:* ${Math.floor(r / 60000)}m ${Math.floor((r / 1000) % 60)}s remaining\n*(Ends at ~${endStr} GMT+1)*` }, { quoted: msg });
                 }
 
+                // ── !OPTOUT ──────────────────────────────────────────────────────────
+                if (command === "!optout") {
+                    let profile = await UserProfile.findOne({ userId: senderId });
+                    if (!profile) {
+                        return sock.sendMessage(chatId, { text: "❌ Profile not found." }, { quoted: msg });
+                    }
+                    if (profile.isArchived) {
+                        return sock.sendMessage(chatId, { text: "⚠️ Your profile is already archived." }, { quoted: msg });
+                    }
+                    profile.isArchived = true;
+                    await profile.save();
+                    return sock.sendMessage(chatId, { text: `✅ Your profile has been archived. You will no longer receive reminders, notifications, or automatic freezes. Contact an admin if you wish to reactivate.` }, { quoted: msg });
+                }
+
                 // ── !CANCEL ─────────────────────────────────────────────────────────
                 if (command === "!cancel" || command === "!stop") {
                     let txt = "";
-                    if (activeSprints[chatId])   { delete activeSprints[chatId]; await ActiveSprint.deleteOne({ groupId: chatId }); txt += "🚫 Sprint cancelled.\n"; }
-                    if (activePomodoros[chatId]) { delete activePomodoros[chatId]; txt += "🚫 Pomodoro cancelled.\n"; }
-                    if (activeDuels[chatId])     { delete activeDuels[chatId]; txt += "🚫 Duel cancelled."; }
+                    if (activeSprints[chatId]) {
+                        const sprint = activeSprints[chatId];
+                        if (sprint.warningTimer) clearTimeout(sprint.warningTimer);
+                        if (sprint.endTimer) clearTimeout(sprint.endTimer);
+                        delete activeSprints[chatId];
+                        await ActiveSprint.deleteOne({ groupId: chatId });
+                        txt += "🚫 Sprint cancelled.\n";
+                    }
+                    if (activePomodoros[chatId]) {
+                        const pomo = activePomodoros[chatId];
+                        if (pomo.breakTimer) clearTimeout(pomo.breakTimer);
+                        delete activePomodoros[chatId];
+                        txt += "🚫 Pomodoro cancelled.\n";
+                    }
+                    if (activeDuels[chatId]) {
+                        const duel = activeDuels[chatId];
+                        if (duel.timer) clearTimeout(duel.timer);
+                        if (duel.graceTimer) clearTimeout(duel.graceTimer);
+                        delete activeDuels[chatId];
+                        txt += "🚫 Duel cancelled.";
+                    }
                     if (!txt) txt = "💤 Nothing to cancel.";
                     await sock.sendMessage(chatId, { text: txt.trim() }, { quoted: msg });
                 }
