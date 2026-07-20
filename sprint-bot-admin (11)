@@ -189,6 +189,7 @@
                         <div class="relative flex-1"><i class="fas fa-search absolute left-6 top-5 text-slate-500"></i><input type="text" id="writer-search" onkeyup="searchWriters(this.value)" class="w-full bg-white/5 border border-white/10 pl-14 pr-6 py-5 rounded font-black italic uppercase tracking-widest text-sm outline-none focus:border-neon-blue" placeholder="SCAN DATABASE..."></div>
                         <div class="flex gap-4">
                             <button onclick="selectAllWriters()" class="bg-white/5 border border-white/10 px-8 py-5 font-black text-xs uppercase tracking-widest hover:border-neon-blue transition-all">Select All</button>
+                            <select id="writer-filter" onchange="loadWritersGrid()" class="bg-void border border-white/10 px-8 py-5 font-black text-xs uppercase tracking-widest outline-none"><option value="all">ALL NODES</option><option value="active">ACTIVE ONLY</option><option value="inactive">INACTIVE ONLY</option><option value="archived">ARCHIVED ONLY</option><option value="banned">BLOCKED ONLY</option></select>
                             <select id="writer-sort" onchange="loadWritersGrid()" class="bg-void border border-white/10 px-8 py-5 font-black text-xs uppercase tracking-widest outline-none"><option value="recent">RECENT</option><option value="words">WORDS</option><option value="name">NAME</option></select>
                         </div>
                     </div>
@@ -512,9 +513,14 @@
         async function loadWritersGrid() {
             const query = document.getElementById('writer-search').value;
             const sort = document.getElementById('writer-sort').value;
+            const filter = document.getElementById('writer-filter').value;
             const data = await api('/api/admin/search', { query });
             writersCache = data || [];
             let list = [...writersCache];
+            if (filter === 'active') list = list.filter(u => !u.isArchived && !u.isInactive && !u.isBanned);
+            else if (filter === 'inactive') list = list.filter(u => u.isInactive);
+            else if (filter === 'archived') list = list.filter(u => u.isArchived);
+            else if (filter === 'banned') list = list.filter(u => u.isBanned);
             if (sort === 'words') list.sort((a,b) => b.totalWords - a.totalWords);
             if (sort === 'name') list.sort((a,b) => a.name.localeCompare(b.name));
             document.getElementById('writers-grid').innerHTML = list.map(u => {
