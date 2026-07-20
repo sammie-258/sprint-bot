@@ -31,14 +31,14 @@ module.exports = function(appState) {
     const router = express.Router();
     
 
-router.get('/', (req, res) => res.redirect('https://quillreads.com/sprint-bot-dashboard'));
-
-router.get('/sprint-bot-admin', (req, res) => {
-    res.sendFile(path.join(__dirname, '../../sprint-bot-admin (11)'));
-});
+router.get('/', (req, res) => res.redirect('/sprint-bot-dashboard'));
 
 router.get('/sprint-bot-dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, '../../sprint-bot-dashboard (2)'));
+});
+
+router.get('/sprint-bot-admin', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../sprint-bot-admin (11)'));
 });
 
 // Profile card

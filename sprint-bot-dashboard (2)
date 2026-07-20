@@ -162,10 +162,6 @@
                     <i class="fas fa-sync-alt text-sm"></i>
                 </button>
 
-                <a href="/sprint-bot-admin" class="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 text-gray-650 dark:text-gray-300 border border-gray-200 dark:border-slate-700 transition-transform hover:scale-105 active:scale-95 shadow-sm" title="Admin Portal">
-                    <i class="fas fa-user-shield text-sm"></i>
-                </a>
-
                 <button id="theme-toggle" class="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-yellow-400 border border-gray-200 dark:border-slate-700 transition-transform hover:scale-105 active:scale-95 shadow-sm">
                     <i class="fas fa-moon" id="theme-icon"></i>
                 </button>
