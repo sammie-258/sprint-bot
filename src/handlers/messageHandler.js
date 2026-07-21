@@ -159,6 +159,8 @@ module.exports = async function(m, appState) {
 
 🎯 *Goals*
 *!goal set 1000* → Set daily target
+*!goal update 5000* → Change target
+*!goal cancel* → Stop active goal
 *!goal check* → View progress
 *!goal history* → Past records
 
@@ -580,10 +582,40 @@ module.exports = async function(m, appState) {
                     const sub = args[1]?.toLowerCase();
                     if (sub === "set") {
                         const t = parseInt(args[2]);
-                        if (isNaN(t)) return sock.sendMessage(chatId, { text: "❌ Use: `!goal set 5000`" }, { quoted: msg });
+                        if (isNaN(t) || t <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!goal set 5000`" }, { quoted: msg });
                         await PersonalGoal.updateMany({ userId: senderId }, { isActive: false });
                         await PersonalGoal.create({ userId: senderId, name: senderName, target: t, current: 0 });
                         return sock.sendMessage(chatId, { text: `🎯 Goal set: *${t.toLocaleString()} words*\nYou've got this! 💪` }, { quoted: msg });
+                    }
+                    if (sub === "update" || sub === "edit" || sub === "change") {
+                        const t = parseInt(args[2]);
+                        if (isNaN(t) || t <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!goal update 5000`" }, { quoted: msg });
+                        const g = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+                        if (!g) return sock.sendMessage(chatId, { text: "❌ No active goal. Set one with `!goal set [number]`" }, { quoted: msg });
+                        g.target = t;
+                        if (g.current >= g.target) {
+                            g.isActive = false;
+                            g.completedAt = new Date();
+                            await g.save();
+                            return sock.sendMessage(chatId, {
+                                text: `🎉 *GOAL ACHIEVED!* 🏆\n\n@${senderId.split('@')[0]} smashed *${g.target.toLocaleString()} words*!\n⏱️ Completed in: ${getDurationString(g.startedAt)}\n\nSet a new one with *!goal set [number]* 🎯`,
+                                mentions: [senderId]
+                            }, { quoted: msg });
+                        }
+                        await g.save();
+                        const rawPct = (g.current / g.target) * 100;
+                        const pct    = Math.min(100, Math.max(0, rawPct));
+                        const bar    = "🟩".repeat(Math.round(pct / 10)) + "⬜".repeat(10 - Math.round(pct / 10));
+                        return sock.sendMessage(chatId, {
+                            text: `🎯 *Goal Updated!*\n👤 ${g.name}\nNew Target: *${g.target.toLocaleString()} words*\nProgress: \`${g.current.toLocaleString()} / ${g.target.toLocaleString()}\` (${rawPct.toFixed(1)}%)\n${bar}`
+                        }, { quoted: msg });
+                    }
+                    if (sub === "cancel" || sub === "stop" || sub === "delete") {
+                        const g = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+                        if (!g) return sock.sendMessage(chatId, { text: "❌ No active goal to cancel." }, { quoted: msg });
+                        g.isActive = false;
+                        await g.save();
+                        return sock.sendMessage(chatId, { text: `🚫 *Goal Cancelled.*\nYour target of *${g.target.toLocaleString()} words* has been cancelled.` }, { quoted: msg });
                     }
                     if (sub === "history") {
                         const history = await PersonalGoal.find({ userId: senderId, isActive: false }).sort({ _id: -1 }).limit(5);
