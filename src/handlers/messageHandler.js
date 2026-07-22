@@ -1,3 +1,4 @@
+const os             = require('os');
 const GroupMeta      = require('../models/GroupMeta');
 const DailyStats     = require('../models/DailyStats');
 const UserProfile    = require('../models/UserProfile');
@@ -94,6 +95,49 @@ module.exports = async function(m, appState) {
 
                 // ── OWNER COMMANDS ──────────────────────────────────────────────────
                 if (isOwner) {
+                    if (command === "!ping") {
+                        let msgTime = msg.messageTimestamp;
+                        if (msgTime && typeof msgTime === 'object' && 'low' in msgTime) msgTime = msgTime.low;
+                        const timeDiff = msgTime ? Math.max(0, Date.now() - Number(msgTime) * 1000) : 0;
+                        return sock.sendMessage(chatId, { 
+                            text: `🏓 *PONG!*\n\n⚡ Latency: *${timeDiff} ms*\n🟢 WhatsApp: *Connected*\n⚙️ Maintenance: *${maintenanceMode ? "ENABLED ⚠️" : "DISABLED ✅"}*` 
+                        }, { quoted: msg });
+                    }
+                    if (command === "!sys" || command === "!system") {
+                        const uptimeSec = process.uptime();
+                        const days = Math.floor(uptimeSec / 86400);
+                        const hours = Math.floor((uptimeSec % 86400) / 3600);
+                        const mins = Math.floor((uptimeSec % 3600) / 60);
+                        const secs = Math.floor(uptimeSec % 60);
+                        const uptimeStr = `${days ? days + 'd ' : ''}${hours ? hours + 'h ' : ''}${mins}m ${secs}s`;
+
+                        const mem = process.memoryUsage();
+                        const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
+                        const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
+                        const rssMB = Math.round(mem.rss / 1024 / 1024);
+                        const freeMemMB = Math.round(os.freemem() / 1024 / 1024);
+                        const totalMemMB = Math.round(os.totalmem() / 1024 / 1024);
+
+                        const activeSprintsCount = Object.keys(activeSprints || {}).length;
+                        const activeDuelsCount = Object.keys(activeDuels || {}).length;
+                        const activePomosCount = Object.keys(activePomodoros || {}).length;
+                        const groupCount = Object.keys(groupCache || {}).length;
+
+                        let txt = `🖥️ *SYSTEM HEALTH & METRICS*\n━━━━━━━━━━━━━━━━\n`;
+                        txt += `⏱️ *Uptime:* ${uptimeStr}\n`;
+                        txt += `💾 *Heap RAM:* ${heapUsedMB} MB / ${heapTotalMB} MB\n`;
+                        txt += `📦 *RSS RAM:* ${rssMB} MB\n`;
+                        txt += `🖥️ *System Memory:* ${freeMemMB} MB free / ${totalMemMB} MB\n`;
+                        txt += `🐧 *Platform:* ${os.platform()} (${os.arch()})\n\n`;
+                        txt += `📊 *Active Sessions:*\n`;
+                        txt += `• 🏃 Sprints: ${activeSprintsCount}\n`;
+                        txt += `• ⚔️ Duels: ${activeDuelsCount}\n`;
+                        txt += `• 🍅 Pomodoros: ${activePomosCount}\n`;
+                        txt += `• 👥 Cached Groups: ${groupCount}\n\n`;
+                        txt += `⚙️ *Maintenance Mode:* ${maintenanceMode ? "ENABLED ⚠️" : "DISABLED ✅"}`;
+
+                        return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
+                    }
                     if (command === "!broadcast") {
                         const message = args.slice(1).join(" ");
                         if (!message) return sock.sendMessage(chatId, { text: "❌ Empty." }, { quoted: msg });
