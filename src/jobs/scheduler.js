@@ -67,45 +67,72 @@ module.exports = function(appState) {
         if (!appState.isConnected || !appState.sock) return;
         try {
             const today = getTodayDateGMT1();
-            const lagos = getLagosDate();
-            const d = new Date(lagos); d.setDate(d.getDate() - 1);
-            const yesterday = d.toLocaleDateString('en-CA', { timeZone: TIMEZONE });
 
-            // Logic Fix: At risk = Anyone with a streak who hasn't logged words today
+            // At risk = Anyone with a streak who hasn't logged words today
             const activeToday = new Set(await DailyStats.distinct("userId", { date: today }));
-            const atRiskProfiles = await UserProfile.find({ 
+            const rawAtRiskProfiles = await UserProfile.find({ 
                 currentStreak: { $gt: 0 },
                 lastActiveDate: { $ne: today }, // Haven't updated streak today
                 isInactive: { $ne: true },      // Skip inactive writers
                 isArchived: { $ne: true }       // Skip archived writers
             });
 
-            console.log(`🔥 Streak Reminder: Checking ${atRiskProfiles.length} potential authors...`);
+            const atRiskProfiles = rawAtRiskProfiles.filter(p => !activeToday.has(p.userId));
+
+            console.log(`🔥 Streak Reminder: ${atRiskProfiles.length} authors at risk...`);
             pushActivity('system', `Running streak reminder for ${atRiskProfiles.length} authors`, '🔥');
 
+            if (!atRiskProfiles.length) return;
+
+            // Map each user to their most recent active group
+            const atRiskUserIds = atRiskProfiles.map(p => p.userId);
+            const recentStats = await DailyStats.aggregate([
+                { $match: { userId: { $in: atRiskUserIds } } },
+                { $sort: { timestamp: -1 } },
+                { $group: {
+                    _id: "$userId",
+                    groupId: { $first: "$groupId" }
+                }}
+            ]);
+
+            const userGroupMap = new Map();
+            recentStats.forEach(r => {
+                if (r.groupId && r.groupId !== "Manual_Correction") {
+                    userGroupMap.set(r._id, r.groupId);
+                }
+            });
+
             const groupsFromDB = await GroupMeta.find({}, 'groupId');
-            const groupIds = groupsFromDB.map(g => g.groupId);
+            const defaultGroup = groupsFromDB[0]?.groupId;
+
+            const groupAtRiskMap = new Map();
+            for (const profile of atRiskProfiles) {
+                const targetGroup = userGroupMap.get(profile.userId) || defaultGroup;
+                if (!targetGroup) continue;
+                if (!groupAtRiskMap.has(targetGroup)) {
+                    groupAtRiskMap.set(targetGroup, []);
+                }
+                groupAtRiskMap.get(targetGroup).push(profile);
+            }
 
             let sentCount = 0;
-            for (const profile of atRiskProfiles) {
-                // Double check they didn't just log something 
-                if (activeToday.has(profile.userId)) continue;
+            for (const [gid, profiles] of groupAtRiskMap.entries()) {
+                if (!profiles.length) continue;
+
+                const listText = profiles.map(p => `- @${p.userId.split('@')[0]} (${p.currentStreak}-day streak 🔥)`).join('\n');
+                const mentions = profiles.map(p => p.userId);
+
+                const txt = `⚠️ *STREAK AT RISK!* ⚠️\n━━━━━━━━━━━━━━━━\nThe following writers have less than 1 hour to log their words or risk losing their streaks:\n${listText}\n\nType *!log [number]* or start a *!sprint* NOW! ✍️`;
 
                 try {
-                    // Find the last group they were active in to send the reminder there
-                    const recent = await DailyStats.findOne({ userId: profile.userId }).sort({ timestamp: -1 });
-                    const targetGroup = recent?.groupId || groupIds[0]; // Fallback to first group if needed
-                    
-                    if (targetGroup) {
-                        await appState.sock.sendMessage(targetGroup, {
-                            text: `⚠️ *STREAK AT RISK!* ⚠️\n━━━━━━━━━━━━━━━━\n@${profile.userId.split('@')[0]}, your *${profile.currentStreak}-day streak* is about to break! 🔥\n\nYou have less than *1 hour* to log words.\n\nType *!log [number]* or join a *!sprint* NOW! ✍️`,
-                            mentions: [profile.userId]
-                        });
-                        sentCount++;
-                        await new Promise(r => setTimeout(r, 1500)); // Prevent rate limits
-                    }
-                } catch (e) { console.error(`Error reminding ${profile.userId}:`, e.message); }
+                    await appState.sock.sendMessage(gid, { text: txt, mentions });
+                    sentCount += profiles.length;
+                    await new Promise(r => setTimeout(r, 500));
+                } catch (e) {
+                    console.error(`Error sending streak reminder to group ${gid}:`, e.message);
+                }
             }
+
             pushActivity('system', `Streak reminders delivered to ${sentCount} authors`, '📢');
         } catch (e) { console.error("Streak reminder job error:", e); }
     }, { timezone: TIMEZONE });
