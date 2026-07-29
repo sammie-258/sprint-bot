@@ -81,6 +81,17 @@ const checkRateLimit = (userId) => {
     return true;
 };
 
+// Periodically clean up stale rateLimiter entries every 10 minutes
+setInterval(() => {
+    const now = Date.now();
+    const WINDOW = 60000;
+    for (const [userId, times] of rateLimiter.entries()) {
+        const valid = times.filter(t => now - t < WINDOW);
+        if (valid.length === 0) rateLimiter.delete(userId);
+        else rateLimiter.set(userId, valid);
+    }
+}, 10 * 60 * 1000);
+
 const updateGroupCache = async (force = false) => {
     // Always reload from DB into local cache
     try {
@@ -150,6 +161,10 @@ setInterval(() => { http.get(`http://localhost:${PORT}/`, () => {}).on('error', 
 // =======================
 //   MAIN LOGIC
 // =======================
+mongoose.connection.on('error', err => console.error('⚠️ MongoDB runtime error:', err));
+mongoose.connection.on('disconnected', () => console.log('⚠️ MongoDB disconnected!'));
+mongoose.connection.on('reconnected', () => console.log('✅ MongoDB reconnected!'));
+
 mongoose.connect(MONGO_URI).then(async () => {
     console.log("✅ MongoDB connected");
 
@@ -301,6 +316,7 @@ mongoose.connect(MONGO_URI).then(async () => {
             const mentions = Object.keys(weekly.contributors);
             const txt = `🏆 *WEEKLY BOSS DEFEATED!* 🏆\n━━━━━━━━━━━━━━━━\n📅 Weekly Target: *${weekly.target.toLocaleString()}*\n⚡ You wrote: ${weekly.current.toLocaleString()} words!\n\n👑 *Top Contributor:* ${top.name} (${top.words.toLocaleString()})\n\nAmazing effort! 🎉`;
             weekly.resolved = true;
+            weekly.markModified('contributors');
             await weekly.save();
             pushActivity('weekly', `Weekly challenge crushed in ${groupCache[groupId]?.subject || groupId}`, '🏆');
             return { completed: true, text: txt, mentions };
@@ -436,6 +452,20 @@ mongoose.connect(MONGO_URI).then(async () => {
         return { participants: l };
     };
 
+    // Periodically sweep and clean up zombie sprints past their end time
+    setInterval(async () => {
+        const now = Date.now();
+        for (const [chatId, sprint] of Object.entries(activeSprints)) {
+            if (sprint.endsAt && now > sprint.endsAt + (30 * 60000)) { // 30 minutes past end time
+                console.log(`🧹 Auto-cleaning zombie sprint in ${chatId}`);
+                if (sprint.warningTimer) clearTimeout(sprint.warningTimer);
+                if (sprint.endTimer) clearTimeout(sprint.endTimer);
+                delete activeSprints[chatId];
+                try { await ActiveSprint.deleteOne({ groupId: chatId }); } catch (e) {}
+            }
+        }
+    }, 15 * 60 * 1000);
+
     // =======================
     require('./src/jobs/scheduler')({
         get sock() { return sock; },
@@ -473,27 +503,40 @@ mongoose.connect(MONGO_URI).then(async () => {
             sock = makeWASocket({
                 version, auth: state, printQRInTerminal: true,
                 browser: ['Sprint Bot', 'Chrome', '120.0'],
-                msgRetryCounterMax: 15, defaultQueryTimeoutMs: 60000,
+                msgRetryCounterMax: 5, defaultQueryTimeoutMs: 60000,
                 shouldIgnoreJid: jid => !jid || jid === 'status@broadcast' || jid.includes('broadcast'),
-                syncFullHistory: false, generateHighQualityLinkPreview: true,
+                syncFullHistory: false, generateHighQualityLinkPreview: false,
             });
+
+            isInitializing = false; // Reset initialization lock once socket is spawned
+            let reconnectAttempts = 0;
 
             sock.ev.on('connection.update', async (update) => {
                 const { connection, lastDisconnect, qr } = update;
                 if (qr) { qrCodeData = qr; console.log('⚠️ New QR Code'); }
                 if (connection === 'open') {
                     isConnected = true; qrCodeData = null;
+                    reconnectAttempts = 0;
                     updateGroupCache(true);
                     console.log('✅ Bot Connected!');
                     pushActivity('connect', 'Bot connected to WhatsApp', '✅');
                 } else if (connection === 'close') {
                     isConnected = false;
                     const code = lastDisconnect?.error?.output?.statusCode;
+                    console.log(`⚠️ Connection closed with status code: ${code}`);
+
                     if (code === DisconnectReason.loggedOut) {
                         console.log("🛑 Logged out. Delete .auth_info_baileys and restart.");
+                    } else if (code === DisconnectReason.connectionReplaced || code === 440) {
+                        console.log("🛑 Connection replaced! Another session was opened. Stopping auto-reconnect.");
                     } else {
-                        console.log('🔄 Reconnecting...');
-                        setTimeout(() => initializeBot(), 3000);
+                        reconnectAttempts++;
+                        const delay = Math.min(3000 * Math.pow(1.5, reconnectAttempts - 1), 30000);
+                        console.log(`🔄 Reconnecting in ${Math.round(delay / 1000)}s (attempt ${reconnectAttempts})...`);
+                        setTimeout(() => {
+                            isInitializing = false;
+                            initializeBot();
+                        }, delay);
                     }
                 }
             });

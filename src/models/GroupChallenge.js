@@ -7,4 +7,6 @@ const challengeSchema = new mongoose.Schema({
     createdBy: String, startedAt: { type: Date, default: Date.now }
 });
 
+challengeSchema.index({ groupId: 1 });
+
 module.exports = mongoose.model("GroupChallenge", challengeSchema);

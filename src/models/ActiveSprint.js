@@ -5,4 +5,6 @@ const activeSprintSchema = new mongoose.Schema({
     participants: { type: Object, default: {} }
 });
 
+activeSprintSchema.index({ groupId: 1 }, { unique: true });
+
 module.exports = mongoose.model("ActiveSprint", activeSprintSchema);

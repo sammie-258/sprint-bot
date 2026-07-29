@@ -6,4 +6,6 @@ const feedbackSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now }
 });
 
+feedbackSchema.index({ timestamp: -1 });
+
 module.exports = mongoose.model("Feedback", feedbackSchema);

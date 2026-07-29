@@ -6,4 +6,6 @@ const streakFreezeSchema = new mongoose.Schema({
     lastEarnedDate:   { type: String, default: null }
 });
 
+streakFreezeSchema.index({ userId: 1 }, { unique: true });
+
 module.exports = mongoose.model("StreakFreeze", streakFreezeSchema);

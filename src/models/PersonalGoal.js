@@ -9,4 +9,6 @@ const goalSchema = new mongoose.Schema({
     completedAt:{ type: Date,    default: null }
 });
 
+goalSchema.index({ userId: 1, isActive: 1 });
+
 module.exports = mongoose.model("PersonalGoal", goalSchema);

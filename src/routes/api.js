@@ -26,6 +26,24 @@ const requireAdmin = (req, res, next) => {
     res.status(403).json({ error: "Unauthorized" });
 };
 
+const escapeHtml = (str) => {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+};
+
+const templatePath = path.join(__dirname, '../../profile.html');
+let profileTemplateCache = null;
+try {
+    if (fs.existsSync(templatePath)) {
+        profileTemplateCache = fs.readFileSync(templatePath, 'utf8');
+    }
+} catch (e) { console.error("⚠️ Error caching profile.html template:", e); }
+
 module.exports = function(appState) {
     const { updateGroupCache } = appState;
     const router = express.Router();
@@ -69,18 +87,21 @@ router.get('/profile/:userId', async (req, res) => {
         ]);
         const dailyWords = todayAgg[0]?.total || 0;
 
-        const templatePath = path.join(__dirname, '../../profile.html');
-        if (!fs.existsSync(templatePath)) return res.status(500).send("<h1>Profile Template Missing</h1>");
-        let html = fs.readFileSync(templatePath, 'utf8');
+        let html = profileTemplateCache;
+        if (!html) {
+            if (!fs.existsSync(templatePath)) return res.status(500).send("<h1>Profile Template Missing</h1>");
+            html = fs.readFileSync(templatePath, 'utf8');
+        }
 
         const nextRankPct   = nextRank ? Math.min(100, (profile.totalWordsAllTime / nextRank.threshold) * 100).toFixed(1) : '100';
         const nextRankName  = nextRank ? nextRank.name : 'MAX RANK';
         const nextRankThres = nextRank ? nextRank.threshold.toLocaleString() : '-';
         const nextRankLeft  = nextRank ? Math.max(0, nextRank.threshold - profile.totalWordsAllTime).toLocaleString() : '0';
+        const safeName      = escapeHtml(profile.name || profile.userId.split('@')[0]);
 
         html = html
-            .replace(/{{NAME}}/g, profile.name)
-            .replace(/{{INITIAL}}/g, profile.name.charAt(0).toUpperCase())
+            .replace(/{{NAME}}/g, safeName)
+            .replace(/{{INITIAL}}/g, safeName.charAt(0).toUpperCase())
             .replace(/{{RANK}}/g, rank)
             .replace(/{{TOTAL}}/g, profile.totalWordsAllTime.toLocaleString())
             .replace(/{{STREAK}}/g, profile.currentStreak)
@@ -158,11 +179,13 @@ router.get('/api/admin/system', requireAdmin, async (req, res) => {
     try {
         const memory = process.memoryUsage();
         const unreadFeedback = await Feedback.countDocuments({ isRead: false });
+        const cpus = os.cpus();
+        const cpuModel = (cpus && cpus.length > 0 && cpus[0].model) ? cpus[0].model : 'Standard Processor';
         res.json({
             uptime:    process.uptime(),
             memory:    Math.round(memory.heapUsed / 1024 / 1024),
             platform:  os.platform() + " " + os.release(),
-            cpu:       os.cpus()[0].model,
+            cpu:       cpuModel,
             maintenance: appState.maintenanceMode,
             activeSprintsCount:    Object.keys(appState.activeSprints).length,
             activeDuelsCount:      Object.keys(appState.activeDuels).length,
@@ -241,14 +264,16 @@ router.post('/api/admin/scheduled/cancel', requireAdmin, async (req, res) => {
     catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Writers: all matching query, no .limit()
 router.post('/api/admin/search', requireAdmin, async (req, res) => {
     try {
         const { query, exact } = req.body;
-        let filter = { $or: [{ name: { $regex: query || '', $options: 'i' } }, { userId: { $regex: query || '', $options: 'i' } }] };
+        const escapeRegex = (str) => (str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const safeQuery = escapeRegex(query);
+        let filter = { $or: [{ name: { $regex: safeQuery, $options: 'i' } }, { userId: { $regex: safeQuery, $options: 'i' } }] };
         if (exact) filter = { userId: query };
 
-        const profiles = await UserProfile.find(filter);
+        const limit = Math.min(parseInt(req.body.limit, 10) || 100, 500);
+        const profiles = await UserProfile.find(filter).limit(limit);
         const blacklisted = new Set(
             (await Blacklist.find({ userId: { $in: profiles.map(p => p.userId) } }, 'userId'))
             .map(b => b.userId)
@@ -317,9 +342,13 @@ router.post('/api/admin/update', requireAdmin, async (req, res) => {
         const history  = await DailyStats.findOne({ userId }).sort({ timestamp: -1 });
         let doc = await DailyStats.findOne({ userId, date: todayStr, groupId: history?.groupId || "Manual_Correction" });
         if (!doc) doc = await DailyStats.create({ userId, name: history?.name || userId, groupId: history?.groupId || "Manual_Correction", date: todayStr, words: 0 });
+        const parsedAmount = parseInt(amount, 10);
+        if (isNaN(parsedAmount)) {
+            return res.status(400).json({ error: "Invalid amount value" });
+        }
         let diff = 0;
-        if (type === 'set') { diff = parseInt(amount) - doc.words; doc.words = parseInt(amount); }
-        else { diff = parseInt(amount); doc.words += diff; }
+        if (type === 'set') { diff = parsedAmount - doc.words; doc.words = parsedAmount; }
+        else { diff = parsedAmount; doc.words += diff; }
         doc.timestamp = new Date();
         await doc.save();
         await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: diff } });
@@ -349,6 +378,7 @@ router.post('/api/admin/writers/archive', requireAdmin, async (req, res) => {
     const { userId, archive } = req.body;
     try {
         const profile = await UserProfile.findOneAndUpdate({ userId }, { isArchived: !!archive }, { new: true });
+        if (!profile) return res.status(404).json({ error: "Writer profile not found" });
         res.json({ success: true, isArchived: profile.isArchived });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -401,9 +431,10 @@ router.post('/api/admin/writers/freeze', requireAdmin, async (req, res) => {
     try {
         const { userId, amount = 1 } = req.body;
         if (!userId) return res.status(400).json({ error: 'userId required' });
+        const addAmount = parseInt(amount, 10) || 1;
         let freeze = await StreakFreeze.findOne({ userId });
         if (!freeze) freeze = await StreakFreeze.create({ userId, freezesAvailable: 0 });
-        freeze.freezesAvailable += Number(amount);
+        freeze.freezesAvailable += addAmount;
         await freeze.save();
         console.log(`🛡️ Admin granted ${amount} freeze(s) to ${userId}. New total: ${freeze.freezesAvailable}`);
         res.json({ success: true, newTotal: freeze.freezesAvailable });

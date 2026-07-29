@@ -8,4 +8,6 @@ const weeklyChallengeSchema = new mongoose.Schema({
     resolved:  { type: Boolean, default: false }
 });
 
+weeklyChallengeSchema.index({ groupId: 1, resolved: 1, weekEnd: 1 });
+
 module.exports = mongoose.model("WeeklyChallenge", weeklyChallengeSchema);

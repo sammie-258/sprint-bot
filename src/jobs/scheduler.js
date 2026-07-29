@@ -6,6 +6,7 @@ const DailyStats = require('../models/DailyStats');
 const UserProfile = require('../models/UserProfile');
 const WeeklyChallenge = require('../models/WeeklyChallenge');
 const StreakFreeze = require('../models/StreakFreeze');
+const BotState = require('../models/BotState');
 const { getRank, getMaxFreezes } = require('../utils/helpers');
 
 module.exports = function(appState) {
@@ -14,50 +15,73 @@ module.exports = function(appState) {
     // Helper for Lagos time
     const getLagosDate = () => new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
 
+    let isMinutelyRunning = false;
+
     // ==========================================
     // 1. MINUTELY CHECKER (Sprints & Broadcasts)
     // ==========================================
     cron.schedule('* * * * *', async () => {
-        if (!appState.isConnected || !appState.sock) return;
+        if (!appState.isConnected || !appState.sock || isMinutelyRunning) return;
+        isMinutelyRunning = true;
         
         // --- Scheduled Sprints ---
         try {
-            const dueSprints = await ScheduledSprint.find({ startTime: { $lte: new Date() } });
+            const dueSprints = await ScheduledSprint.find({ startTime: { $lte: new Date() }, status: { $ne: 'failed' } });
             for (const sprint of dueSprints) {
-                const started = await startSprintSession(sprint.groupId, sprint.duration);
-                if (started) {
-                    await appState.sock.sendMessage(sprint.groupId, { 
-                        text: `(Scheduled by @${sprint.createdBy.split('@')[0]})`, 
-                        mentions: [sprint.createdBy] 
-                    });
+                try {
+                    const started = await startSprintSession(sprint.groupId, sprint.duration);
+                    if (started) {
+                        await appState.sock.sendMessage(sprint.groupId, { 
+                            text: `(Scheduled by @${sprint.createdBy.split('@')[0]})`, 
+                            mentions: [sprint.createdBy] 
+                        });
+                        await ScheduledSprint.deleteOne({ _id: sprint._id });
+                    } else {
+                        sprint.retryCount = (sprint.retryCount || 0) + 1;
+                        if (sprint.retryCount >= 5) sprint.status = 'failed';
+                        await sprint.save();
+                    }
+                } catch (e) {
+                    sprint.retryCount = (sprint.retryCount || 0) + 1;
+                    if (sprint.retryCount >= 5) sprint.status = 'failed';
+                    await sprint.save();
                 }
-                await ScheduledSprint.deleteOne({ _id: sprint._id });
             }
         } catch (e) { console.error("Sprint scheduler error:", e); }
 
         // --- Scheduled Broadcasts ---
         try {
-            const dueBroadcasts = await ScheduledBroadcast.find({ sent: false, sendAt: { $lte: new Date() } });
+            const dueBroadcasts = await ScheduledBroadcast.find({ sent: false, sendAt: { $lte: new Date() }, status: { $ne: 'failed' } });
             for (const broadcast of dueBroadcasts) {
-                const groups = await appState.sock.groupFetchAllParticipating();
-                console.log(`📢 Sending scheduled broadcast to ${Object.keys(groups).length} groups...`);
-                
-                for (const gid of Object.keys(groups)) {
-                    try {
-                        if (broadcast.image) {
-                            const buffer = Buffer.from(broadcast.image.split(",")[1], 'base64');
-                            await appState.sock.sendMessage(gid, { image: buffer, caption: broadcast.message || "" });
-                        } else {
-                            await appState.sock.sendMessage(gid, { text: broadcast.message });
-                        }
-                        await new Promise(r => setTimeout(r, 500));
-                    } catch (e) {}
+                try {
+                    const groups = await appState.sock.groupFetchAllParticipating();
+                    console.log(`📢 Sending scheduled broadcast to ${Object.keys(groups).length} groups...`);
+                    
+                    for (const gid of Object.keys(groups)) {
+                        try {
+                            if (broadcast.image) {
+                                const buffer = Buffer.from(broadcast.image.split(",")[1], 'base64');
+                                await appState.sock.sendMessage(gid, { image: buffer, caption: broadcast.message || "" });
+                            } else {
+                                await appState.sock.sendMessage(gid, { text: broadcast.message });
+                            }
+                            await new Promise(r => setTimeout(r, 500));
+                        } catch (e) {}
+                    }
+                    broadcast.sent = true;
+                    broadcast.status = 'completed';
+                    await broadcast.save();
+                    pushActivity('broadcast', 'Scheduled broadcast delivered', '📢');
+                } catch (e) {
+                    broadcast.retryCount = (broadcast.retryCount || 0) + 1;
+                    if (broadcast.retryCount >= 5) broadcast.status = 'failed';
+                    await broadcast.save();
                 }
-                broadcast.sent = true;
-                await broadcast.save();
-                pushActivity('broadcast', 'Scheduled broadcast delivered', '📢');
             }
         } catch (e) { console.error("Broadcast scheduler error:", e); }
+        finally {
+            isMinutelyRunning = false;
+        }
     }, { timezone: TIMEZONE });
 
     // ==========================================
@@ -200,14 +224,18 @@ module.exports = function(appState) {
                 // Resolve expired weekly challenges
                 const expired = await WeeklyChallenge.find({ resolved: false, weekEnd: { $lte: lagos } });
                 for (const wc of expired) {
-                    if (wc.current < wc.target) {
-                        const pct = Math.round((wc.current / wc.target) * 100);
-                        try {
+                    try {
+                        if (wc.current < wc.target) {
+                            const pct = Math.round((wc.current / wc.target) * 100);
                             await appState.sock.sendMessage(wc.groupId, {
                                 text: `😤 *WEEKLY BOSS SURVIVED!*\n━━━━━━━━━━━━━━━━\n👹 Boss needed *${wc.target.toLocaleString()}* words.\nYou reached *${wc.current.toLocaleString()}* (${pct}%).\n\nThe boss returns Monday — STRONGER. 💀`
                             });
-                        } catch (e) {}
-                    }
+                        } else {
+                            await appState.sock.sendMessage(wc.groupId, {
+                                text: `🎉 *WEEKLY BOSS SLAIN!* 🎉\n━━━━━━━━━━━━━━━━\n⚔️ Target *${wc.target.toLocaleString()}* crushed with *${wc.current.toLocaleString()}* words!\n\nIncredible teamwork this week! 🏆`
+                            });
+                        }
+                    } catch (e) {}
                     wc.resolved = true;
                     await wc.save();
                 }
@@ -267,8 +295,16 @@ module.exports = function(appState) {
     cron.schedule('0 0 * * *', async () => {
         if (!appState.isConnected || !appState.sock) return;
         try {
-            const lagos = getLagosDate();
             const today = getTodayDateGMT1();
+            const stateKey = `freeze_processed_${today}`;
+
+            const alreadyProcessed = await BotState.findOne({ key: stateKey });
+            if (alreadyProcessed) {
+                console.log(`🛡️ Freeze Processor already executed for ${today}. Skipping.`);
+                return;
+            }
+
+            const lagos = getLagosDate();
             const yesterday = (() => { 
                 const d = new Date(lagos); d.setDate(d.getDate() - 1); 
                 return d.toLocaleDateString('en-CA', { timeZone: TIMEZONE }); 
@@ -280,59 +316,65 @@ module.exports = function(appState) {
             console.log(`🛡️ Freeze Processor: Checking streaks for ${allProfiles.length} users...`);
 
             for (const profile of allProfiles) {
-                if (activeYest.has(profile.userId)) {
-                    // Wrote yesterday — check if earned a freeze (every 7 days)
-                    if (profile.currentStreak % 7 === 0) {
-                        const rank = getRank(profile.totalWordsAllTime);
-                        const maxFreezes = getMaxFreezes(rank);
-                        if (maxFreezes > 0) {
-                            let freeze = await StreakFreeze.findOne({ userId: profile.userId });
-                            if (!freeze) freeze = await StreakFreeze.create({ userId: profile.userId, freezesAvailable: 0 });
-                            if (freeze.freezesAvailable < maxFreezes) {
-                                freeze.freezesAvailable += 1;
-                                freeze.lastEarnedDate = today;
-                                await freeze.save();
-                                try {
-                                    const recent = await DailyStats.findOne({ userId: profile.userId }).sort({ timestamp: -1 });
-                                    if (recent?.groupId) {
-                                        await appState.sock.sendMessage(recent.groupId, {
-                                            text: `🛡️ *STREAK FREEZE EARNED!*\n\n@${profile.userId.split('@')[0]} hit a *${profile.currentStreak}-day streak milestone!*\nYou now have *${freeze.freezesAvailable}/${maxFreezes}* freeze${freeze.freezesAvailable !== 1 ? 's' : ''}.\n\nUse *!streak freeze* on a missed day to protect your streak.`,
-                                            mentions: [profile.userId]
-                                        });
-                                    }
-                                } catch (e) {}
+                try {
+                    if (activeYest.has(profile.userId)) {
+                        // Wrote yesterday — check if earned a freeze (every 7 days)
+                        if (profile.currentStreak % 7 === 0) {
+                            const rank = getRank(profile.totalWordsAllTime);
+                            const maxFreezes = getMaxFreezes(rank);
+                            if (maxFreezes > 0) {
+                                let freeze = await StreakFreeze.findOne({ userId: profile.userId });
+                                if (!freeze) freeze = await StreakFreeze.create({ userId: profile.userId, freezesAvailable: 0 });
+                                if (freeze.freezesAvailable < maxFreezes) {
+                                    freeze.freezesAvailable += 1;
+                                    freeze.lastEarnedDate = today;
+                                    await freeze.save();
+                                    try {
+                                        const recent = await DailyStats.findOne({ userId: profile.userId }).sort({ timestamp: -1 });
+                                        if (recent?.groupId) {
+                                            await appState.sock.sendMessage(recent.groupId, {
+                                                text: `🛡️ *STREAK FREEZE EARNED!*\n\n@${profile.userId.split('@')[0]} hit a *${profile.currentStreak}-day streak milestone!*\nYou now have *${freeze.freezesAvailable}/${maxFreezes}* freeze${freeze.freezesAvailable !== 1 ? 's' : ''}.\n\nUse *!streak freeze* on a missed day to protect your streak.`,
+                                                mentions: [profile.userId]
+                                            });
+                                        }
+                                    } catch (e) {}
+                                }
                             }
                         }
-                    }
-                } else {
-                    // Manual freeze check: if they manual-froze or wrote today, lastActiveDate is already yesterday or today
-                    if (profile.lastActiveDate === yesterday || profile.lastActiveDate === today) {
-                        continue;
-                    }
-
-                    // Missed yesterday — auto-burn freeze
-                    const freeze = await StreakFreeze.findOne({ userId: profile.userId });
-                    if (freeze && freeze.freezesAvailable > 0) {
-                        freeze.freezesAvailable -= 1;
-                        await freeze.save();
-                        profile.lastActiveDate = yesterday; // Protect the streak
-                        await profile.save();
-                        try {
-                            const recent = await DailyStats.findOne({ userId: profile.userId }).sort({ timestamp: -1 });
-                            if (recent?.groupId) {
-                                await appState.sock.sendMessage(recent.groupId, {
-                                    text: `🛡️ *FREEZE AUTO-USED!* \n\n@${profile.userId.split('@')[0]}, a freeze protected your *${profile.currentStreak}-day streak!*\n${freeze.freezesAvailable} freeze${freeze.freezesAvailable !== 1 ? 's' : ''} remaining.`,
-                                    mentions: [profile.userId]
-                                });
-                            }
-                        } catch (e) {}
                     } else {
-                        // NO FREEZES LEFT — Streak is broken! Reset to 0
-                        profile.currentStreak = 0;
-                        await profile.save();
+                        // Manual freeze check: if they manual-froze or wrote today, lastActiveDate is already yesterday or today
+                        if (profile.lastActiveDate === yesterday || profile.lastActiveDate === today) {
+                            continue;
+                        }
+
+                        // Missed yesterday — auto-burn freeze
+                        const freeze = await StreakFreeze.findOne({ userId: profile.userId });
+                        if (freeze && freeze.freezesAvailable > 0) {
+                            freeze.freezesAvailable -= 1;
+                            await freeze.save();
+                            profile.lastActiveDate = yesterday; // Protect the streak
+                            await profile.save();
+                            try {
+                                const recent = await DailyStats.findOne({ userId: profile.userId }).sort({ timestamp: -1 });
+                                if (recent?.groupId) {
+                                    await appState.sock.sendMessage(recent.groupId, {
+                                        text: `🛡️ *FREEZE AUTO-USED!* \n\n@${profile.userId.split('@')[0]}, a freeze protected your *${profile.currentStreak}-day streak!*\n${freeze.freezesAvailable} freeze${freeze.freezesAvailable !== 1 ? 's' : ''} remaining.`,
+                                        mentions: [profile.userId]
+                                    });
+                                }
+                            } catch (e) {}
+                        } else {
+                            // NO FREEZES LEFT — Streak is broken! Reset to 0
+                            profile.currentStreak = 0;
+                            await profile.save();
+                        }
                     }
+                } catch (profileErr) {
+                    console.error(`⚠️ Freeze Processor error for user ${profile.userId}:`, profileErr);
                 }
             }
+
+            await BotState.create({ key: stateKey, value: true });
         } catch (e) { console.error("Freeze Processor error:", e); }
     }, { timezone: TIMEZONE });
 

@@ -17,4 +17,7 @@ const userProfileSchema = new mongoose.Schema({
     isArchived:        { type: Boolean,  default: false }
 });
 
+userProfileSchema.index({ userId: 1 }, { unique: true });
+userProfileSchema.index({ currentStreak: 1, isArchived: 1 });
+
 module.exports = mongoose.model("UserProfile", userProfileSchema);

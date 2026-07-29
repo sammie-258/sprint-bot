@@ -1,5 +1,4 @@
 const os             = require('os');
-const GroupMeta      = require('../models/GroupMeta');
 const DailyStats     = require('../models/DailyStats');
 const UserProfile    = require('../models/UserProfile');
 const PersonalGoal   = require('../models/PersonalGoal');
@@ -10,6 +9,7 @@ const Blacklist      = require('../models/Blacklist');
 const Feedback       = require('../models/Feedback');
 const SprintRecord   = require('../models/SprintRecord');
 const StreakFreeze   = require('../models/StreakFreeze');
+const ActiveSprint   = require('../models/ActiveSprint');
 const { getDurationString, getNextRank, getRank, getMaxFreezes, toSuperscript, BADGE_DEFS } = require('../utils/helpers');
 
 const BASE_URL     = process.env.BASE_URL || 'https://sprint-bot-9bll.onrender.com';
@@ -50,8 +50,11 @@ module.exports = async function(m, appState) {
                 if (processedMessages.has(msgId)) return;
                 processedMessages.add(msgId);
                 if (processedMessages.size > 1000) {
-                    const firstKey = processedMessages.keys().next().value;
-                    processedMessages.delete(firstKey);
+                    while (processedMessages.size > 1000) {
+                        const firstKey = processedMessages.keys().next().value;
+                        if (!firstKey) break;
+                        processedMessages.delete(firstKey);
+                    }
                 }
 
                 // 2. Ignore messages older than 2 minutes (120 seconds) to prevent replay/history processing on reconnect
@@ -397,57 +400,67 @@ module.exports = async function(m, appState) {
 
                     pushActivity('duel', `Duel started by @${senderName}`, '⚔️');
 
-                    setTimeout(async () => {
-                        const duel = activeDuels[chatId];
-                        if (!duel) return; // Might have been cancelled
-                        
-                        // Enter Grace Period
-                        duel.isGracePeriod = true;
-                        duel.endsAt = Date.now() + (5 * 60000); // Add 5 minutes to the clock for logging
+                    const timer = setTimeout(async () => {
+                        try {
+                            const duel = activeDuels[chatId];
+                            if (!duel) return; // Might have been cancelled
+                            
+                            // Enter Grace Period
+                            duel.isGracePeriod = true;
+                            duel.endsAt = Date.now() + (5 * 60000); // Add 5 minutes to the clock for logging
 
-                        await sock.sendMessage(chatId, { 
-                            text: `🛑 *DUEL TIME'S UP!*\n\n@${duel.challenger.split('@')[0]} and @${duel.opponent.split('@')[0]}, put your pens down!\n\nYou have *5 minutes* to submit your final words using *!wc [number]*!`, 
-                            mentions: [duel.challenger, duel.opponent] 
-                        });
+                            await sock.sendMessage(chatId, { 
+                                text: `🛑 *DUEL TIME'S UP!*\n\n@${duel.challenger.split('@')[0]} and @${duel.opponent.split('@')[0]}, put your pens down!\n\nYou have *5 minutes* to submit your final words using *!wc [number]*!`, 
+                                mentions: [duel.challenger, duel.opponent] 
+                            });
 
-                        // Final resolution timer
-                        setTimeout(async () => {
-                            const finalDuel = activeDuels[chatId];
-                            if (!finalDuel) return;
-                            delete activeDuels[chatId];
-
-                            const cW = finalDuel.words[finalDuel.challenger] || 0;
-                            const oW = finalDuel.words[finalDuel.opponent]   || 0;
-                            const draw     = cW === oW;
-                            const winnerId = cW > oW ? finalDuel.challenger : finalDuel.opponent;
-                            const loserId  = cW > oW ? finalDuel.opponent   : finalDuel.challenger;
-
-                            let txt = `⚔️ *DUEL OVER!* ⚔️\n━━━━━━━━━━━━━━━━\n`;
-                            if (draw) {
-                                txt += `🤝 *IT'S A DRAW!*\nBoth: *${cW.toLocaleString()} words*\n\nHonour among wordsmiths! 🙏`;
-                            } else {
-                                txt += `🏆 *WINNER:* @${winnerId.split('@')[0]} — *${Math.max(cW, oW).toLocaleString()} words*\n💀 *LOSER:* @${loserId.split('@')[0]} — ${Math.min(cW, oW).toLocaleString()} words\n\nBetter luck next time! 😤`;
+                            // Final resolution timer
+                            const graceTimer = setTimeout(async () => {
                                 try {
-                                    const winProf = await UserProfile.findOne({ userId: winnerId });
-                                    if (winProf) await awardBadge(winProf, 'duel_win', chatId);
-                                } catch (e) {}
-                            }
+                                    const finalDuel = activeDuels[chatId];
+                                    if (!finalDuel) return;
+                                    delete activeDuels[chatId];
 
-                            // Log words to daily stats for both
-                            for (const [uid, words] of Object.entries(finalDuel.words)) {
-                                if (words > 0) {
-                                    const name = uid === finalDuel.challenger ? finalDuel.challengerName : finalDuel.opponentName;
-                                    await DailyStats.findOneAndUpdate({ userId: uid, groupId: chatId, date: todayStr }, { name, $inc: { words }, timestamp: new Date() }, { upsert: true });
-                                    await updateStreak(uid, name, words);
+                                    const cW = finalDuel.words[finalDuel.challenger] || 0;
+                                    const oW = finalDuel.words[finalDuel.opponent]   || 0;
+                                    const draw     = cW === oW;
+                                    const winnerId = cW > oW ? finalDuel.challenger : finalDuel.opponent;
+                                    const loserId  = cW > oW ? finalDuel.opponent   : finalDuel.challenger;
+
+                                    let txt = `⚔️ *DUEL OVER!* ⚔️\n━━━━━━━━━━━━━━━━\n`;
+                                    if (draw) {
+                                        txt += `🤝 *IT'S A DRAW!*\nBoth: *${cW.toLocaleString()} words*\n\nHonour among wordsmiths! 🙏`;
+                                    } else {
+                                        txt += `🏆 *WINNER:* @${winnerId.split('@')[0]} — *${Math.max(cW, oW).toLocaleString()} words*\n💀 *LOSER:* @${loserId.split('@')[0]} — ${Math.min(cW, oW).toLocaleString()} words\n\nBetter luck next time! 😤`;
+                                        try {
+                                            const winProf = await UserProfile.findOne({ userId: winnerId });
+                                            if (winProf) await awardBadge(winProf, 'duel_win', chatId);
+                                        } catch (e) {}
+                                    }
+
+                                    // Log words to daily stats for both
+                                    for (const [uid, words] of Object.entries(finalDuel.words)) {
+                                        if (words > 0) {
+                                            const name = uid === finalDuel.challenger ? finalDuel.challengerName : finalDuel.opponentName;
+                                            await DailyStats.findOneAndUpdate({ userId: uid, groupId: chatId, date: todayStr }, { name, $inc: { words }, timestamp: new Date() }, { upsert: true });
+                                            await updateStreak(uid, name, words);
+                                        }
+                                    }
+
+                                    await sock.sendMessage(chatId, { text: txt, mentions: [finalDuel.challenger, finalDuel.opponent] });
+                                    pushActivity('duel', `Duel ended in ${groupCache[chatId]?.subject || chatId}`, '⚔️');
+                                } catch (e) {
+                                    console.error("⚠️ Error in duel resolution timer:", e);
                                 }
-                            }
-
-                            await sock.sendMessage(chatId, { text: txt, mentions: [finalDuel.challenger, finalDuel.opponent] });
-                            pushActivity('duel', `Duel ended in ${groupCache[chatId]?.subject || chatId}`, '⚔️');
-                        }, 5 * 60000); // 5 minutes later
-                        duel.graceTimer = graceTimer;
+                            }, 5 * 60000); // 5 minutes later
+                            duel.graceTimer = graceTimer;
+                        } catch (e) {
+                            console.error("⚠️ Error in duel end timer:", e);
+                        }
                     }, duration * 60000);
-                    activeDuels[chatId].timer = timer;
+                    if (activeDuels[chatId]) {
+                        activeDuels[chatId].timer = timer;
+                    }
                 }
 
                 // ── !WC ─────────────────────────────────────────────────────────────
