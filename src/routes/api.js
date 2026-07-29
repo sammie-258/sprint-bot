@@ -385,7 +385,7 @@ router.post('/api/admin/writers/archive', requireAdmin, async (req, res) => {
 
 router.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
     try {
-        const { message, image, targetGroups } = req.body;
+        const { message, image, targetGroups, tagAll } = req.body;
         if (!message && !image) return res.status(400).json({ error: "Need text or image" });
         if (!appState.sock || !appState.isConnected) {
             console.log("❌ Broadcast failed: Bot not connected");
@@ -403,15 +403,40 @@ router.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
             console.log(`📣 Broadcasting to all ${gids.length} groups...`);
         }
 
+        const isTagAllRequested = !!tagAll || (message && /@all|@everyone/i.test(message));
+        const userMatches = message ? message.match(/@(\d{7,15})/g) : null;
+        const specificUserJids = userMatches ? userMatches.map(m => m.replace('@', '') + '@s.whatsapp.net') : [];
+
         let count = 0;
         for (const gid of gids) {
             try {
+                let mentions = [...specificUserJids];
+                if (isTagAllRequested) {
+                    try {
+                        const meta = await appState.sock.groupMetadata(gid);
+                        if (meta && meta.participants) {
+                            const allParticipantIds = meta.participants.map(p => p.id);
+                            mentions = [...new Set([...mentions, ...allParticipantIds])];
+                        }
+                    } catch (e) {
+                        console.log(`⚠️ Could not fetch group metadata for ${gid} (tagAll):`, e.message);
+                    }
+                }
+
+                const msgOptions = {};
                 if (image) {
                     const buffer = Buffer.from(image.split(",")[1], 'base64');
-                    await appState.sock.sendMessage(gid, { image: buffer, caption: message || "" });
+                    msgOptions.image = buffer;
+                    msgOptions.caption = message || "";
                 } else {
-                    await appState.sock.sendMessage(gid, { text: message });
+                    msgOptions.text = message;
                 }
+
+                if (mentions.length > 0) {
+                    msgOptions.mentions = mentions;
+                }
+
+                await appState.sock.sendMessage(gid, msgOptions);
                 count++;
                 await new Promise(r => setTimeout(r, 500));
             } catch (e) {

@@ -183,7 +183,10 @@
     <div id="broadcast-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-xl w-full max-w-lg shadow-2xl border-t-4 border-yellow-500">
             <h3 class="text-xl font-bold mb-2">Global Broadcast</h3>
-            <textarea id="broadcast-text" rows="4" class="w-full p-4 border rounded-lg mb-4" placeholder="Type message..."></textarea>
+            <textarea id="broadcast-text" rows="4" class="w-full p-4 border rounded-lg mb-2" placeholder="Type message... (use @everyone to tag all, or @234... to tag a user)"></textarea>
+            <label class="flex items-center gap-2 mb-4 text-sm font-semibold text-gray-700 cursor-pointer">
+                <input type="checkbox" id="broadcast-tag-all" class="w-4 h-4 text-yellow-500 rounded"> Tag Everyone (@everyone)
+            </label>
             <div class="flex justify-end gap-3">
                 <button onclick="document.getElementById('broadcast-modal').classList.add('hidden')" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
                 <button onclick="sendBroadcast()" class="px-6 py-2 bg-yellow-500 text-white font-bold rounded">Send</button>
@@ -407,8 +410,9 @@
         function openBroadcast() { document.getElementById('broadcast-modal').classList.remove('hidden'); }
         async function sendBroadcast() {
             const msg = document.getElementById('broadcast-text').value;
+            const tagAll = document.getElementById('broadcast-tag-all')?.checked || false;
             if(!confirm("Send to ALL groups?")) return;
-            const res = await api('/api/admin/broadcast', { message: msg });
+            const res = await api('/api/admin/broadcast', { message: msg, tagAll });
             if(res.success) { alert(`Sent to ${res.count} groups!`); document.getElementById('broadcast-modal').classList.add('hidden'); }
         }
     </script>
