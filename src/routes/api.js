@@ -76,6 +76,7 @@ router.get('/profile/:userId', async (req, res) => {
         const nextRankPct   = nextRank ? Math.min(100, (profile.totalWordsAllTime / nextRank.threshold) * 100).toFixed(1) : '100';
         const nextRankName  = nextRank ? nextRank.name : 'MAX RANK';
         const nextRankThres = nextRank ? nextRank.threshold.toLocaleString() : '-';
+        const nextRankLeft  = nextRank ? Math.max(0, nextRank.threshold - profile.totalWordsAllTime).toLocaleString() : '0';
 
         html = html
             .replace(/{{NAME}}/g, profile.name)
@@ -90,7 +91,8 @@ router.get('/profile/:userId', async (req, res) => {
             .replace(/{{ACTIVITY_LOG}}/g, profile.activityLog || '0'.repeat(35))
             .replace(/{{NEXT_RANK_NAME}}/g, nextRankName)
             .replace(/{{NEXT_RANK_PCT}}/g, nextRankPct)
-            .replace(/{{NEXT_RANK_THRESHOLD}}/g, nextRankThres);
+            .replace(/{{NEXT_RANK_THRESHOLD}}/g, nextRankThres)
+            .replace(/{{NEXT_RANK_LEFT}}/g, nextRankLeft);
 
         if (goal) {
             const pct = Math.min(100, (goal.current / goal.target) * 100).toFixed(1);

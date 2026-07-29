@@ -16,6 +16,21 @@ const BASE_URL     = process.env.BASE_URL || 'https://sprint-bot-9bll.onrender.c
 const TIMEZONE     = 'Africa/Lagos';
 const OWNER_NUMBER = process.env.OWNER_NUMBER || '2349019671229';
 
+const MONTH_MAP = {
+    jan: { num: '01', name: 'January' },
+    feb: { num: '02', name: 'February' },
+    mar: { num: '03', name: 'March' },
+    apr: { num: '04', name: 'April' },
+    may: { num: '05', name: 'May' },
+    jun: { num: '06', name: 'June' },
+    jul: { num: '07', name: 'July' },
+    aug: { num: '08', name: 'August' },
+    sep: { num: '09', name: 'September' },
+    oct: { num: '10', name: 'October' },
+    nov: { num: '11', name: 'November' },
+    dec: { num: '12', name: 'December' }
+};
+
 const processedMessages = new Set();
 
 module.exports = async function(m, appState) {
@@ -192,8 +207,10 @@ module.exports = async function(m, appState) {
 *!profile* → Your full stats
 *!wpm* → Sprint speed history
 *!daily* → Today's Leaderboard
+*!yesterday* → Yesterday's Leaderboard
 *!weekly* → Last 7 days
 *!monthly* → Last 30 days
+*!jan26* / *!dec25* → Specific month stats
 *!top10* → All-Time Hall of Fame
 *!myname Sam* → Set display name
 
@@ -532,7 +549,8 @@ module.exports = async function(m, appState) {
                     let txt = `👤 *WRITER PROFILE*\n━━━━━━━━━━━━━━\n📛 *${profile.name}*\n🎖️ Rank: ${rank}\n`;
                     if (nextRank) {
                         const pct = Math.min(100, (profile.totalWordsAllTime / nextRank.threshold) * 100).toFixed(1);
-                        txt += `📈 Next: ${nextRank.name} (${pct}%)\n`;
+                        const wordsLeft = Math.max(0, nextRank.threshold - profile.totalWordsAllTime);
+                        txt += `📈 Next: ${nextRank.name} (${pct}% | ${wordsLeft.toLocaleString()} words left)\n`;
                     }
                     txt += `\n🔥 Streak: *${profile.currentStreak} days*\n`;
                     txt += `🏆 Best: ${profile.bestStreak} days\n`;
@@ -590,27 +608,49 @@ module.exports = async function(m, appState) {
                     }, { quoted: msg });
                 }
 
-                // ── !DAILY / !WEEKLY / !MONTHLY ─────────────────────────────────────
-                if (["!daily", "!weekly", "!monthly"].includes(command)) {
-                    const isDaily = command === "!daily";
-                    const days  = isDaily ? 1 : command === "!weekly" ? 7 : 30;
-                    const title = isDaily ? `Daily (${todayStr})` : command === "!weekly" ? "Weekly (7 days)" : "Monthly (30 days)";
-                    let stats;
-                    if (isDaily) {
-                        stats = await DailyStats.aggregate([
-                            { $match: { date: todayStr } },
-                            { $group: { _id: "$userId", totalWords: { $sum: "$words" }, name: { $first: "$name" } } },
-                            { $sort: { totalWords: -1 } }, { $limit: 15 }
-                        ]);
-                    } else {
-                        const dt = new Date(); dt.setDate(dt.getDate() - days);
-                        stats = await DailyStats.aggregate([
-                            { $match: { timestamp: { $gte: dt } } },
-                            { $group: { _id: "$userId", totalWords: { $sum: "$words" }, name: { $first: "$name" } } },
-                            { $sort: { totalWords: -1 } }, { $limit: 15 }
-                        ]);
+                // ── !DAILY / !YESTERDAY / !WEEKLY / !MONTHLY / !MMM-YY ─────────────────
+                const monthMatch = command.match(/^!([a-z]{3})(\d{2}|\d{4})$/i);
+                const isMonthCmd = monthMatch && MONTH_MAP[monthMatch[1].toLowerCase()];
+
+                if (["!daily", "!yesterday", "!weekly", "!monthly"].includes(command) || isMonthCmd) {
+                    let title = "";
+                    let matchQuery = {};
+
+                    if (command === "!daily") {
+                        title = `Daily (${todayStr})`;
+                        matchQuery = { date: todayStr };
+                    } else if (command === "!yesterday") {
+                        const yDate = new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
+                        yDate.setDate(yDate.getDate() - 1);
+                        const yStr = yDate.toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+                        title = `Yesterday (${yStr})`;
+                        matchQuery = { date: yStr };
+                    } else if (command === "!weekly") {
+                        const dt = new Date(); dt.setDate(dt.getDate() - 7);
+                        title = "Weekly (7 days)";
+                        matchQuery = { timestamp: { $gte: dt } };
+                    } else if (command === "!monthly") {
+                        const dt = new Date(); dt.setDate(dt.getDate() - 30);
+                        title = "Monthly (30 days)";
+                        matchQuery = { timestamp: { $gte: dt } };
+                    } else if (isMonthCmd) {
+                        const mKey = monthMatch[1].toLowerCase();
+                        const yRaw = monthMatch[2];
+                        const fullYear = yRaw.length === 2 ? '20' + yRaw : yRaw;
+                        const mInfo = MONTH_MAP[mKey];
+                        title = `${mInfo.name} ${fullYear}`;
+                        matchQuery = { date: { $regex: `^${fullYear}-${mInfo.num}` } };
                     }
-                    if (!stats.length) return sock.sendMessage(chatId, { text: "📉 No stats yet." }, { quoted: msg });
+
+                    const stats = await DailyStats.aggregate([
+                        { $match: matchQuery },
+                        { $group: { _id: "$userId", totalWords: { $sum: "$words" }, name: { $first: "$name" } } },
+                        { $sort: { totalWords: -1 } },
+                        { $limit: 15 }
+                    ]);
+
+                    if (!stats.length) return sock.sendMessage(chatId, { text: `📉 No stats found for *${title}*.` }, { quoted: msg });
+
                     let txt = `🏆 *${title}*\n\n`;
                     for (let i = 0; i < stats.length; i++) {
                         const s = stats[i];

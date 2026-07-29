@@ -149,6 +149,7 @@ const USER_DATA = {
     nextRankName:    "{{NEXT_RANK_NAME}}",
     nextRankPct:     parseFloat("{{NEXT_RANK_PCT}}") || 0,
     nextRankThreshold:"{{NEXT_RANK_THRESHOLD}}",
+    nextRankLeft:    "{{NEXT_RANK_LEFT}}",
     goalActive:      "{{GOAL_DISPLAY}}" !== "hidden",
     goalCurrent:     "{{GOAL_CURRENT}}",
     goalTarget:      "{{GOAL_TARGET}}",
@@ -292,7 +293,7 @@ function initUI() {
 
     setTimeout(() => {
         document.getElementById('rank-bar').style.width = USER_DATA.nextRankPct + '%';
-        document.getElementById('ui-next-rank').textContent = USER_DATA.nextRankName;
+        document.getElementById('ui-next-rank').textContent = USER_DATA.nextRankName + (USER_DATA.nextRankLeft && USER_DATA.nextRankLeft !== '0' ? ' (' + USER_DATA.nextRankLeft + ' left)' : '');
         if (USER_DATA.goalActive) {
             document.getElementById('goal-section').classList.remove('hidden');
             document.getElementById('goal-bar').style.width = USER_DATA.goalPercent + '%';
