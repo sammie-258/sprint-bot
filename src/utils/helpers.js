@@ -70,7 +70,8 @@ const BADGE_DEFS = [
 
 // Date helpers for GMT+1 (Africa/Lagos, UTC+1)
 const getLagosDateString = (ms = Date.now()) => {
-    const d = new Date(ms + 3600000);
+    const time = (ms instanceof Date) ? ms.getTime() : Number(ms || Date.now());
+    const d = new Date(time + 3600000);
     return d.toISOString().slice(0, 10);
 };
 
@@ -79,7 +80,8 @@ const getLagosMonthName = (ms = Date.now()) => {
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
     ];
-    const d = new Date(ms + 3600000);
+    const time = (ms instanceof Date) ? ms.getTime() : Number(ms || Date.now());
+    const d = new Date(time + 3600000);
     return `${MONTH_NAMES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 };
 

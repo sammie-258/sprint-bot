@@ -198,10 +198,7 @@ module.exports = function(appState) {
             // --- WEEKLY (Sundays) ---
             if (dayOfWeek === 0) {
                 console.log("🏆 Running Weekly MVP Announcements...");
-                const dates = Array.from({ length: 7 }, (_, i) => { 
-                    const d = new Date(lagos); d.setDate(d.getDate() - i); 
-                    return d.toLocaleDateString('en-CA', { timeZone: TIMEZONE }); 
-                });
+                const dates = Array.from({ length: 7 }, (_, i) => getLagosDateString(Date.now() - i * 86400000));
 
                 for (const gid of groupIds) {
                     try {
@@ -221,8 +218,9 @@ module.exports = function(appState) {
                     } catch (e) {}
                 }
 
-                // Resolve expired weekly challenges
-                const expired = await WeeklyChallenge.find({ resolved: false, weekEnd: { $lte: lagos } });
+                // Resolve expired weekly challenges (check within 15 min buffer to resolve before Monday spawn)
+                const expiryCutoff = new Date(Date.now() + 3600000 + 15 * 60 * 1000);
+                const expired = await WeeklyChallenge.find({ resolved: false, weekEnd: { $lte: expiryCutoff } });
                 for (const wc of expired) {
                     try {
                         if (wc.current < wc.target) {
@@ -311,10 +309,7 @@ module.exports = function(appState) {
             }
 
             const lagos = getLagosDate();
-            const yesterday = (() => { 
-                const d = new Date(lagos); d.setDate(d.getDate() - 1); 
-                return d.toLocaleDateString('en-CA', { timeZone: TIMEZONE }); 
-            })();
+            const yesterday = getLagosDateString(Date.now() - 86400000);
 
             const allProfiles = await UserProfile.find({ currentStreak: { $gt: 0 }, isArchived: { $ne: true } });
             const activeYest  = new Set(await DailyStats.distinct("userId", { date: yesterday }));

@@ -233,7 +233,7 @@ module.exports = async function(m, appState) {
                                     title: "🎯 Goals & Challenges",
                                     rows: [
                                         { title: "🎯 Personal Goal", rowId: "!goal", description: "Check or set your target" },
-                                        { title: "⚔️ Group Challenge", rowId: "!challenge", description: "Check active group boss" },
+                                        { title: "⚔️ Group Challenge", rowId: "!challenge status", description: "Check active group boss" },
                                         { title: "🛡️ Streak Status", rowId: "!streak status", description: "Check streak & freezes" }
                                     ]
                                 },
@@ -703,11 +703,11 @@ module.exports = async function(m, appState) {
                         title = `Yesterday (${yStr})`;
                         matchQuery = { date: yStr };
                     } else if (command === "!weekly") {
-                        const dt = new Date(); dt.setDate(dt.getDate() - 7);
+                        const dt = new Date(); dt.setDate(dt.getDate() - 7); dt.setHours(0, 0, 0, 0);
                         title = "Weekly (7 days)";
                         matchQuery = { timestamp: { $gte: dt } };
                     } else if (command === "!monthly") {
-                        const dt = new Date(); dt.setDate(dt.getDate() - 30);
+                        const dt = new Date(); dt.setDate(dt.getDate() - 30); dt.setHours(0, 0, 0, 0);
                         title = "Monthly (30 days)";
                         matchQuery = { timestamp: { $gte: dt } };
                     } else if (isMonthCmd) {
@@ -835,6 +835,7 @@ module.exports = async function(m, appState) {
                 if (command === "!sprint") {
                     const mins = parseInt(args[1]);
                     if (isNaN(mins) || mins <= 0 || mins > 180) return sock.sendMessage(chatId, { text: "❌ Use: `!sprint 20`" }, { quoted: msg });
+                    if (activeDuels[chatId]) return sock.sendMessage(chatId, { text: "⚠️ A duel is currently in progress! Complete or cancel the duel first." }, { quoted: msg });
                     if (activeSprints[chatId]) {
                         const left = Math.ceil((activeSprints[chatId].endsAt - Date.now()) / 60000);
                         return sock.sendMessage(chatId, { text: `⚠️ Sprint running! *${left}m* left. Use \`!wc [number]\` to join.` }, { quoted: msg });
