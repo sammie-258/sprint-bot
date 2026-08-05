@@ -1,5 +1,4 @@
 const os             = require('os');
-const { proto, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 const DailyStats     = require('../models/DailyStats');
 const UserProfile    = require('../models/UserProfile');
 const PersonalGoal   = require('../models/PersonalGoal');
@@ -200,88 +199,6 @@ module.exports = async function(m, appState) {
                     if (command === "!leave") {
                         await sock.sendMessage(chatId, { text: "👋 Bye!" });
                         await sock.groupLeave(chatId);
-                        return;
-                    }
-                }
-
-                // ── MENU ────────────────────────────────────────────────────────────
-                if (command === "!menu" || command === "!start") {
-                    try {
-                        const listSections = [
-                            {
-                                title: "🏃 Writing Sprints",
-                                rows: [
-                                    { title: "🏃 15-Min Sprint",  id: "!sprint 15",         description: "Start a 15-minute sprint" },
-                                    { title: "🏃 20-Min Sprint",  id: "!sprint 20",         description: "Start a 20-minute sprint" },
-                                    { title: "🏃 30-Min Sprint",  id: "!sprint 30",         description: "Start a 30-minute sprint" },
-                                    { title: "✍️ Log Words",       id: "!log 500",           description: "Log your words written today" }
-                                ]
-                            },
-                            {
-                                title: "📊 Profile & Leaderboards",
-                                rows: [
-                                    { title: "👤 My Profile",         id: "!profile",   description: "View your rank, stats & badges" },
-                                    { title: "🔥 Daily Leaderboard",  id: "!daily",     description: "Top writers today" },
-                                    { title: "⏪ Yesterday's Stats",  id: "!yesterday", description: "Yesterday's top writers" },
-                                    { title: "🏆 Weekly Stats",       id: "!weekly",    description: "This week's leaderboard" },
-                                    { title: "📅 Monthly Stats",      id: "!monthly",   description: "This month's leaderboard" }
-                                ]
-                            },
-                            {
-                                title: "🎯 Goals & Challenges",
-                                rows: [
-                                    { title: "🎯 Personal Goal",    id: "!goal",             description: "Check or set your target" },
-                                    { title: "⚔️ Group Challenge",  id: "!challenge status", description: "Check active group boss" },
-                                    { title: "🛡️ Streak Status",    id: "!streak status",    description: "Check streak & freezes" }
-                                ]
-                            },
-                            {
-                                title: "ℹ️ Help & System",
-                                rows: [
-                                    { title: "📖 Help Commands", id: "!help", description: "Full list of text commands" },
-                                    { title: "⏰ Server Time",    id: "!time", description: "Check current Lagos time" }
-                                ]
-                            }
-                        ];
-
-                        const nativeMsg = generateWAMessageFromContent(chatId, {
-                            messageContextInfo: {
-                                deviceListMetadata: {},
-                                deviceListMetadataVersion: 2
-                            },
-                            interactiveMessage: proto.Message.InteractiveMessage.create({
-                                body: proto.Message.InteractiveMessage.Body.create({
-                                    text: "👋 *Welcome to Sprint Bot!*\n\nSelect an option from the menu below to write, track your progress, or check leaderboards:"
-                                }),
-                                footer: proto.Message.InteractiveMessage.Footer.create({
-                                    text: "Sprint Bot • Write More Together"
-                                }),
-                                header: proto.Message.InteractiveMessage.Header.create({
-                                    title: "📚 Sprint Bot Control Panel",
-                                    hasMediaAttachment: false
-                                }),
-                                nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-                                    buttons: [
-                                        {
-                                            name: "single_select",
-                                            buttonParamsJson: JSON.stringify({
-                                                title: "Open Menu",
-                                                sections: listSections
-                                            })
-                                        }
-                                    ]
-                                })
-                            })
-                        }, { userJid: sock.user?.id || '' });
-
-                        await sock.relayMessage(chatId, nativeMsg.message, { messageId: nativeMsg.key.id });
-                        return;
-                    } catch (e) {
-                        console.error("Error sending list menu:", e);
-                        // Fallback to text menu if interactive lists fail
-                        await sock.sendMessage(chatId, {
-                            text: `📋 *SPRINT BOT MENU*\n━━━━━━━━━━━━━━━━\n\n🏃 *Sprints*\n• !sprint 15 / !sprint 20 / !sprint 30\n• !wc 500 — log words in sprint\n• !finish — end sprint\n\n📊 *Stats*\n• !profile — your rank & badges\n• !daily — today's leaderboard\n• !yesterday — yesterday's stats\n• !weekly / !monthly — leaderboards\n\n🎯 *Goals & Challenges*\n• !goal — check your goal\n• !challenge status — group boss HP\n• !streak status — streak & freezes\n\nℹ️ *More: !help*`
-                        }, { quoted: msg });
                         return;
                     }
                 }
