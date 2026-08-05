@@ -245,37 +245,33 @@ module.exports = async function(m, appState) {
                         ];
 
                         const nativeMsg = generateWAMessageFromContent(chatId, {
-                            viewOnceMessage: {
-                                message: {
-                                    messageContextInfo: {
-                                        deviceListMetadata: {},
-                                        deviceListMetadataVersion: 2
-                                    },
-                                    interactiveMessage: proto.Message.InteractiveMessage.create({
-                                        body: proto.Message.InteractiveMessage.Body.create({
-                                            text: "👋 *Welcome to Sprint Bot!*\n\nSelect an option from the menu below to write, track your progress, or check leaderboards:"
-                                        }),
-                                        footer: proto.Message.InteractiveMessage.Footer.create({
-                                            text: "Sprint Bot • Write More Together"
-                                        }),
-                                        header: proto.Message.InteractiveMessage.Header.create({
-                                            title: "📚 Sprint Bot Control Panel",
-                                            hasMediaAttachment: false
-                                        }),
-                                        nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-                                            buttons: [
-                                                {
-                                                    name: "single_select",
-                                                    buttonParamsJson: JSON.stringify({
-                                                        title: "Open Menu",
-                                                        sections: listSections
-                                                    })
-                                                }
-                                            ]
-                                        })
-                                    })
-                                }
-                            }
+                            messageContextInfo: {
+                                deviceListMetadata: {},
+                                deviceListMetadataVersion: 2
+                            },
+                            interactiveMessage: proto.Message.InteractiveMessage.create({
+                                body: proto.Message.InteractiveMessage.Body.create({
+                                    text: "👋 *Welcome to Sprint Bot!*\n\nSelect an option from the menu below to write, track your progress, or check leaderboards:"
+                                }),
+                                footer: proto.Message.InteractiveMessage.Footer.create({
+                                    text: "Sprint Bot • Write More Together"
+                                }),
+                                header: proto.Message.InteractiveMessage.Header.create({
+                                    title: "📚 Sprint Bot Control Panel",
+                                    hasMediaAttachment: false
+                                }),
+                                nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                                    buttons: [
+                                        {
+                                            name: "single_select",
+                                            buttonParamsJson: JSON.stringify({
+                                                title: "Open Menu",
+                                                sections: listSections
+                                            })
+                                        }
+                                    ]
+                                })
+                            })
                         }, { userJid: sock.user?.id || '' });
 
                         await sock.relayMessage(chatId, nativeMsg.message, { messageId: nativeMsg.key.id });
