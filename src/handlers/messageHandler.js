@@ -10,7 +10,7 @@ const Feedback       = require('../models/Feedback');
 const SprintRecord   = require('../models/SprintRecord');
 const StreakFreeze   = require('../models/StreakFreeze');
 const ActiveSprint   = require('../models/ActiveSprint');
-const { getDurationString, getNextRank, getRank, getMaxFreezes, toSuperscript, BADGE_DEFS } = require('../utils/helpers');
+const { getDurationString, getNextRank, getRank, getMaxFreezes, toSuperscript, BADGE_DEFS, getLagosDateString, getLagosMonthName } = require('../utils/helpers');
 
 const BASE_URL     = process.env.BASE_URL || 'https://sprint-bot-9bll.onrender.com';
 const TIMEZONE     = 'Africa/Lagos';
@@ -84,13 +84,28 @@ module.exports = async function(m, appState) {
 
                 const isOwner = senderId.includes(OWNER_NUMBER);
 
-                // Unwrap ephemeral/viewOnce message wrappers
+                // Unwrap ephemeral/viewOnce/interactive message wrappers
                 const rawMsg = msg.message.ephemeralMessage?.message 
                     || msg.message.viewOnceMessage?.message 
                     || msg.message.documentWithCaptionMessage?.message
                     || msg.message;
-                const body = rawMsg.conversation || rawMsg.extendedTextMessage?.text || rawMsg.imageMessage?.caption || rawMsg.videoMessage?.caption || '';
-                if (!body.startsWith("!")) return;
+                let body = rawMsg.conversation 
+                    || rawMsg.extendedTextMessage?.text 
+                    || rawMsg.imageMessage?.caption 
+                    || rawMsg.videoMessage?.caption 
+                    || rawMsg.listResponseMessage?.singleSelectReply?.selectedRowId
+                    || rawMsg.buttonsResponseMessage?.selectedButtonId
+                    || rawMsg.templateButtonReplyMessage?.selectedId
+                    || '';
+
+                if (!body && rawMsg.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson) {
+                    try {
+                        const params = JSON.parse(rawMsg.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson);
+                        body = params.id || params.row_id || '';
+                    } catch (e) {}
+                }
+
+                if (!body || !body.startsWith("!")) return;
 
                 if (maintenanceMode && !isOwner) {
                     await sock.sendMessage(chatId, { text: "⚠️ Bot is in Maintenance Mode. Check back soon!" }, { quoted: msg });
@@ -183,6 +198,57 @@ module.exports = async function(m, appState) {
                         await sock.sendMessage(chatId, { text: "👋 Bye!" });
                         await sock.groupLeave(chatId);
                         return;
+                    }
+                }
+
+                // ── MENU ────────────────────────────────────────────────────────────
+                if (command === "!menu" || command === "!start") {
+                    try {
+                        await sock.sendMessage(chatId, {
+                            text: `👋 *Welcome to Sprint Bot!*\n\nSelect an option from the menu below to write, track your progress, or check leaderboards:`,
+                            footer: "Sprint Bot • Write More Together",
+                            title: "📚 Sprint Bot Control Panel",
+                            buttonText: "Open Menu",
+                            sections: [
+                                {
+                                    title: "🏃 Writing Sprints",
+                                    rows: [
+                                        { title: "🏃 15-Min Sprint", rowId: "!sprint 15", description: "Start a quick 15-minute sprint" },
+                                        { title: "🏃 20-Min Sprint", rowId: "!sprint 20", description: "Start a 20-minute sprint" },
+                                        { title: "🏃 30-Min Sprint", rowId: "!sprint 30", description: "Start a 30-minute sprint" },
+                                        { title: "✍️ Log Words", rowId: "!log 500", description: "Log your words written today" }
+                                    ]
+                                },
+                                {
+                                    title: "📊 Profile & Leaderboards",
+                                    rows: [
+                                        { title: "👤 My Profile", rowId: "!profile", description: "View your rank, stats & badges" },
+                                        { title: "🔥 Daily Leaderboard", rowId: "!daily", description: "Top writers today" },
+                                        { title: "⏪ Yesterday's Stats", rowId: "!yesterday", description: "Yesterday's top writers" },
+                                        { title: "🏆 Weekly Stats", rowId: "!weekly", description: "This week's leaderboard" },
+                                        { title: "📅 Monthly Stats", rowId: "!monthly", description: "This month's leaderboard" }
+                                    ]
+                                },
+                                {
+                                    title: "🎯 Goals & Challenges",
+                                    rows: [
+                                        { title: "🎯 Personal Goal", rowId: "!goal", description: "Check or set your target" },
+                                        { title: "⚔️ Group Challenge", rowId: "!challenge", description: "Check active group boss" },
+                                        { title: "🛡️ Streak Status", rowId: "!streak status", description: "Check streak & freezes" }
+                                    ]
+                                },
+                                {
+                                    title: "ℹ️ Help & System",
+                                    rows: [
+                                        { title: "📖 Help Commands", rowId: "!help", description: "Full list of text commands" },
+                                        { title: "⏰ Server Time", rowId: "!time", description: "Check current Lagos time" }
+                                    ]
+                                }
+                            ]
+                        }, { quoted: msg });
+                        return;
+                    } catch (e) {
+                        console.error("Error sending list menu:", e);
                     }
                 }
 
@@ -633,9 +699,7 @@ module.exports = async function(m, appState) {
                         title = `Daily (${todayStr})`;
                         matchQuery = { date: todayStr };
                     } else if (command === "!yesterday") {
-                        const yDate = new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
-                        yDate.setDate(yDate.getDate() - 1);
-                        const yStr = yDate.toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+                        const yStr = getLagosDateString(Date.now() - 86400000);
                         title = `Yesterday (${yStr})`;
                         matchQuery = { date: yStr };
                     } else if (command === "!weekly") {

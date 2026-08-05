@@ -7,13 +7,13 @@ const UserProfile = require('../models/UserProfile');
 const WeeklyChallenge = require('../models/WeeklyChallenge');
 const StreakFreeze = require('../models/StreakFreeze');
 const BotState = require('../models/BotState');
-const { getRank, getMaxFreezes } = require('../utils/helpers');
+const { getRank, getMaxFreezes, getLagosDateString, getLagosMonthName } = require('../utils/helpers');
 
 module.exports = function(appState) {
     const { getTodayDateGMT1, awardBadge, startSprintSession, TIMEZONE, pushActivity } = appState;
 
-    // Helper for Lagos time
-    const getLagosDate = () => new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
+    // Helper for Lagos time (UTC+1 Date instance)
+    const getLagosDate = () => new Date(Date.now() + 3600000);
 
     let isMinutelyRunning = false;
 
@@ -242,12 +242,18 @@ module.exports = function(appState) {
             }
 
             // --- MONTHLY (Last day of month) ---
-            const tomorrow = new Date(lagos); tomorrow.setDate(tomorrow.getDate() + 1);
-            if (tomorrow.getDate() === 1) {
+            const tomorrow = new Date(Date.now() + 3600000 + 86400000);
+            if (tomorrow.getUTCDate() === 1) {
                 console.log("🎖️ Running Monthly MVP Announcements...");
-                const year = lagos.getFullYear(), month = lagos.getMonth();
-                const monthDates = Array.from({ length: lagos.getDate() }, (_, i) => new Date(year, month, i + 1).toLocaleDateString('en-CA', { timeZone: TIMEZONE }));
-                const monthStr   = lagos.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: TIMEZONE });
+                const nowLagos = new Date(Date.now() + 3600000);
+                const year = nowLagos.getUTCFullYear(), month = nowLagos.getUTCMonth();
+                const daysInMonth = nowLagos.getUTCDate();
+                const monthDates = Array.from({ length: daysInMonth }, (_, i) => {
+                    const m = String(month + 1).padStart(2, '0');
+                    const d = String(i + 1).padStart(2, '0');
+                    return `${year}-${m}-${d}`;
+                });
+                const monthStr   = getLagosMonthName();
                 
                 for (const gid of groupIds) {
                     try {

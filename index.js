@@ -14,7 +14,7 @@ require("dotenv").config();
 // =======================
 //   HELPER FUNCTIONS
 // =======================
-const { toSuperscript, getRank, getNextRank, getMaxFreezes, getDurationString, BADGE_DEFS } = require('./src/utils/helpers');
+const { toSuperscript, getRank, getNextRank, getMaxFreezes, getDurationString, getLagosDateString, getLagosMonthName, BADGE_DEFS } = require('./src/utils/helpers');
 
 // =======================
 //   CONFIG & SERVER SETUP
@@ -184,7 +184,7 @@ mongoose.connect(MONGO_URI).then(async () => {
         }
     });
 
-    const getTodayDateGMT1 = () => new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+    const getTodayDateGMT1 = () => getLagosDateString();
 
     // =======================
     //   BADGE SYSTEM
@@ -549,7 +549,7 @@ mongoose.connect(MONGO_URI).then(async () => {
                 try {
                     await new Promise(r => setTimeout(r, 2000));
                     await sock.sendMessage(group.id, {
-                        text: `👋 *Hey writers! Sprint Bot just joined the room!*\n\nI help you track writing sprints, word counts, streaks, and group challenges. Here's how to get started:\n\n📖 *!help* — Full command list\n✍️ *!log 500* — Log your words right now\n🏃 *!sprint 20* — Start a 20-minute sprint\n📊 *!wc 500* — Submit your word count during a sprint\n🎯 *!goal set 1000* — Set a personal writing target\n\nLet's write! 🚀`
+                        text: `👋 *Hey writers! Sprint Bot just joined the room!*\n\nI help you track writing sprints, word counts, streaks, and group challenges. Here's how to get started:\n\n📋 *!menu* — Interactive popup menu\n📖 *!help* — Full command list\n✍️ *!log 500* — Log your words right now\n🏃 *!sprint 20* — Start a 20-minute sprint\n📊 *!wc 500* — Submit your word count during a sprint\n🎯 *!goal set 1000* — Set a personal writing target\n\nLet's write! 🚀`
                     });
                     await GroupMeta.updateOne(
                         { groupId: group.id },
