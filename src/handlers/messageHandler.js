@@ -94,6 +94,8 @@ module.exports = async function(m, appState) {
                     || rawMsg.imageMessage?.caption 
                     || rawMsg.videoMessage?.caption 
                     || rawMsg.listResponseMessage?.singleSelectReply?.selectedRowId
+                    || rawMsg.listResponseMessage?.singleSelectReply?.id
+                    || rawMsg.listResponseMessage?.title
                     || rawMsg.buttonsResponseMessage?.selectedButtonId
                     || rawMsg.templateButtonReplyMessage?.selectedId
                     || '';
@@ -101,7 +103,7 @@ module.exports = async function(m, appState) {
                 if (!body && rawMsg.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson) {
                     try {
                         const params = JSON.parse(rawMsg.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson);
-                        body = params.id || params.row_id || '';
+                        body = params.id || params.row_id || params.selectedRowId || '';
                     } catch (e) {}
                 }
 
@@ -204,51 +206,61 @@ module.exports = async function(m, appState) {
                 // ── MENU ────────────────────────────────────────────────────────────
                 if (command === "!menu" || command === "!start") {
                     try {
+                        const listSections = [
+                            {
+                                title: "🏃 Writing Sprints",
+                                rows: [
+                                    { title: "🏃 15-Min Sprint",  id: "!sprint 15",         description: "Start a 15-minute sprint" },
+                                    { title: "🏃 20-Min Sprint",  id: "!sprint 20",         description: "Start a 20-minute sprint" },
+                                    { title: "🏃 30-Min Sprint",  id: "!sprint 30",         description: "Start a 30-minute sprint" },
+                                    { title: "✍️ Log Words",       id: "!log 500",           description: "Log your words written today" }
+                                ]
+                            },
+                            {
+                                title: "📊 Profile & Leaderboards",
+                                rows: [
+                                    { title: "👤 My Profile",         id: "!profile",   description: "View your rank, stats & badges" },
+                                    { title: "🔥 Daily Leaderboard",  id: "!daily",     description: "Top writers today" },
+                                    { title: "⏪ Yesterday's Stats",  id: "!yesterday", description: "Yesterday's top writers" },
+                                    { title: "🏆 Weekly Stats",       id: "!weekly",    description: "This week's leaderboard" },
+                                    { title: "📅 Monthly Stats",      id: "!monthly",   description: "This month's leaderboard" }
+                                ]
+                            },
+                            {
+                                title: "🎯 Goals & Challenges",
+                                rows: [
+                                    { title: "🎯 Personal Goal",    id: "!goal",             description: "Check or set your target" },
+                                    { title: "⚔️ Group Challenge",  id: "!challenge status", description: "Check active group boss" },
+                                    { title: "🛡️ Streak Status",    id: "!streak status",    description: "Check streak & freezes" }
+                                ]
+                            },
+                            {
+                                title: "ℹ️ Help & System",
+                                rows: [
+                                    { title: "📖 Help Commands", id: "!help", description: "Full list of text commands" },
+                                    { title: "⏰ Server Time",    id: "!time", description: "Check current Lagos time" }
+                                ]
+                            }
+                        ];
+
                         await sock.sendMessage(chatId, {
-                            text: `👋 *Welcome to Sprint Bot!*\n\nSelect an option from the menu below to write, track your progress, or check leaderboards:`,
-                            footer: "Sprint Bot • Write More Together",
-                            title: "📚 Sprint Bot Control Panel",
-                            buttonText: "Open Menu",
-                            sections: [
-                                {
-                                    title: "🏃 Writing Sprints",
-                                    rows: [
-                                        { title: "🏃 15-Min Sprint", rowId: "!sprint 15", description: "Start a quick 15-minute sprint" },
-                                        { title: "🏃 20-Min Sprint", rowId: "!sprint 20", description: "Start a 20-minute sprint" },
-                                        { title: "🏃 30-Min Sprint", rowId: "!sprint 30", description: "Start a 30-minute sprint" },
-                                        { title: "✍️ Log Words", rowId: "!log 500", description: "Log your words written today" }
-                                    ]
-                                },
-                                {
-                                    title: "📊 Profile & Leaderboards",
-                                    rows: [
-                                        { title: "👤 My Profile", rowId: "!profile", description: "View your rank, stats & badges" },
-                                        { title: "🔥 Daily Leaderboard", rowId: "!daily", description: "Top writers today" },
-                                        { title: "⏪ Yesterday's Stats", rowId: "!yesterday", description: "Yesterday's top writers" },
-                                        { title: "🏆 Weekly Stats", rowId: "!weekly", description: "This week's leaderboard" },
-                                        { title: "📅 Monthly Stats", rowId: "!monthly", description: "This month's leaderboard" }
-                                    ]
-                                },
-                                {
-                                    title: "🎯 Goals & Challenges",
-                                    rows: [
-                                        { title: "🎯 Personal Goal", rowId: "!goal", description: "Check or set your target" },
-                                        { title: "⚔️ Group Challenge", rowId: "!challenge status", description: "Check active group boss" },
-                                        { title: "🛡️ Streak Status", rowId: "!streak status", description: "Check streak & freezes" }
-                                    ]
-                                },
-                                {
-                                    title: "ℹ️ Help & System",
-                                    rows: [
-                                        { title: "📖 Help Commands", rowId: "!help", description: "Full list of text commands" },
-                                        { title: "⏰ Server Time", rowId: "!time", description: "Check current Lagos time" }
-                                    ]
-                                }
-                            ]
+                            listMessage: {
+                                title: "📚 Sprint Bot Control Panel",
+                                description: "👋 *Welcome to Sprint Bot!*\n\nSelect an option below to write, track your progress, or check leaderboards:",
+                                footerText: "Sprint Bot • Write More Together",
+                                buttonText: "Open Menu",
+                                listType: 1, // SINGLE_SELECT
+                                sections: listSections
+                            }
                         }, { quoted: msg });
                         return;
                     } catch (e) {
                         console.error("Error sending list menu:", e);
+                        // Fallback to plain text menu if interactive lists not supported
+                        await sock.sendMessage(chatId, {
+                            text: `📋 *SPRINT BOT MENU*\n━━━━━━━━━━━━━━━━\n\n🏃 *Sprints*\n• !sprint 15 / !sprint 20 / !sprint 30\n• !wc 500 — log words in sprint\n• !finish — end sprint\n\n📊 *Stats*\n• !profile — your rank & badges\n• !daily — today's leaderboard\n• !yesterday — yesterday's stats\n• !weekly / !monthly — leaderboards\n\n🎯 *Goals & Challenges*\n• !goal — check your goal\n• !challenge status — group boss HP\n• !streak status — streak & freezes\n\nℹ️ *More: !help*`
+                        }, { quoted: msg });
+                        return;
                     }
                 }
 
