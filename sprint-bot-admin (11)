@@ -886,42 +886,57 @@
                 const qrBox = document.getElementById('qr-box');
 
                 if (sys.isConnected) {
-                    connBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Connected`;
-                    connBadge.className = "text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5";
-                    connDisplay.innerHTML = `<i class="fas fa-circle-check text-emerald-400 text-2xl"></i><span class="font-bold text-sm text-slate-200">Online & Ready</span>`;
-                    qrBox.innerHTML = `
-                        <div class="text-center">
-                            <i class="fas fa-circle-check text-2xl text-emerald-400 mb-1 block"></i>
-                            <div class="text-emerald-400 font-bold text-xs">WhatsApp Paired</div>
-                            <button onclick="unpairWhatsApp()" class="mt-2 px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg text-[10px] font-bold transition">Unpair & Re-pair</button>
-                        </div>
-                    `;
+                    if (connBadge) {
+                        connBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Connected`;
+                        connBadge.className = "text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5";
+                    }
+                    if (connDisplay) {
+                        connDisplay.innerHTML = `<i class="fas fa-circle-check text-emerald-400 text-2xl"></i><span class="font-bold text-sm text-slate-200">Online & Ready</span>`;
+                    }
+                    if (qrBox) {
+                        qrBox.innerHTML = `
+                            <div class="text-center">
+                                <i class="fas fa-circle-check text-2xl text-emerald-400 mb-1 block"></i>
+                                <div class="text-emerald-400 font-bold text-xs">WhatsApp Paired</div>
+                                <button onclick="unpairWhatsApp()" class="mt-2 px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg text-[10px] font-bold transition">Unpair & Re-pair</button>
+                            </div>
+                        `;
+                    }
                 } else {
-                    connBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Pairing Required`;
-                    connBadge.className = "text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1.5";
-                    connDisplay.innerHTML = `<i class="fas fa-triangle-exclamation text-amber-400 text-2xl"></i><span class="font-bold text-sm text-slate-200">Pairing Needed</span>`;
+                    if (connBadge) {
+                        connBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Pairing Required`;
+                        connBadge.className = "text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1.5";
+                    }
+                    if (connDisplay) {
+                        connDisplay.innerHTML = `<i class="fas fa-triangle-exclamation text-amber-400 text-2xl"></i><span class="font-bold text-sm text-slate-200">Pairing Needed</span>`;
+                    }
                     
-                    if (sys.qrCode) {
-                        qrBox.innerHTML = `<img src="${sys.qrCode}" class="w-full h-full object-contain rounded-lg">`;
-                    } else {
-                        qrBox.innerHTML = `<div class="text-slate-500 text-xs text-center font-bold">Generating QR Code...</div>`;
+                    if (qrBox) {
+                        if (sys.qrCode) {
+                            qrBox.innerHTML = `<img src="${sys.qrCode}" class="w-full h-full object-contain rounded-lg">`;
+                        } else {
+                            qrBox.innerHTML = `<div class="text-slate-500 text-xs text-center font-bold">Generating QR Code...</div>`;
+                        }
                     }
                 }
 
                 const maintBtn = document.getElementById('maint-btn');
                 const maintStatus = document.getElementById('maint-status');
-                if (sys.maintenance) {
-                    maintStatus.innerText = "ACTIVE";
-                    maintStatus.className = "text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30";
-                    maintBtn.innerText = "Deactivate";
-                } else {
-                    maintStatus.innerText = "Inactive";
-                    maintStatus.className = "text-xs font-bold px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700";
-                    maintBtn.innerText = "Activate";
+                if (maintStatus && maintBtn) {
+                    if (sys.maintenance) {
+                        maintStatus.innerText = "ACTIVE";
+                        maintStatus.className = "text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30";
+                        maintBtn.innerText = "Deactivate";
+                    } else {
+                        maintStatus.innerText = "Inactive";
+                        maintStatus.className = "text-xs font-bold px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700";
+                        maintBtn.innerText = "Activate";
+                    }
                 }
 
-                if (sys.recentActivity) {
-                    document.getElementById('sys-log').innerHTML = sys.recentActivity.map(a => {
+                const sysLogEl = document.getElementById('sys-log');
+                if (sysLogEl && sys.recentActivity) {
+                    sysLogEl.innerHTML = sys.recentActivity.map(a => {
                         const dateObj = new Date(a.at || a.time || Date.now());
                         const timeStr = isNaN(dateObj.getTime()) ? new Date().toLocaleTimeString() : dateObj.toLocaleTimeString();
                         return `<div><span class="text-slate-500">[${timeStr}]</span> ${a.text}</div>`;
@@ -939,14 +954,19 @@
             if (stats) {
                 const totalW = (stats.totalWords || 0);
                 const formattedW = totalW >= 1000000 ? (totalW / 1000000).toFixed(1) + 'M' : totalW.toLocaleString();
-                document.getElementById('hud-total-words').innerText = formattedW;
-                document.getElementById('hud-total-writers').innerText = stats.totalWriters || 0;
-                document.getElementById('hud-active-groups').innerText = stats.totalGroups || 0;
-                document.getElementById('hud-sys-status').innerText = stats.isConnected ? 'Active' : 'Offline';
+                const hudTW = document.getElementById('hud-total-words');
+                if (hudTW) hudTW.innerText = formattedW;
+                const hudTWriters = document.getElementById('hud-total-writers');
+                if (hudTWriters) hudTWriters.innerText = stats.totalWriters || 0;
+                const hudTGroups = document.getElementById('hud-active-groups');
+                if (hudTGroups) hudTGroups.innerText = stats.totalGroups || 0;
+                const hudSysStatus = document.getElementById('hud-sys-status');
+                if (hudSysStatus) hudSysStatus.innerText = stats.isConnected ? 'Active' : 'Offline';
 
                 // Chart: Velocity Curve
-                if (stats.chartData) {
-                    const ctx = document.getElementById('hud-chart-velocity').getContext('2d');
+                const chartEl = document.getElementById('hud-chart-velocity');
+                if (stats.chartData && chartEl) {
+                    const ctx = chartEl.getContext('2d');
                     if (hudVelocityChart) hudVelocityChart.destroy();
                     hudVelocityChart = new Chart(ctx, {
                         type: 'line',
