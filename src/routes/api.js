@@ -264,10 +264,33 @@ router.get('/api/admin/scheduled', requireAdmin, async (req, res) => {
         const sprints = await ScheduledSprint.find({ startTime: { $gt: new Date() } }).sort({ startTime: 1 });
         res.json(sprints.map(s => ({
             id: s._id,
+            groupId: s.groupId,
             groupName: appState.groupCache[s.groupId]?.subject || s.groupId,
             startTime: s.startTime, duration: s.duration,
             createdBy: s.createdBy ? s.createdBy.split('@')[0] : 'Admin'
         })));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/scheduled/create', requireAdmin, async (req, res) => {
+    try {
+        const { groupId, startTime, duration, createdBy } = req.body;
+        if (!groupId || !startTime || !duration) {
+            return res.status(400).json({ error: "groupId, startTime, and duration are required" });
+        }
+        const start = new Date(startTime);
+        if (isNaN(start.getTime())) {
+            return res.status(400).json({ error: "Invalid start date/time" });
+        }
+
+        const scheduled = await ScheduledSprint.create({
+            groupId,
+            startTime: start,
+            duration: parseInt(duration, 10),
+            createdBy: createdBy || 'Admin'
+        });
+
+        res.json({ success: true, scheduled });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -726,7 +749,7 @@ router.get('/api/admin/analytics', requireAdmin, async (req, res) => {
 
         const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        const [wordsByDay, wordsByHour, activeCurrent, activePrev, currentWords, prevWords, groupBreakdown, dbGroups] = await Promise.all([
+        const [wordsByDay, wordsByHour, activeCurrent, activePrev, currentWords, prevWords, groupBreakdown, dbGroups, totalWordsAgg] = await Promise.all([
             DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo } } }, { $group: { _id: "$date", total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
             DailyStats.aggregate([{ $match: { timestamp: { $gte: thirtyDaysAgo } } }, { $group: { _id: { $hour: "$timestamp" }, total: { $sum: "$words" } } }, { $sort: { _id: 1 } }]),
             DailyStats.distinct("userId", { timestamp: { $gte: currentStart } }),
@@ -734,7 +757,8 @@ router.get('/api/admin/analytics', requireAdmin, async (req, res) => {
             DailyStats.aggregate([{ $match: { timestamp: { $gte: currentStart } } }, { $group: { _id: "$userId", total: { $sum: "$words" }, name: { $first: "$name" } } }]),
             DailyStats.aggregate([{ $match: { timestamp: { $gte: prevStart, $lt: currentStart } } }, { $group: { _id: "$userId", total: { $sum: "$words" } } }]),
             DailyStats.aggregate([{ $match: { timestamp: { $gte: currentStart }, groupId: { $ne: "Manual_Correction" } } }, { $group: { _id: "$groupId", total: { $sum: "$words" }, writers: { $addToSet: "$userId" } } }, { $sort: { total: -1 } }, { $limit: 10 }]),
-            GroupMeta.find({})
+            GroupMeta.find({}),
+            DailyStats.aggregate([{ $group: { _id: null, total: { $sum: "$words" } } }])
         ]);
 
         const retained      = activeCurrent.filter(u => activePrev.includes(u));
@@ -752,7 +776,10 @@ router.get('/api/admin/analytics', requireAdmin, async (req, res) => {
         res.json({
             wordsByDay: { labels: wordsByDay.map(d => d._id), data: wordsByDay.map(d => d.total) },
             wordsByHour: Array.from({ length: 24 }, (_, h) => ({ hour: h, total: wordsByHour.find(x => x._id === h)?.total || 0 })),
-            retentionRate, activeCurrent: activeCurrent.length, activePrev: activePrev.length,
+            retentionRate,
+            activeCurrentCount: activeCurrent.length,
+            activePrevCount: activePrev.length,
+            totalLoggedWords: totalWordsAgg[0]?.total || 0,
             growers,
             groupBreakdown: groupBreakdown.map(g => ({ name: groupMap[g._id] || g._id, words: g.total, writers: g.writers.length }))
         });

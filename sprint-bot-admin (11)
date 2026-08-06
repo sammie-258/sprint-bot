@@ -40,7 +40,7 @@
             --panel: #111827;
             --border: rgba(255, 255, 255, 0.08);
         }
-        body { background-color: var(--bg); color: #f9fafb; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg); color: #f9fafb; font-family: 'Inter', sans-serif; overflow-x: hidden; }
         
         .panel {
             background: var(--panel);
@@ -60,6 +60,16 @@
             border: 1px solid rgba(16, 185, 129, 0.25);
         }
 
+        /* Slide-over Drawer Animation */
+        .drawer {
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .drawer.open {
+            transform: translateX(0);
+        }
+
+        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
@@ -71,6 +81,39 @@
     </style>
 </head>
 <body class="h-screen w-screen flex overflow-hidden">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-[300] space-y-2 pointer-events-none"></div>
+
+    <!-- Custom Confirmation Modal -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[280] hidden flex items-center justify-center p-4">
+        <div class="panel p-6 max-w-sm w-full border border-white/10 text-center space-y-4">
+            <div class="w-12 h-12 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto text-xl">
+                <i class="fas fa-triangle-exclamation"></i>
+            </div>
+            <h3 id="confirm-title" class="font-bold text-base text-white">Confirmation</h3>
+            <p id="confirm-msg" class="text-xs text-slate-400"></p>
+            <div class="flex gap-3 pt-2">
+                <button onclick="closeConfirmModal(false)" class="flex-1 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold transition">Cancel</button>
+                <button id="confirm-ok-btn" onclick="closeConfirmModal(true)" class="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Prompt Input Modal -->
+    <div id="prompt-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[280] hidden flex items-center justify-center p-4">
+        <div class="panel p-6 max-w-sm w-full border border-white/10 text-center space-y-4">
+            <div class="w-12 h-12 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mx-auto text-xl">
+                <i class="fas fa-pen-to-square"></i>
+            </div>
+            <h3 id="prompt-title" class="font-bold text-base text-white">Enter Value</h3>
+            <input type="text" id="prompt-input" class="w-full bg-black/40 border border-white/15 px-4 py-2.5 rounded-xl text-xs font-mono text-center outline-none focus:border-indigo-400">
+            <div class="flex gap-3 pt-2">
+                <button onclick="closePromptModal(null)" class="flex-1 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold transition">Cancel</button>
+                <button onclick="closePromptModal(document.getElementById('prompt-input').value)" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition">Submit</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Auth Modal -->
     <div id="auth-modal" class="fixed inset-0 bg-[#0b0f19]/98 z-[200] flex items-center justify-center p-4">
@@ -99,23 +142,23 @@
                 </div>
                 <div>
                     <h2 class="font-bold text-base leading-tight">Sprint Bot</h2>
-                    <span class="text-[10px] text-[#10b981] font-semibold tracking-wider uppercase bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">Command Center v5.1</span>
+                    <span class="text-[10px] text-[#10b981] font-semibold tracking-wider uppercase bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">Command Center v5.2</span>
                 </div>
             </div>
 
             <!-- Navigation Links -->
             <div class="space-y-1 mb-6">
                 <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">Core Modules</div>
-                <button onclick="switchTab('overview')" id="nav-overview" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-chart-pie text-xs w-4"></i> Overview & QR Code</button>
+                <button onclick="switchTab('overview')" id="nav-overview" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-[#10b981] fa-desktop text-xs w-4"></i> Overview & Live HUD</button>
                 <button onclick="switchTab('writers')" id="nav-writers" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-users-gear text-xs w-4"></i> Writers & PIN Access</button>
                 <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-chart-line text-xs w-4"></i> Performance Analytics</button>
             </div>
 
             <div class="space-y-1 mb-6">
                 <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">Management</div>
-                <button onclick="switchTab('sprints')" id="nav-sprints" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-stopwatch text-xs w-4"></i> Active Sprints</button>
+                <button onclick="switchTab('sprints')" id="nav-sprints" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-stopwatch text-xs w-4"></i> Sprints & Missions</button>
                 <button onclick="switchTab('groups')" id="nav-groups" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-comments text-xs w-4"></i> WhatsApp Groups</button>
-                <button onclick="switchTab('scheduler')" id="nav-scheduler" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-bullhorn text-xs w-4"></i> Broadcast & Schedule</button>
+                <button onclick="switchTab('broadcast')" id="nav-broadcast" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-paper-plane text-xs w-4"></i> Broadcast Channel</button>
                 <button onclick="switchTab('feedback')" id="nav-feedback" class="nav-link w-full flex items-center justify-between px-4 py-2.5 text-sm text-slate-300 hover:text-white transition">
                     <span class="flex items-center gap-3"><i class="fas fa-inbox text-xs w-4"></i> Feedback Inbox</span>
                     <span id="unread-count" class="hidden text-[10px] font-bold bg-[#ef4444] text-white px-2 py-0.5 rounded-full">0</span>
@@ -123,9 +166,6 @@
             </div>
 
             <div class="mt-auto pt-4 border-t border-white/10 space-y-2">
-                <button onclick="switchTab('scheduler')" class="w-full py-2.5 bg-[#6366f1]/10 hover:bg-[#6366f1]/20 border border-[#6366f1]/30 text-[#818cf8] font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition">
-                    <i class="fas fa-paper-plane"></i> Send Broadcast
-                </button>
                 <button onclick="logout()" class="w-full py-2 text-slate-400 hover:text-red-400 text-xs font-semibold text-left px-3 transition flex items-center gap-2">
                     <i class="fas fa-arrow-right-from-bracket"></i> Sign Out
                 </button>
@@ -154,7 +194,7 @@
             <!-- Tab Content Views -->
             <div class="flex-1 overflow-y-auto p-6 space-y-6">
                 
-                <!-- VIEW 1: OVERVIEW & QR CODE SCANNER -->
+                <!-- VIEW 1: OVERVIEW & LIVE HUD -->
                 <div id="view-overview" class="space-y-6">
                     
                     <!-- QR Code & Connection Status Card -->
@@ -199,6 +239,16 @@
                         </div>
                     </div>
 
+                    <!-- Live HUD Widget -->
+                    <div class="panel p-5">
+                        <h3 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
+                            <i class="fas fa-satellite-dish text-emerald-400"></i> Live Sprint HUD
+                        </h3>
+                        <div id="live-hud-container" class="space-y-3">
+                            <div class="text-slate-500 text-xs py-4 text-center">No active sprints currently running.</div>
+                        </div>
+                    </div>
+
                     <!-- Global Maintenance Panel -->
                     <div class="panel p-5 flex items-center justify-between">
                         <div class="flex items-center gap-4">
@@ -223,7 +273,7 @@
                     </div>
                 </div>
 
-                <!-- VIEW 2: WRITERS & PIN ACCESS (COMPLETE MANAGEMENT) -->
+                <!-- VIEW 2: WRITERS & PIN ACCESS (ZOHO BOOKS STYLE DETAIL DRAWER) -->
                 <div id="view-writers" class="hidden space-y-6">
                     
                     <!-- Quick PIN Lookup Header Card -->
@@ -358,10 +408,47 @@
                     </div>
                 </div>
 
-                <!-- VIEW 4: SPRINTS & MISSIONS -->
+                <!-- VIEW 4: SPRINTS & MISSIONS (UNIFIED) -->
                 <div id="view-sprints" class="hidden space-y-6">
+                    
+                    <!-- Schedule Sprint Form Box -->
+                    <div class="panel p-6 bg-gradient-to-r from-[#111827] to-[#1f2937] border-emerald-500/30">
+                        <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+                            <i class="fas fa-[#10b981] fa-calendar-plus text-emerald-400"></i> Schedule Future Group Sprint
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Target Group</label>
+                                <select id="sch-group" class="w-full bg-[#1f2937] border border-white/10 p-2.5 rounded-xl text-xs outline-none"></select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Start Date & Time</label>
+                                <input type="datetime-local" id="sch-time" class="w-full bg-black/30 border border-white/10 p-2.5 rounded-xl text-xs outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Duration (Minutes)</label>
+                                <select id="sch-duration" class="w-full bg-[#1f2937] border border-white/10 p-2.5 rounded-xl text-xs outline-none">
+                                    <option value="15">15 Minutes</option>
+                                    <option value="20" selected>20 Minutes</option>
+                                    <option value="30">30 Minutes</option>
+                                    <option value="45">45 Minutes</option>
+                                    <option value="60">60 Minutes</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button onclick="createScheduledSprint()" class="mt-4 px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-emerald-500/20">Schedule Sprint</button>
+                    </div>
+
+                    <!-- Upcoming Scheduled Sprints -->
                     <div class="panel p-5">
-                        <h3 class="text-sm font-bold mb-4">Active Sprints Across Groups</h3>
+                        <h3 class="text-sm font-bold mb-4">Upcoming Scheduled Sprints</h3>
+                        <div id="scheduled-list" class="space-y-3"></div>
+                    </div>
+
+                    <!-- Active Sprints List -->
+                    <div class="panel p-5">
+                        <h3 class="text-sm font-bold mb-4">Active Sprints Running Across Groups</h3>
                         <div id="active-sprints-list" class="space-y-3"></div>
                     </div>
                 </div>
@@ -390,8 +477,8 @@
                     <div id="groups-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 </div>
 
-                <!-- VIEW 6: SCHEDULER & BROADCAST -->
-                <div id="view-scheduler" class="hidden space-y-6">
+                <!-- VIEW 6: BROADCAST CHANNEL -->
+                <div id="view-broadcast" class="hidden space-y-6">
                     
                     <!-- Instant Broadcast Blast Box -->
                     <div class="panel p-6 border-indigo-500/30">
@@ -424,38 +511,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Schedule Sprint Box -->
-                    <div class="panel p-6">
-                        <h3 class="text-base font-bold text-white mb-4">Schedule Future Sprint</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Target Group</label>
-                                <select id="sch-group" class="w-full bg-[#1f2937] border border-white/10 p-2.5 rounded-xl text-xs outline-none"></select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Start Date & Time</label>
-                                <input type="datetime-local" id="sch-time" class="w-full bg-black/30 border border-white/10 p-2.5 rounded-xl text-xs outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Duration (Minutes)</label>
-                                <select id="sch-duration" class="w-full bg-[#1f2937] border border-white/10 p-2.5 rounded-xl text-xs outline-none">
-                                    <option value="15">15 Minutes</option>
-                                    <option value="20" selected>20 Minutes</option>
-                                    <option value="30">30 Minutes</option>
-                                    <option value="45">45 Minutes</option>
-                                    <option value="60">60 Minutes</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button onclick="createScheduledSprint()" class="mt-4 px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs transition">Schedule Sprint</button>
-                    </div>
-
-                    <!-- Scheduled Sprints List -->
-                    <div class="panel p-5">
-                        <h3 class="text-sm font-bold mb-4">Upcoming Scheduled Sprints</h3>
-                        <div id="scheduled-list" class="space-y-3"></div>
-                    </div>
                 </div>
 
                 <!-- VIEW 7: FEEDBACK -->
@@ -473,38 +528,70 @@
         </main>
     </div>
 
-    <!-- Edit Writer Drawer Modal -->
-    <div id="writer-edit-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4">
-        <div class="panel p-6 max-w-md w-full relative">
-            <button onclick="closeWriterEditModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
-            <h3 class="text-lg font-bold mb-4">Edit Writer Profile</h3>
-            
-            <div class="space-y-4">
+    <!-- WRITER DETAIL SIDE DRAWER (ZOHO BOOKS STYLE) -->
+    <div id="writer-drawer-overlay" onclick="closeWriterDrawer()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[250] hidden"></div>
+    <aside id="writer-drawer" class="drawer fixed inset-y-0 right-0 w-full max-w-xl bg-[#111827] border-l border-white/10 z-[260] flex flex-col p-6 overflow-y-auto">
+        <div class="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+            <div class="flex items-center gap-3">
+                <div id="dr-avatar" class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-lg"></div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Writer Name</label>
-                    <input type="text" id="edit-w-name" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-400">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Current Streak (Days)</label>
-                    <input type="number" id="edit-w-streak" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-400">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Web Logging 4-Digit PIN</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="edit-w-pin" maxlength="4" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono tracking-widest text-center outline-none focus:border-emerald-400">
-                        <button onclick="generateEditPin()" class="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition">🎲 Random</button>
-                    </div>
+                    <h3 id="dr-name" class="font-bold text-lg text-white"></h3>
+                    <div id="dr-phone" class="text-xs font-mono text-slate-400"></div>
                 </div>
             </div>
+            <button onclick="closeWriterDrawer()" class="text-slate-400 hover:text-white p-2 text-lg"><i class="fas fa-times"></i></button>
+        </div>
 
-            <div class="mt-6 flex justify-end gap-2">
-                <button onclick="closeWriterEditModal()" class="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold transition">Cancel</button>
-                <button onclick="saveWriterEdit()" class="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs transition">Save Changes</button>
+        <!-- Action Toolbar inside Drawer -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+            <button onclick="copyWriterProfileLink()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1.5">
+                <i class="fas fa-link text-emerald-400"></i> Profile Link
+            </button>
+            <button onclick="copyWriterPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1.5">
+                <i class="fas fa-key text-amber-400"></i> Copy PIN
+            </button>
+            <button onclick="resetDrawerPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1.5">
+                <i class="fas fa-dice text-indigo-400"></i> Reset PIN
+            </button>
+            <button onclick="toggleDrawerBan()" id="dr-ban-btn" class="py-2 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                <i class="fas fa-ban"></i> Ban User
+            </button>
+        </div>
+
+        <!-- Quick Stats Grid inside Drawer -->
+        <div class="grid grid-cols-2 gap-3 mb-6">
+            <div class="panel p-4 bg-white/5">
+                <div class="text-[10px] text-slate-400 font-bold uppercase">Total Words</div>
+                <div class="flex items-center justify-between mt-1">
+                    <div id="dr-total-words" class="text-xl font-bold font-mono text-white"></div>
+                    <button onclick="editWriterWords()" class="text-xs text-slate-400 hover:text-emerald-400 p-1"><i class="fas fa-pencil"></i></button>
+                </div>
+            </div>
+            <div class="panel p-4 bg-white/5">
+                <div class="text-[10px] text-slate-400 font-bold uppercase">Current Streak</div>
+                <div class="flex items-center justify-between mt-1">
+                    <div id="dr-streak" class="text-xl font-bold font-mono text-amber-400"></div>
+                    <button onclick="editWriterStreak()" class="text-xs text-slate-400 hover:text-amber-400 p-1"><i class="fas fa-pencil"></i></button>
+                </div>
+            </div>
+            <div class="panel p-4 bg-white/5">
+                <div class="text-[10px] text-slate-400 font-bold uppercase">Rank & Best WPM</div>
+                <div id="dr-rank" class="text-sm font-bold text-emerald-400 mt-1"></div>
+            </div>
+            <div class="panel p-4 bg-white/5">
+                <div class="text-[10px] text-slate-400 font-bold uppercase">Web Logging PIN</div>
+                <div id="dr-pin-display" class="text-xl font-bold font-mono text-emerald-400 mt-1 tracking-widest"></div>
             </div>
         </div>
-    </div>
+
+        <!-- History & Activity Section inside Drawer -->
+        <div class="space-y-4 flex-1">
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Recent Sprints & Performance</h4>
+            <div id="dr-sprint-history" class="space-y-2 font-mono text-xs">
+                <!-- Populated via API -->
+            </div>
+        </div>
+    </aside>
 
     <!-- Script Application Logic -->
     <script>
@@ -512,10 +599,50 @@
         let currentTab = 'overview';
         let writersCache = [];
         let selectedWriters = [];
-        let editingUserId = null;
+        let activeDrawerUserId = null;
         let revealedPins = new Set();
         let bcImageBase64 = null;
         let velocityChart = null, hoursChart = null;
+
+        // Custom Confirm Callback
+        let confirmResolve = null;
+        function showConfirm(msg, title = "Confirm Action") {
+            return new Promise((resolve) => {
+                confirmResolve = resolve;
+                document.getElementById('confirm-title').innerText = title;
+                document.getElementById('confirm-msg').innerText = msg;
+                document.getElementById('confirm-modal').classList.remove('hidden');
+            });
+        }
+        function closeConfirmModal(result) {
+            document.getElementById('confirm-modal').classList.add('hidden');
+            if (confirmResolve) confirmResolve(result);
+        }
+
+        // Custom Prompt Callback
+        let promptResolve = null;
+        function showPrompt(title, defaultValue = "") {
+            return new Promise((resolve) => {
+                promptResolve = resolve;
+                document.getElementById('prompt-title').innerText = title;
+                document.getElementById('prompt-input').value = defaultValue;
+                document.getElementById('prompt-modal').classList.remove('hidden');
+            });
+        }
+        function closePromptModal(val) {
+            document.getElementById('prompt-modal').classList.add('hidden');
+            if (promptResolve) promptResolve(val);
+        }
+
+        // Custom Toast Notification
+        function showToast(msg, type = "success") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `p-4 rounded-xl text-xs font-bold shadow-2xl flex items-center gap-2 pointer-events-auto transition-all ${type === 'error' ? 'bg-red-900/90 text-red-200 border border-red-500/50' : 'bg-emerald-950/90 text-emerald-200 border border-emerald-500/50'}`;
+            toast.innerHTML = `<i class="fas ${type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check'}"></i> <span>${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
 
         async function api(endpoint, body = null) {
             const options = {
@@ -535,7 +662,7 @@
 
         async function login() {
             adminPass = document.getElementById('admin-pass').value.trim();
-            if (!adminPass) return alert("Please enter the access key");
+            if (!adminPass) return showToast("Please enter access key", "error");
             const res = await api('/api/admin/system');
             if (res && !res.error) {
                 localStorage.setItem('admin_pass', adminPass);
@@ -543,7 +670,7 @@
                 document.getElementById('app').classList.remove('hidden');
                 switchTab('overview');
             } else {
-                alert("Invalid Access Key");
+                showToast("Invalid Access Key", "error");
             }
         }
 
@@ -572,9 +699,9 @@
             if (currentTab === 'overview') loadOverview();
             else if (currentTab === 'writers') loadWritersGrid();
             else if (currentTab === 'analytics') loadAnalytics();
-            else if (currentTab === 'sprints') loadSprints();
+            else if (currentTab === 'sprints') { loadSprints(); loadScheduledSprints(); populateGroupDropdowns(); }
             else if (currentTab === 'groups') loadGroups();
-            else if (currentTab === 'scheduler') { loadScheduledSprints(); populateGroupDropdowns(); }
+            else if (currentTab === 'broadcast') populateGroupDropdowns();
             else if (currentTab === 'feedback') loadFeedback();
         }
 
@@ -618,8 +745,13 @@
                     maintBtn.innerText = "Activate";
                 }
 
+                // System Activity Stream formatting fix
                 if (sys.recentActivity) {
-                    document.getElementById('sys-log').innerHTML = sys.recentActivity.map(a => `<div><span class="text-slate-500">[${new Date(a.time).toLocaleTimeString()}]</span> ${a.text}</div>`).join('');
+                    document.getElementById('sys-log').innerHTML = sys.recentActivity.map(a => {
+                        const dateObj = new Date(a.at || a.time || Date.now());
+                        const timeStr = isNaN(dateObj.getTime()) ? new Date().toLocaleTimeString() : dateObj.toLocaleTimeString();
+                        return `<div><span class="text-slate-500">[${timeStr}]</span> ${a.text}</div>`;
+                    }).join('');
                 }
             }
         }
@@ -659,8 +791,8 @@
                 else if (u.isInactive) statusBadge = `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[10px]">Inactive</span>`;
 
                 return `
-                    <tr class="hover:bg-white/5 transition">
-                        <td class="py-3 px-4">
+                    <tr class="hover:bg-white/5 transition cursor-pointer" onclick="openWriterDrawer('${u._id}')">
+                        <td class="py-3 px-4" onclick="event.stopPropagation()">
                             <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleWriterSelection('${u._id}')" class="w-4 h-4 accent-emerald-500 cursor-pointer">
                         </td>
                         <td class="py-3 px-4">
@@ -677,7 +809,7 @@
                             <div class="text-[10px] text-emerald-400">${u.rank || 'Novice'}</div>
                         </td>
                         <td class="py-3 px-4 font-mono font-bold text-amber-400">${u.streak || 0}🔥</td>
-                        <td class="py-3 px-4 font-mono">
+                        <td class="py-3 px-4 font-mono" onclick="event.stopPropagation()">
                             <div class="flex items-center gap-2">
                                 <span class="font-bold text-emerald-400 tracking-wider">${pinDisplay}</span>
                                 <button onclick="togglePinReveal('${u._id}')" class="text-slate-400 hover:text-white p-1" title="Show/Hide PIN">
@@ -689,12 +821,9 @@
                             </div>
                         </td>
                         <td class="py-3 px-4">${statusBadge}</td>
-                        <td class="py-3 px-4 text-right space-x-1">
+                        <td class="py-3 px-4 text-right space-x-1" onclick="event.stopPropagation()">
                             <button onclick="grantFreezeModal('${u._id}')" class="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg text-xs transition" title="Grant Freeze">
                                 🛡️
-                            </button>
-                            <button onclick="openWriterEditModal('${u._id}')" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-lg text-slate-300 transition" title="Edit Writer">
-                                <i class="fas fa-pen"></i>
                             </button>
                             <button onclick="toggleWriterBan('${u._id}', ${!u.isBanned})" class="px-2.5 py-1 ${u.isBanned ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'} rounded-lg transition" title="${u.isBanned ? 'Unban Writer' : 'Ban Writer'}">
                                 <i class="fas ${u.isBanned ? 'fa-user-check' : 'fa-user-slash'}"></i>
@@ -705,6 +834,119 @@
             }).join('');
 
             updateBulkBar();
+        }
+
+        // ZOHO BOOKS STYLE WRITER DETAIL DRAWER
+        async function openWriterDrawer(userId) {
+            activeDrawerUserId = userId;
+            const u = writersCache.find(x => x._id === userId);
+            if (!u) return;
+
+            document.getElementById('dr-avatar').innerText = u.name.charAt(0).toUpperCase();
+            document.getElementById('dr-name').innerText = u.name;
+            document.getElementById('dr-phone').innerText = u._id.split('@')[0];
+            document.getElementById('dr-total-words').innerText = (u.totalWords || 0).toLocaleString();
+            document.getElementById('dr-streak').innerText = (u.streak || 0) + "🔥";
+            document.getElementById('dr-rank').innerText = `${u.rank || 'Novice'} • Best WPM: ${u.bestSprintWpm || 0}`;
+            document.getElementById('dr-pin-display').innerText = u.webPin || '----';
+
+            const banBtn = document.getElementById('dr-ban-btn');
+            if (u.isBanned) {
+                banBtn.className = "py-2 px-3 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5";
+                banBtn.innerHTML = `<i class="fas fa-check"></i> Unban User`;
+            } else {
+                banBtn.className = "py-2 px-3 bg-red-500/20 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5";
+                banBtn.innerHTML = `<i class="fas fa-ban"></i> Ban User`;
+            }
+
+            document.getElementById('writer-drawer-overlay').classList.remove('hidden');
+            document.getElementById('writer-drawer').classList.add('open');
+
+            // Load drawer sprint history
+            const hist = await api('/api/admin/writer/' + encodeURIComponent(userId) + '/history');
+            const histBox = document.getElementById('dr-sprint-history');
+            if (hist && hist.recentSprints && hist.recentSprints.length > 0) {
+                histBox.innerHTML = hist.recentSprints.map(s => `
+                    <div class="p-3 bg-white/5 rounded-xl flex items-center justify-between">
+                        <div>
+                            <div class="text-white font-bold">${s.words.toLocaleString()} words</div>
+                            <div class="text-[10px] text-slate-400">${new Date(s.date).toLocaleDateString()} • ${s.duration} min sprint</div>
+                        </div>
+                        <div class="text-emerald-400 font-bold">${s.wpm} WPM</div>
+                    </div>
+                `).join('');
+            } else {
+                histBox.innerHTML = `<div class="text-slate-500 text-xs text-center py-4">No recent sprint history.</div>`;
+            }
+        }
+
+        function closeWriterDrawer() {
+            document.getElementById('writer-drawer').classList.remove('open');
+            document.getElementById('writer-drawer-overlay').classList.add('hidden');
+        }
+
+        function copyWriterProfileLink() {
+            if (!activeDrawerUserId) return;
+            const phone = activeDrawerUserId.split('@')[0];
+            const url = window.location.origin + '/profile/' + phone;
+            navigator.clipboard.writeText(url);
+            showToast("Copied Profile Link: " + url);
+        }
+
+        function copyWriterPin() {
+            const u = writersCache.find(x => x._id === activeDrawerUserId);
+            if (u && u.webPin) {
+                navigator.clipboard.writeText(u.webPin);
+                showToast("Copied PIN: " + u.webPin);
+            }
+        }
+
+        async function resetDrawerPin() {
+            if (!activeDrawerUserId) return;
+            const res = await api('/api/admin/user/set-pin', { userId: activeDrawerUserId });
+            if (res?.success) {
+                showToast("New PIN Generated: " + res.webPin);
+                document.getElementById('dr-pin-display').innerText = res.webPin;
+                loadWritersGrid();
+            }
+        }
+
+        async function toggleDrawerBan() {
+            if (!activeDrawerUserId) return;
+            const u = writersCache.find(x => x._id === activeDrawerUserId);
+            const isBanning = !u?.isBanned;
+            const confirmed = await showConfirm(`Are you sure you want to ${isBanning ? 'BAN' : 'UNBAN'} this writer?`);
+            if (confirmed) {
+                await api('/api/admin/ban', { userId: activeDrawerUserId, action: isBanning ? 'ban' : 'unban' });
+                showToast(isBanning ? "Writer Banned" : "Writer Unbanned");
+                closeWriterDrawer();
+                loadWritersGrid();
+            }
+        }
+
+        async function editWriterWords() {
+            if (!activeDrawerUserId) return;
+            const u = writersCache.find(x => x._id === activeDrawerUserId);
+            const val = await showPrompt("Set New Total Word Count:", u?.totalWords || 0);
+            if (val !== null) {
+                await api('/api/admin/update', { userId: activeDrawerUserId, type: 'set', amount: parseInt(val, 10) });
+                showToast("Total words updated!");
+                closeWriterDrawer();
+                loadWritersGrid();
+            }
+        }
+
+        async function editWriterStreak() {
+            if (!activeDrawerUserId) return;
+            const u = writersCache.find(x => x._id === activeDrawerUserId);
+            const val = await showPrompt("Set Current Streak (Days):", u?.streak || 0);
+            if (val !== null) {
+                const streakNum = parseInt(val, 10);
+                await api('/api/admin/update', { userId: activeDrawerUserId, type: 'streak', currentStreak: streakNum, bestStreak: Math.max(streakNum, u?.bestStreak || 0) });
+                showToast("Streak updated!");
+                closeWriterDrawer();
+                loadWritersGrid();
+            }
         }
 
         function toggleWriterSelection(id) {
@@ -731,27 +973,29 @@
 
         async function bulkBan() {
             if (!selectedWriters.length) return;
-            if (confirm(`Ban ${selectedWriters.length} selected writers?`)) {
+            const ok = await showConfirm(`Ban ${selectedWriters.length} selected writers?`);
+            if (ok) {
                 for (const id of selectedWriters) await api('/api/admin/ban', { userId: id, action: 'ban' });
+                showToast(`${selectedWriters.length} writers banned`);
                 clearSelection();
             }
         }
 
         async function bulkFreeze() {
             if (!selectedWriters.length) return;
-            const num = prompt("Enter number of streak freezes to grant:", "1");
+            const num = await showPrompt("Enter number of streak freezes to grant:", "1");
             if (num) {
                 for (const id of selectedWriters) await api('/api/admin/writers/freeze', { userId: id, amount: parseInt(num, 10) });
-                alert(`Granted ${num} freeze(s) to selected writers!`);
+                showToast(`Granted ${num} freeze(s) to selected writers!`);
                 clearSelection();
             }
         }
 
         async function grantFreezeModal(userId) {
-            const num = prompt("Enter streak freezes to grant:", "1");
+            const num = await showPrompt("Enter streak freezes to grant:", "1");
             if (num) {
                 const res = await api('/api/admin/writers/freeze', { userId, amount: parseInt(num, 10) });
-                if (res?.success) alert(`Granted ${num} freeze(s)! New total: ${res.newTotal}`);
+                if (res?.success) showToast(`Granted ${num} freeze(s)! New total: ${res.newTotal}`);
             }
         }
 
@@ -765,7 +1009,7 @@
             const res = await api('/api/admin/user/set-pin', { userId });
             if (res?.success) {
                 revealedPins.add(userId);
-                alert(`New PIN generated for ${userId.split('@')[0]}: ${res.webPin}`);
+                showToast(`New PIN generated for ${userId.split('@')[0]}: ${res.webPin}`);
                 loadWritersGrid();
             }
         }
@@ -790,7 +1034,7 @@
         function copyQuickPin() {
             const pin = document.getElementById('qp-pin').innerText;
             navigator.clipboard.writeText(pin);
-            alert("PIN copied to clipboard: " + pin);
+            showToast("PIN copied: " + pin);
         }
 
         function openWriterEditModal(userId) {
@@ -822,12 +1066,15 @@
             if (pin && pin.length === 4) await api('/api/admin/user/set-pin', { userId: editingUserId, pin });
 
             closeWriterEditModal();
+            showToast("Writer details saved!");
             loadWritersGrid();
         }
 
         async function toggleWriterBan(userId, isBanning) {
-            if (confirm(`Are you sure you want to ${isBanning ? 'BAN' : 'UNBAN'} this writer?`)) {
+            const confirmed = await showConfirm(`Are you sure you want to ${isBanning ? 'BAN' : 'UNBAN'} this writer?`);
+            if (confirmed) {
                 await api('/api/admin/ban', { userId, action: isBanning ? 'ban' : 'unban' });
+                showToast(isBanning ? "Writer Banned" : "Writer Unbanned");
                 loadWritersGrid();
             }
         }
@@ -836,9 +1083,9 @@
             const data = await api('/api/admin/analytics?range=' + range);
             if (data) {
                 document.getElementById('ana-retention').innerText = (data.retentionRate || 0) + "%";
-                document.getElementById('ana-active-current').innerText = data.activeCurrent?.length || 0;
+                document.getElementById('ana-active-current').innerText = data.activeCurrentCount ?? 0;
+                document.getElementById('ana-total-words').innerText = (data.totalLoggedWords || 0).toLocaleString();
 
-                // Charts
                 if (data.wordsByDay) {
                     const ctx1 = document.getElementById('chart-velocity').getContext('2d');
                     if (velocityChart) velocityChart.destroy();
@@ -851,30 +1098,52 @@
                         options: { responsive: true, maintainAspectRatio: false }
                     });
                 }
+
+                if (data.wordsByHour) {
+                    const ctx2 = document.getElementById('chart-hours').getContext('2d');
+                    if (hoursChart) hoursChart.destroy();
+                    hoursChart = new Chart(ctx2, {
+                        type: 'line',
+                        data: {
+                            labels: data.wordsByHour.map(h => h.hour + ':00'),
+                            datasets: [{ label: 'Hourly Words', data: data.wordsByHour.map(h => h.total), borderColor: '#6366f1', tension: 0.3 }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
             }
         }
 
         async function loadSprints() {
             const sprints = await api('/api/admin/sprints');
             const list = document.getElementById('active-sprints-list');
+            const hudList = document.getElementById('live-hud-container');
+
             if (!sprints || sprints.length === 0) {
-                list.innerHTML = `<div class="text-center py-6 text-slate-500 text-xs">No active sprints right now.</div>`;
+                list.innerHTML = `<div class="text-center py-6 text-slate-500 text-xs">No active sprints running.</div>`;
+                if (hudList) hudList.innerHTML = `<div class="text-slate-500 text-xs py-4 text-center">No active sprints running currently.</div>`;
                 return;
             }
-            list.innerHTML = sprints.map(s => `
-                <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+
+            const html = sprints.map(s => `
+                <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
                     <div>
                         <div class="font-bold text-sm text-white">${s.name}</div>
-                        <div class="text-xs text-slate-400">${s.participants} participants • ${s.timeLeft}m remaining</div>
+                        <div class="text-xs text-slate-400">${s.participants} participants • <span class="text-emerald-400 font-bold">${s.timeLeft}m remaining</span></div>
                     </div>
                     <button onclick="stopSprint('${s.id}')" class="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-xs font-bold hover:bg-red-500/30 transition">Stop Sprint</button>
                 </div>
             `).join('');
+
+            list.innerHTML = html;
+            if (hudList) hudList.innerHTML = html;
         }
 
         async function stopSprint(chatId) {
-            if (confirm("Stop this sprint?")) {
+            const confirmed = await showConfirm("Stop this active sprint?");
+            if (confirmed) {
                 await api('/api/admin/sprints/stop', { chatId });
+                showToast("Sprint stopped!");
                 loadSprints();
             }
         }
@@ -904,23 +1173,26 @@
 
         async function syncGroupsFromWA() {
             await api('/api/admin/groups/sync');
+            showToast("Groups synced!");
             loadGroups();
         }
 
         async function acceptInvite() {
             const code = document.getElementById('invite-code-input').value.trim();
-            if (!code) return alert("Enter invite link or code");
+            if (!code) return showToast("Enter invite link or code", "error");
             const res = await api('/api/admin/groups/accept', { inviteCode: code });
             if (res?.success) {
-                alert("Bot successfully joined group!");
+                showToast("Bot joined group successfully!");
                 document.getElementById('invite-code-input').value = '';
                 loadGroups();
             }
         }
 
         async function leaveGroup(chatId) {
-            if (confirm("Are you sure you want the bot to leave this group?")) {
+            const confirmed = await showConfirm("Have the bot leave this group?");
+            if (confirmed) {
                 await api('/api/admin/groups/leave', { chatId });
+                showToast("Left group!");
                 loadGroups();
             }
         }
@@ -929,7 +1201,7 @@
             const groups = await api('/api/admin/groups');
             if (groups) {
                 const sel = document.getElementById('sch-group');
-                sel.innerHTML = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+                if (sel) sel.innerHTML = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
             }
         }
 
@@ -941,7 +1213,7 @@
                 return;
             }
             list.innerHTML = sprints.map(s => `
-                <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
                     <div>
                         <div class="font-bold text-sm text-white">${s.groupName}</div>
                         <div class="text-xs text-slate-400">${s.duration} mins • ${new Date(s.startTime).toLocaleString()}</div>
@@ -956,18 +1228,22 @@
             const startTime = document.getElementById('sch-time').value;
             const duration = parseInt(document.getElementById('sch-duration').value, 10);
 
-            if (!groupId || !startTime) return alert("Please select group and start time");
+            if (!groupId || !startTime) return showToast("Please select group and start date/time", "error");
 
             const res = await api('/api/admin/scheduled/create', { groupId, startTime, duration });
             if (res?.success) {
-                alert("Sprint scheduled successfully!");
+                showToast("Sprint scheduled successfully!");
                 loadScheduledSprints();
+            } else {
+                showToast(res?.error || "Failed to schedule sprint", "error");
             }
         }
 
         async function cancelScheduledSprint(id) {
-            if (confirm("Cancel this scheduled sprint?")) {
+            const confirmed = await showConfirm("Cancel this scheduled sprint?");
+            if (confirmed) {
                 await api('/api/admin/scheduled/cancel', { id });
+                showToast("Schedule cancelled!");
                 loadScheduledSprints();
             }
         }
@@ -986,15 +1262,17 @@
             const msg = document.getElementById('bc-msg').value.trim();
             const tagAll = document.getElementById('bc-tag-all').checked;
 
-            if (!msg && !bcImageBase64) return alert("Please enter message or attach image");
+            if (!msg && !bcImageBase64) return showToast("Please enter message or attach image", "error");
 
             const res = await api('/api/admin/broadcast', { message: msg, image: bcImageBase64, tagAll });
             if (res?.success) {
-                alert(`Broadcast delivered to ${res.count} groups!`);
+                showToast(`Broadcast delivered to ${res.count} groups!`);
                 document.getElementById('bc-msg').value = '';
                 document.getElementById('bc-tag-all').checked = false;
                 document.getElementById('bc-img-name').innerText = '';
                 bcImageBase64 = null;
+            } else {
+                showToast(res?.error || "Failed to send broadcast", "error");
             }
         }
 
@@ -1020,6 +1298,7 @@
 
         async function markAllFeedbackRead() {
             await api('/api/admin/feedback/read', { id: 'all' });
+            showToast("Marked feedback as read");
             loadFeedback();
         }
 
