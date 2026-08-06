@@ -796,10 +796,16 @@ router.get('/api/admin/broadcasts/scheduled', requireAdmin, async (req, res) => 
 
 router.post('/api/admin/broadcasts/schedule', requireAdmin, async (req, res) => {
     try {
-        const { message, image, sendAt } = req.body;
+        const { message, image, sendAt, targetGroups, tagAll } = req.body;
         if (!message && !image) return res.status(400).json({ error: "Need message or image" });
         if (!sendAt) return res.status(400).json({ error: "Need sendAt time" });
-        const broadcast = await ScheduledBroadcast.create({ message, image, sendAt: new Date(sendAt) });
+        const broadcast = await ScheduledBroadcast.create({
+            message,
+            image,
+            sendAt: new Date(sendAt),
+            targetGroups: targetGroups || [],
+            tagAll: !!tagAll
+        });
         res.json({ success: true, id: broadcast._id });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });

@@ -60,16 +60,6 @@
             border: 1px solid rgba(16, 185, 129, 0.25);
         }
 
-        /* Slide-over Drawer Animation */
-        .drawer {
-            transform: translateX(100%);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .drawer.open {
-            transform: translateX(0);
-        }
-
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
@@ -142,7 +132,7 @@
                 </div>
                 <div>
                     <h2 class="font-bold text-base leading-tight">Sprint Bot</h2>
-                    <span class="text-[10px] text-[#10b981] font-semibold tracking-wider uppercase bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">Command Center v5.2</span>
+                    <span class="text-[10px] text-[#10b981] font-semibold tracking-wider uppercase bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">Command Center v5.3</span>
                 </div>
             </div>
 
@@ -178,7 +168,7 @@
             <!-- Top App Bar -->
             <header class="h-16 border-b border-white/10 flex items-center justify-between px-6 shrink-0 bg-[#111827]">
                 <div class="flex items-center gap-3">
-                    <h2 id="view-title" class="font-bold text-lg text-white">Overview</h2>
+                    <h2 id="view-title" class="font-bold text-lg text-white">Overview & Live HUD</h2>
                     <span id="conn-badge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
                         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Connected
                     </span>
@@ -194,10 +184,102 @@
             <!-- Tab Content Views -->
             <div class="flex-1 overflow-y-auto p-6 space-y-6">
                 
-                <!-- VIEW 1: OVERVIEW & LIVE HUD -->
+                <!-- VIEW 1: OVERVIEW & LIVE HUD (MATCHES SPRINT BOT PUBLIC DASHBOARD LOOK) -->
                 <div id="view-overview" class="space-y-6">
                     
-                    <!-- QR Code & Connection Status Card -->
+                    <!-- Top KPI Cards (Screenshot 1 Match) -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="panel p-5 flex items-center justify-between">
+                            <div>
+                                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Words</div>
+                                <div id="hud-total-words" class="text-3xl font-extrabold text-white font-mono">...</div>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg">
+                                ✍️
+                            </div>
+                        </div>
+
+                        <div class="panel p-5 flex items-center justify-between">
+                            <div>
+                                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Writers</div>
+                                <div id="hud-total-writers" class="text-3xl font-extrabold text-white font-mono">...</div>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center text-lg">
+                                👥
+                            </div>
+                        </div>
+
+                        <div class="panel p-5 flex items-center justify-between">
+                            <div>
+                                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Active Groups</div>
+                                <div id="hud-active-groups" class="text-3xl font-extrabold text-white font-mono">...</div>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg">
+                                🥞
+                            </div>
+                        </div>
+
+                        <div class="panel p-5 flex items-center justify-between">
+                            <div>
+                                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">System Status</div>
+                                <div id="hud-sys-status" class="text-2xl font-bold text-emerald-400">Active</div>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg">
+                                🤖
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sprint Velocity Curve Chart (Screenshot 1 Match) -->
+                    <div class="panel p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-base font-bold text-white">Sprint Velocity</h3>
+                            <span class="text-xs text-emerald-400 font-bold flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Live Data
+                            </span>
+                        </div>
+                        <div class="h-64"><canvas id="hud-chart-velocity"></canvas></div>
+                    </div>
+
+                    <!-- 3-Column Live Leaderboards Grid (Screenshot 2 Match) -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        
+                        <!-- Hall of Fame -->
+                        <div class="panel p-5 space-y-4">
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                🏆 Hall of Fame
+                            </h3>
+                            <div id="hud-hall-of-fame" class="space-y-2 text-xs divide-y divide-white/5">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Today's Top -->
+                        <div class="panel p-5 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                    ⏱️ Today's Top
+                                </h3>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">LIVE</span>
+                            </div>
+                            <div id="hud-todays-top" class="space-y-2 text-xs divide-y divide-white/5">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Top Groups -->
+                        <div class="panel p-5 space-y-4">
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                👑 Top Groups
+                            </h3>
+                            <div id="hud-top-groups" class="space-y-2 text-xs divide-y divide-white/5">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- QR Code & Connection Status Box -->
                     <div id="qr-container" class="panel p-6 bg-gradient-to-r from-[#111827] to-[#1f2937] border-emerald-500/30">
                         <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                             <div class="space-y-2 flex-1">
@@ -210,42 +292,9 @@
                                 </p>
                             </div>
 
-                            <!-- Dynamic QR Code Box -->
-                            <div id="qr-box" class="w-48 h-48 bg-white p-2 rounded-2xl flex items-center justify-center shadow-2xl shrink-0">
+                            <div id="qr-box" class="w-44 h-44 bg-white p-2 rounded-2xl flex items-center justify-center shadow-2xl shrink-0">
                                 <div class="text-slate-500 text-xs text-center font-bold">Scanning Socket...</div>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div class="panel p-5">
-                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">WhatsApp Connection</div>
-                            <div id="conn-display" class="flex items-center gap-3">
-                                <i class="fas fa-circle-check text-emerald-400 text-2xl"></i>
-                                <span class="font-bold text-sm text-slate-200">Online & Ready</span>
-                            </div>
-                        </div>
-                        <div class="panel p-5">
-                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Server Memory</div>
-                            <div id="sys-mem" class="text-2xl font-bold font-mono text-indigo-400">...</div>
-                        </div>
-                        <div class="panel p-5">
-                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Server Uptime</div>
-                            <div id="sys-uptime" class="text-xl font-bold font-mono text-emerald-400">...</div>
-                        </div>
-                        <div class="panel p-5">
-                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Active Sprints</div>
-                            <div id="sys-sprints-count" class="text-2xl font-bold font-mono text-amber-400">0</div>
-                        </div>
-                    </div>
-
-                    <!-- Live HUD Widget -->
-                    <div class="panel p-5">
-                        <h3 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
-                            <i class="fas fa-satellite-dish text-emerald-400"></i> Live Sprint HUD
-                        </h3>
-                        <div id="live-hud-container" class="space-y-3">
-                            <div class="text-slate-500 text-xs py-4 text-center">No active sprints currently running.</div>
                         </div>
                     </div>
 
@@ -266,107 +315,139 @@
                         </div>
                     </div>
 
-                    <!-- Activity Log -->
+                    <!-- Activity Stream -->
                     <div class="panel p-5">
                         <h3 class="text-sm font-bold mb-4 text-slate-200">System Activity Stream</h3>
-                        <div id="sys-log" class="space-y-2 max-h-[350px] overflow-y-auto font-mono text-xs text-slate-300"></div>
+                        <div id="sys-log" class="space-y-2 max-h-[250px] overflow-y-auto font-mono text-xs text-slate-300"></div>
                     </div>
+
                 </div>
 
-                <!-- VIEW 2: WRITERS & PIN ACCESS (ZOHO BOOKS STYLE DETAIL DRAWER) -->
+                <!-- VIEW 2: WRITERS & PIN ACCESS (ZOHO BOOKS 2-COLUMN SPLIT VIEW) -->
                 <div id="view-writers" class="hidden space-y-6">
                     
-                    <!-- Quick PIN Lookup Header Card -->
-                    <div class="panel p-6 bg-gradient-to-r from-[#111827] to-[#1f2937] border-emerald-500/30 relative overflow-hidden">
-                        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                            <div>
-                                <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                                    <i class="fas fa-key text-emerald-400"></i> Quick Writer PIN Lookup
-                                </h3>
-                                <p class="text-xs text-slate-400 mt-1">Search any writer's phone or name to view or issue their 4-digit web logging PIN</p>
-                            </div>
-
-                            <div class="flex items-center gap-2 w-full md:w-auto">
-                                <input type="text" id="quick-pin-search" oninput="quickPinLookup(this.value)" placeholder="Enter phone or name..." class="bg-black/30 border border-white/15 px-4 py-2.5 rounded-xl text-xs w-full md:w-64 outline-none focus:border-emerald-400">
-                            </div>
-                        </div>
-
-                        <!-- Quick Result Display Box -->
-                        <div id="quick-pin-result" class="hidden mt-4 pt-4 border-t border-white/10 flex items-center justify-between bg-black/40 p-4 rounded-xl">
-                            <div class="flex items-center gap-3">
-                                <div id="qp-avatar" class="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-sm"></div>
-                                <div>
-                                    <div id="qp-name" class="font-bold text-sm"></div>
-                                    <div id="qp-phone" class="text-xs text-slate-400 font-mono"></div>
-                                </div>
-                            </div>
+                    <!-- Header Bar -->
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <input type="text" id="writer-search" oninput="loadWritersGrid()" placeholder="Search writers by name or phone..." class="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-xs w-full sm:w-64 outline-none focus:border-emerald-400">
                             
-                            <div class="flex items-center gap-4">
-                                <div class="text-right">
-                                    <div class="text-[10px] text-slate-400 uppercase font-bold">4-Digit Web PIN</div>
-                                    <div id="qp-pin" class="text-2xl font-bold font-mono text-emerald-400 tracking-widest"></div>
-                                </div>
-                                <button onclick="copyQuickPin()" class="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
-                                    <i class="fas fa-copy"></i> Copy PIN
-                                </button>
+                            <select id="writer-filter" onchange="loadWritersGrid()" class="bg-[#1f2937] border border-white/10 px-3 py-2 rounded-xl text-xs outline-none">
+                                <option value="all">All Writers</option>
+                                <option value="active">Active Only</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="archived">Archived</option>
+                                <option value="banned">Banned</option>
+                            </select>
+                        </div>
+
+                        <div class="text-xs text-slate-400 font-medium">
+                            Total: <span id="writers-count" class="font-bold text-white">0</span> writers
+                        </div>
+                    </div>
+
+                    <!-- ZOHO BOOKS 2-COLUMN SPLIT CONTAINER -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        
+                        <!-- Left Pane: Writers List (~4 columns) -->
+                        <div class="lg:col-span-4 panel p-4 space-y-2 max-h-[700px] overflow-y-auto">
+                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider px-2 mb-3">Writer Accounts</div>
+                            <div id="writers-split-list" class="space-y-2">
+                                <!-- Populated dynamically -->
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Bulk Actions Bar -->
-                    <div id="bulk-bar" class="hidden panel p-4 bg-indigo-950/40 border-indigo-500/30 flex items-center justify-between">
-                        <div class="text-xs font-bold text-indigo-300">
-                            Selected <span id="bulk-count" class="font-mono text-white">0</span> writers
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button onclick="bulkBan()" class="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-lg text-xs font-bold transition">Bulk Ban</button>
-                            <button onclick="bulkFreeze()" class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-bold transition">Grant Freezes</button>
-                            <button onclick="clearSelection()" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 rounded-lg text-xs font-bold transition">Clear</button>
-                        </div>
-                    </div>
+                        <!-- Right Pane: Selected Writer Detail & Actions (~8 columns) -->
+                        <div class="lg:col-span-8 panel p-6 space-y-6">
+                            <div id="split-detail-empty" class="text-center py-20 text-slate-500 text-xs">
+                                Select a writer from the left list to view details and manage access.
+                            </div>
 
-                    <!-- Writers Data Table & Controls -->
-                    <div class="panel p-5 space-y-4">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                            <div class="flex items-center gap-2 w-full sm:w-auto">
-                                <input type="text" id="writer-search" oninput="loadWritersGrid()" placeholder="Search writers..." class="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-xs w-full sm:w-64 outline-none focus:border-emerald-400">
+                            <div id="split-detail-content" class="hidden space-y-6">
                                 
-                                <select id="writer-filter" onchange="loadWritersGrid()" class="bg-[#1f2937] border border-white/10 px-3 py-2 rounded-xl text-xs outline-none">
-                                    <option value="all">All Writers</option>
-                                    <option value="active">Active Only</option>
-                                    <option value="inactive">Inactive</option>
-                                    <option value="archived">Archived</option>
-                                    <option value="banned">Banned</option>
-                                </select>
+                                <!-- Selected Writer Header -->
+                                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+                                    <div class="flex items-center gap-4">
+                                        <div id="sp-avatar" class="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xl border border-emerald-500/30"></div>
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <h3 id="sp-name" class="font-bold text-xl text-white"></h3>
+                                                <span id="sp-status-badge"></span>
+                                            </div>
+                                            <div id="sp-phone" class="text-xs font-mono text-slate-400 mt-0.5"></div>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                <button onclick="selectAllWriters()" class="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition">Select All</button>
-                            </div>
+                                <!-- Action Toolbar -->
+                                <div class="flex flex-wrap gap-2">
+                                    <button onclick="copyWriterProfileLink()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
+                                        <i class="fas fa-link text-emerald-400"></i> Copy Profile Link
+                                    </button>
+                                    <button onclick="copyWriterPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
+                                        <i class="fas fa-key text-amber-400"></i> Copy Web PIN
+                                    </button>
+                                    <button onclick="resetDrawerPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
+                                        <i class="fas fa-dice text-indigo-400"></i> Reset PIN
+                                    </button>
+                                    <button onclick="toggleWriterArchive()" id="sp-archive-btn" class="py-2 px-3 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                        <i class="fas fa-box-archive"></i> Archive User
+                                    </button>
+                                    <button onclick="toggleWriterInactive()" id="sp-inactive-btn" class="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                        <i class="fas fa-moon"></i> Toggle Inactive
+                                    </button>
+                                    <button onclick="grantFreezeModal(activeDrawerUserId)" class="py-2 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                        🛡️ Grant Freeze
+                                    </button>
+                                    <button onclick="toggleDrawerBan()" id="sp-ban-btn" class="py-2 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                        <i class="fas fa-ban"></i> Ban User
+                                    </button>
+                                </div>
 
-                            <div class="text-xs text-slate-400 font-medium">
-                                Total: <span id="writers-count" class="font-bold text-white">0</span> writers
+                                <!-- Editable Stats Grid -->
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    <div class="panel p-4 bg-white/5">
+                                        <div class="text-[10px] text-slate-400 font-bold uppercase">Total Words</div>
+                                        <div class="flex items-center justify-between mt-1">
+                                            <div id="sp-total-words" class="text-xl font-bold font-mono text-white"></div>
+                                            <button onclick="editWriterWords()" class="text-xs text-slate-400 hover:text-emerald-400 p-1" title="Edit Total Words"><i class="fas fa-pen"></i></button>
+                                        </div>
+                                    </div>
+
+                                    <div class="panel p-4 bg-white/5">
+                                        <div class="text-[10px] text-slate-400 font-bold uppercase">Current Streak</div>
+                                        <div class="flex items-center justify-between mt-1">
+                                            <div id="sp-streak" class="text-xl font-bold font-mono text-amber-400"></div>
+                                            <button onclick="editWriterStreak()" class="text-xs text-slate-400 hover:text-amber-400 p-1" title="Edit Streak"><i class="fas fa-pen"></i></button>
+                                        </div>
+                                    </div>
+
+                                    <div class="panel p-4 bg-white/5">
+                                        <div class="text-[10px] text-slate-400 font-bold uppercase">Web Logging PIN</div>
+                                        <div id="sp-pin-display" class="text-xl font-bold font-mono text-emerald-400 mt-1 tracking-widest"></div>
+                                    </div>
+
+                                    <div class="panel p-4 bg-white/5">
+                                        <div class="text-[10px] text-slate-400 font-bold uppercase">Rank</div>
+                                        <div id="sp-rank" class="text-sm font-bold text-emerald-400 mt-1"></div>
+                                    </div>
+
+                                    <div class="panel p-4 bg-white/5">
+                                        <div class="text-[10px] text-slate-400 font-bold uppercase">Best Sprint WPM</div>
+                                        <div id="sp-wpm" class="text-sm font-bold text-indigo-400 mt-1"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Sprint & Activity Log Stream -->
+                                <div class="space-y-3 pt-2">
+                                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Recent Sprints & Performance</h4>
+                                    <div id="sp-sprint-history" class="space-y-2 font-mono text-xs">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
 
-                        <!-- Main Writers Table -->
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-xs">
-                                <thead>
-                                    <tr class="border-b border-white/10 text-slate-400 uppercase text-[10px] tracking-wider font-bold">
-                                        <th class="py-3 px-4 w-10">Select</th>
-                                        <th class="py-3 px-4">Writer</th>
-                                        <th class="py-3 px-4">Phone ID</th>
-                                        <th class="py-3 px-4">Rank & Words</th>
-                                        <th class="py-3 px-4">Streak</th>
-                                        <th class="py-3 px-4">Web PIN</th>
-                                        <th class="py-3 px-4">Status</th>
-                                        <th class="py-3 px-4 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="writers-table-body" class="divide-y divide-white/5 font-medium">
-                                    <!-- Populated dynamically -->
-                                </tbody>
-                            </table>
-                        </div>
                     </div>
                 </div>
 
@@ -408,13 +489,21 @@
                     </div>
                 </div>
 
-                <!-- VIEW 4: SPRINTS & MISSIONS (UNIFIED) -->
+                <!-- VIEW 4: SPRINTS & MISSIONS (UNIFIED ACTIVE & SCHEDULED) -->
                 <div id="view-sprints" class="hidden space-y-6">
                     
+                    <!-- Active Sprints Running -->
+                    <div class="panel p-5">
+                        <h3 class="text-sm font-bold mb-4 text-white flex items-center gap-2">
+                            <i class="fas fa-person-running text-emerald-400"></i> Active Sprints Running Across Groups
+                        </h3>
+                        <div id="active-sprints-list" class="space-y-3"></div>
+                    </div>
+
                     <!-- Schedule Sprint Form Box -->
                     <div class="panel p-6 bg-gradient-to-r from-[#111827] to-[#1f2937] border-emerald-500/30">
                         <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
-                            <i class="fas fa-[#10b981] fa-calendar-plus text-emerald-400"></i> Schedule Future Group Sprint
+                            <i class="fas fa-calendar-plus text-emerald-400"></i> Schedule Future Group Sprint
                         </h3>
                         
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -442,14 +531,10 @@
 
                     <!-- Upcoming Scheduled Sprints -->
                     <div class="panel p-5">
-                        <h3 class="text-sm font-bold mb-4">Upcoming Scheduled Sprints</h3>
+                        <h3 class="text-sm font-bold mb-4 text-white flex items-center gap-2">
+                            <i class="fas fa-clock text-amber-400"></i> Upcoming Scheduled Group Sprints
+                        </h3>
                         <div id="scheduled-list" class="space-y-3"></div>
-                    </div>
-
-                    <!-- Active Sprints List -->
-                    <div class="panel p-5">
-                        <h3 class="text-sm font-bold mb-4">Active Sprints Running Across Groups</h3>
-                        <div id="active-sprints-list" class="space-y-3"></div>
                     </div>
                 </div>
 
@@ -477,13 +562,13 @@
                     <div id="groups-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 </div>
 
-                <!-- VIEW 6: BROADCAST CHANNEL -->
+                <!-- VIEW 6: BROADCAST CHANNEL (INSTANT & SCHEDULED BROADCASTS) -->
                 <div id="view-broadcast" class="hidden space-y-6">
                     
                     <!-- Instant Broadcast Blast Box -->
                     <div class="panel p-6 border-indigo-500/30">
                         <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
-                            <i class="fas fa-paper-plane text-indigo-400"></i> Instant Group Broadcast Blast
+                            <i class="fas fa-bolt text-indigo-400"></i> Instant Group Broadcast Blast
                         </h3>
 
                         <div class="space-y-4">
@@ -506,11 +591,36 @@
                                 </div>
 
                                 <button onclick="sendBroadcast()" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-indigo-600/30 flex items-center gap-2">
-                                    <i class="fas fa-paper-plane"></i> Send Blast
+                                    <i class="fas fa-paper-plane"></i> Send Blast Now
                                 </button>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Scheduled Broadcast Blast Form -->
+                    <div class="panel p-6 border-purple-500/30">
+                        <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+                            <i class="fas fa-clock text-purple-400"></i> Schedule Future Broadcast Blast
+                        </h3>
+
+                        <div class="space-y-4">
+                            <textarea id="sch-bc-msg" rows="3" placeholder="Type scheduled broadcast message..." class="w-full bg-black/30 border border-white/10 p-4 rounded-xl text-xs outline-none focus:border-purple-400"></textarea>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Send Date & Time</label>
+                                <input type="datetime-local" id="sch-bc-time" class="w-full bg-black/30 border border-white/10 p-2.5 rounded-xl text-xs outline-none">
+                            </div>
+
+                            <button onclick="createScheduledBroadcast()" class="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-purple-600/30">Schedule Broadcast Blast</button>
+                        </div>
+                    </div>
+
+                    <!-- Upcoming Scheduled Broadcasts -->
+                    <div class="panel p-5">
+                        <h3 class="text-sm font-bold mb-4 text-white">Upcoming Scheduled Broadcasts</h3>
+                        <div id="sch-bc-list" class="space-y-3"></div>
+                    </div>
+
                 </div>
 
                 <!-- VIEW 7: FEEDBACK -->
@@ -528,81 +638,14 @@
         </main>
     </div>
 
-    <!-- WRITER DETAIL SIDE DRAWER (ZOHO BOOKS STYLE) -->
-    <div id="writer-drawer-overlay" onclick="closeWriterDrawer()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[250] hidden"></div>
-    <aside id="writer-drawer" class="drawer fixed inset-y-0 right-0 w-full max-w-xl bg-[#111827] border-l border-white/10 z-[260] flex flex-col p-6 overflow-y-auto">
-        <div class="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
-            <div class="flex items-center gap-3">
-                <div id="dr-avatar" class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-lg"></div>
-                <div>
-                    <h3 id="dr-name" class="font-bold text-lg text-white"></h3>
-                    <div id="dr-phone" class="text-xs font-mono text-slate-400"></div>
-                </div>
-            </div>
-            <button onclick="closeWriterDrawer()" class="text-slate-400 hover:text-white p-2 text-lg"><i class="fas fa-times"></i></button>
-        </div>
-
-        <!-- Action Toolbar inside Drawer -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
-            <button onclick="copyWriterProfileLink()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1.5">
-                <i class="fas fa-link text-emerald-400"></i> Profile Link
-            </button>
-            <button onclick="copyWriterPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1.5">
-                <i class="fas fa-key text-amber-400"></i> Copy PIN
-            </button>
-            <button onclick="resetDrawerPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1.5">
-                <i class="fas fa-dice text-indigo-400"></i> Reset PIN
-            </button>
-            <button onclick="toggleDrawerBan()" id="dr-ban-btn" class="py-2 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
-                <i class="fas fa-ban"></i> Ban User
-            </button>
-        </div>
-
-        <!-- Quick Stats Grid inside Drawer -->
-        <div class="grid grid-cols-2 gap-3 mb-6">
-            <div class="panel p-4 bg-white/5">
-                <div class="text-[10px] text-slate-400 font-bold uppercase">Total Words</div>
-                <div class="flex items-center justify-between mt-1">
-                    <div id="dr-total-words" class="text-xl font-bold font-mono text-white"></div>
-                    <button onclick="editWriterWords()" class="text-xs text-slate-400 hover:text-emerald-400 p-1"><i class="fas fa-pencil"></i></button>
-                </div>
-            </div>
-            <div class="panel p-4 bg-white/5">
-                <div class="text-[10px] text-slate-400 font-bold uppercase">Current Streak</div>
-                <div class="flex items-center justify-between mt-1">
-                    <div id="dr-streak" class="text-xl font-bold font-mono text-amber-400"></div>
-                    <button onclick="editWriterStreak()" class="text-xs text-slate-400 hover:text-amber-400 p-1"><i class="fas fa-pencil"></i></button>
-                </div>
-            </div>
-            <div class="panel p-4 bg-white/5">
-                <div class="text-[10px] text-slate-400 font-bold uppercase">Rank & Best WPM</div>
-                <div id="dr-rank" class="text-sm font-bold text-emerald-400 mt-1"></div>
-            </div>
-            <div class="panel p-4 bg-white/5">
-                <div class="text-[10px] text-slate-400 font-bold uppercase">Web Logging PIN</div>
-                <div id="dr-pin-display" class="text-xl font-bold font-mono text-emerald-400 mt-1 tracking-widest"></div>
-            </div>
-        </div>
-
-        <!-- History & Activity Section inside Drawer -->
-        <div class="space-y-4 flex-1">
-            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Recent Sprints & Performance</h4>
-            <div id="dr-sprint-history" class="space-y-2 font-mono text-xs">
-                <!-- Populated via API -->
-            </div>
-        </div>
-    </aside>
-
     <!-- Script Application Logic -->
     <script>
         let adminPass = localStorage.getItem('admin_pass') || '';
         let currentTab = 'overview';
         let writersCache = [];
-        let selectedWriters = [];
         let activeDrawerUserId = null;
-        let revealedPins = new Set();
         let bcImageBase64 = null;
-        let velocityChart = null, hoursChart = null;
+        let velocityChart = null, hoursChart = null, hudVelocityChart = null;
 
         // Custom Confirm Callback
         let confirmResolve = null;
@@ -691,7 +734,7 @@
             const viewEl = document.getElementById('view-' + tab);
             if (viewEl) viewEl.classList.remove('hidden');
 
-            document.getElementById('view-title').innerText = tab.charAt(0).toUpperCase() + tab.slice(1);
+            document.getElementById('view-title').innerText = tab === 'overview' ? 'Overview & Live HUD' : tab.charAt(0).toUpperCase() + tab.slice(1);
             refreshData();
         }
 
@@ -701,16 +744,20 @@
             else if (currentTab === 'analytics') loadAnalytics();
             else if (currentTab === 'sprints') { loadSprints(); loadScheduledSprints(); populateGroupDropdowns(); }
             else if (currentTab === 'groups') loadGroups();
-            else if (currentTab === 'broadcast') populateGroupDropdowns();
+            else if (currentTab === 'broadcast') { populateGroupDropdowns(); loadScheduledBroadcasts(); }
             else if (currentTab === 'feedback') loadFeedback();
         }
 
         async function loadOverview() {
-            const sys = await api('/api/admin/system');
+            const [sys, stats] = await Promise.all([
+                api('/api/admin/system'),
+                fetch('/api/stats').then(r => r.json()).catch(() => null)
+            ]);
+
             if (sys) {
                 document.getElementById('sys-mem').innerText = sys.memory + " MB";
                 document.getElementById('sys-uptime').innerText = Math.floor(sys.uptime / 3600) + "h " + Math.floor((sys.uptime % 3600)/60) + "m";
-                document.getElementById('sys-sprints-count').innerText = sys.activeSprintsCount || 0;
+                document.getElementById('sys-[#10b981] s-count')?.innerText = sys.activeSprintsCount || 0;
                 
                 const connBadge = document.getElementById('conn-badge');
                 const connDisplay = document.getElementById('conn-display');
@@ -745,13 +792,81 @@
                     maintBtn.innerText = "Activate";
                 }
 
-                // System Activity Stream formatting fix
                 if (sys.recentActivity) {
                     document.getElementById('sys-log').innerHTML = sys.recentActivity.map(a => {
                         const dateObj = new Date(a.at || a.time || Date.now());
                         const timeStr = isNaN(dateObj.getTime()) ? new Date().toLocaleTimeString() : dateObj.toLocaleTimeString();
                         return `<div><span class="text-slate-500">[${timeStr}]</span> ${a.text}</div>`;
                     }).join('');
+                }
+            }
+
+            // POPULATE LIVE HUD FROM /api/stats (MATCHES SCREENSHOTS 1 & 2)
+            if (stats) {
+                const totalW = (stats.totalWords || 0);
+                const formattedW = totalW >= 1000000 ? (totalW / 1000000).toFixed(1) + 'M' : totalW.toLocaleString();
+                document.getElementById('hud-total-words').innerText = formattedW;
+                document.getElementById('hud-total-writers').innerText = stats.totalWriters || 0;
+                document.getElementById('hud-active-groups').innerText = stats.totalGroups || 0;
+                document.getElementById('hud-sys-status').innerText = stats.isConnected ? 'Active' : 'Offline';
+
+                // Chart: Velocity Curve
+                if (stats.chartData) {
+                    const ctx = document.getElementById('hud-chart-velocity').getContext('2d');
+                    if (hudVelocityChart) hudVelocityChart.destroy();
+                    hudVelocityChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: stats.chartData.labels,
+                            datasets: [{
+                                label: 'Words Logged',
+                                data: stats.chartData.data,
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: '#10b981'
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+
+                // Leaderboards: Hall of Fame, Today's Top, Top Groups
+                if (stats.topWriters) {
+                    document.getElementById('hud-hall-of-fame').innerHTML = stats.topWriters.map((w, i) => `
+                        <div class="flex items-center justify-between py-2">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-slate-400 w-4">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i+1)}</span>
+                                <span class="font-bold text-white">${w.name}</span>
+                            </div>
+                            <span class="font-mono font-bold text-slate-300">${w.words.toLocaleString()}</span>
+                        </div>
+                    `).join('');
+                }
+
+                if (stats.todayWriters) {
+                    document.getElementById('hud-todays-top').innerHTML = stats.todayWriters.map((w, i) => `
+                        <div class="flex items-center justify-between py-2">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-slate-400 w-4">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i+1)}</span>
+                                <span class="font-bold text-white">${w.name}</span>
+                            </div>
+                            <span class="font-mono font-bold text-[#10b981]">${w.words.toLocaleString()}</span>
+                        </div>
+                    `).join('');
+                }
+
+                if (stats.topGroups) {
+                    document.getElementById('hud-top-groups').innerHTML = stats.topGroups.map((g, i) => `
+                        <div class="flex items-center justify-between py-2">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-slate-400 w-4">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i+1)}</span>
+                                <span class="font-bold text-white truncate max-w-[140px]">${g.name}</span>
+                            </div>
+                            <span class="font-mono font-bold text-slate-300">${g.words.toLocaleString()}</span>
+                        </div>
+                    `).join('');
                 }
             }
         }
@@ -762,6 +877,7 @@
             loadOverview();
         }
 
+        // ZOHO BOOKS 2-COLUMN SPLIT VIEW IMPLEMENTATION
         async function loadWritersGrid() {
             const query = document.getElementById('writer-search').value;
             const filter = document.getElementById('writer-filter').value;
@@ -775,96 +891,97 @@
             else if (filter === 'archived') list = list.filter(u => u.isArchived);
             else if (filter === 'banned') list = list.filter(u => u.isBanned);
 
-            const tbody = document.getElementById('writers-table-body');
+            const listContainer = document.getElementById('writers-split-list');
             if (list.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-500">No writers found matching search criteria.</td></tr>`;
+                listContainer.innerHTML = `<div class="py-8 text-center text-slate-500 text-xs">No writers found.</div>`;
                 return;
             }
 
-            tbody.innerHTML = list.map(u => {
-                const isSelected = selectedWriters.includes(u._id);
-                const isRevealed = revealedPins.has(u._id);
-                const pinDisplay = isRevealed ? (u.webPin || '----') : '••••';
-                let statusBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">Active</span>`;
-                if (u.isBanned) statusBadge = `<span class="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-[10px]">Banned</span>`;
-                else if (u.isArchived) statusBadge = `<span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[10px]">Archived</span>`;
-                else if (u.isInactive) statusBadge = `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[10px]">Inactive</span>`;
+            listContainer.innerHTML = list.map(u => {
+                const isSelected = activeDrawerUserId === u._id;
+                let badge = `<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold">Active</span>`;
+                if (u.isBanned) badge = `<span class="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-[9px] font-bold">Banned</span>`;
+                else if (u.isArchived) badge = `<span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 text-[9px] font-bold">Archived</span>`;
+                else if (u.isInactive) badge = `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[9px] font-bold">Inactive</span>`;
 
                 return `
-                    <tr class="hover:bg-white/5 transition cursor-pointer" onclick="openWriterDrawer('${u._id}')">
-                        <td class="py-3 px-4" onclick="event.stopPropagation()">
-                            <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleWriterSelection('${u._id}')" class="w-4 h-4 accent-emerald-500 cursor-pointer">
-                        </td>
-                        <td class="py-3 px-4">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs">
-                                    ${u.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div class="font-bold text-white">${u.name}</div>
+                    <div onclick="selectWriterSplit('${u._id}')" class="p-3 rounded-xl cursor-pointer transition flex items-center justify-between border ${isSelected ? 'bg-emerald-500/15 border-emerald-500/40' : 'bg-white/5 border-transparent hover:bg-white/10'}">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs shrink-0">
+                                ${u.name.charAt(0).toUpperCase()}
                             </div>
-                        </td>
-                        <td class="py-3 px-4 font-mono text-slate-400">${u._id.split('@')[0]}</td>
-                        <td class="py-3 px-4">
-                            <div class="font-bold text-white font-mono">${(u.totalWords || 0).toLocaleString()}</div>
-                            <div class="text-[10px] text-emerald-400">${u.rank || 'Novice'}</div>
-                        </td>
-                        <td class="py-3 px-4 font-mono font-bold text-amber-400">${u.streak || 0}🔥</td>
-                        <td class="py-3 px-4 font-mono" onclick="event.stopPropagation()">
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-emerald-400 tracking-wider">${pinDisplay}</span>
-                                <button onclick="togglePinReveal('${u._id}')" class="text-slate-400 hover:text-white p-1" title="Show/Hide PIN">
-                                    <i class="fas ${isRevealed ? 'fa-eye-slash' : 'fa-eye'}"></i>
-                                </button>
-                                <button onclick="resetUserPin('${u._id}')" class="text-slate-400 hover:text-emerald-400 p-1" title="Generate New PIN">
-                                    <i class="fas fa-dice"></i>
-                                </button>
+                            <div class="min-w-0">
+                                <div class="font-bold text-xs text-white truncate">${u.name}</div>
+                                <div class="text-[10px] text-slate-400 font-mono">${(u.totalWords||0).toLocaleString()} words</div>
                             </div>
-                        </td>
-                        <td class="py-3 px-4">${statusBadge}</td>
-                        <td class="py-3 px-4 text-right space-x-1" onclick="event.stopPropagation()">
-                            <button onclick="grantFreezeModal('${u._id}')" class="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg text-xs transition" title="Grant Freeze">
-                                🛡️
-                            </button>
-                            <button onclick="toggleWriterBan('${u._id}', ${!u.isBanned})" class="px-2.5 py-1 ${u.isBanned ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'} rounded-lg transition" title="${u.isBanned ? 'Unban Writer' : 'Ban Writer'}">
-                                <i class="fas ${u.isBanned ? 'fa-user-check' : 'fa-user-slash'}"></i>
-                            </button>
-                        </td>
-                    </tr>
+                        </div>
+                        <div>${badge}</div>
+                    </div>
                 `;
             }).join('');
 
-            updateBulkBar();
+            if (!activeDrawerUserId && list.length > 0) {
+                selectWriterSplit(list[0]._id);
+            }
         }
 
-        // ZOHO BOOKS STYLE WRITER DETAIL DRAWER
-        async function openWriterDrawer(userId) {
+        async function selectWriterSplit(userId) {
             activeDrawerUserId = userId;
             const u = writersCache.find(x => x._id === userId);
             if (!u) return;
 
-            document.getElementById('dr-avatar').innerText = u.name.charAt(0).toUpperCase();
-            document.getElementById('dr-name').innerText = u.name;
-            document.getElementById('dr-phone').innerText = u._id.split('@')[0];
-            document.getElementById('dr-total-words').innerText = (u.totalWords || 0).toLocaleString();
-            document.getElementById('dr-streak').innerText = (u.streak || 0) + "🔥";
-            document.getElementById('dr-rank').innerText = `${u.rank || 'Novice'} • Best WPM: ${u.bestSprintWpm || 0}`;
-            document.getElementById('dr-pin-display').innerText = u.webPin || '----';
+            document.getElementById('split-detail-empty').classList.add('hidden');
+            document.getElementById('split-detail-content').classList.remove('hidden');
 
-            const banBtn = document.getElementById('dr-ban-btn');
+            document.getElementById('sp-avatar').innerText = u.name.charAt(0).toUpperCase();
+            document.getElementById('sp-name').innerText = u.name;
+            document.getElementById('sp-phone').innerText = u._id.split('@')[0];
+            document.getElementById('sp-total-words').innerText = (u.totalWords || 0).toLocaleString();
+            document.getElementById('sp-streak').innerText = (u.streak || 0) + "🔥";
+            document.getElementById('sp-rank').innerText = u.rank || 'Novice';
+            document.getElementById('sp-wpm').innerText = (u.bestSprintWpm || 0) + " WPM";
+            document.getElementById('sp-pin-display').innerText = u.webPin || '----';
+
+            let badgeHtml = `<span class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold">Active</span>`;
+            if (u.isBanned) badgeHtml = `<span class="px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-bold">Banned</span>`;
+            else if (u.isArchived) badgeHtml = `<span class="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-bold">Archived</span>`;
+            else if (u.isInactive) badgeHtml = `<span class="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-xs font-bold">Inactive</span>`;
+            document.getElementById('sp-status-badge').innerHTML = badgeHtml;
+
+            // Archive button state
+            const archBtn = document.getElementById('sp-archive-btn');
+            if (u.isArchived) {
+                archBtn.innerHTML = `<i class="fas fa-box-open"></i> Unarchive User`;
+                archBtn.className = "py-2 px-3 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5";
+            } else {
+                archBtn.innerHTML = `<i class="fas fa-box-archive"></i> Archive User`;
+                archBtn.className = "py-2 px-3 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5";
+            }
+
+            // Inactive button state
+            const inactBtn = document.getElementById('sp-inactive-btn');
+            if (u.isInactive) {
+                inactBtn.innerHTML = `<i class="fas fa-sun"></i> Mark Active`;
+            } else {
+                inactBtn.innerHTML = `<i class="fas fa-moon"></i> Mark Inactive`;
+            }
+
+            // Ban button state
+            const banBtn = document.getElementById('sp-ban-btn');
             if (u.isBanned) {
-                banBtn.className = "py-2 px-3 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5";
+                banBtn.className = "py-2 px-3 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5";
                 banBtn.innerHTML = `<i class="fas fa-check"></i> Unban User`;
             } else {
-                banBtn.className = "py-2 px-3 bg-red-500/20 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5";
+                banBtn.className = "py-2 px-3 bg-red-500/20 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5";
                 banBtn.innerHTML = `<i class="fas fa-ban"></i> Ban User`;
             }
 
-            document.getElementById('writer-drawer-overlay').classList.remove('hidden');
-            document.getElementById('writer-drawer').classList.add('open');
+            // Re-render list selection indicator
+            document.querySelectorAll('#writers-split-list > div').forEach(el => el.classList.remove('bg-emerald-500/15', 'border-emerald-500/40'));
 
-            // Load drawer sprint history
+            // Load writer sprint history
             const hist = await api('/api/admin/writer/' + encodeURIComponent(userId) + '/history');
-            const histBox = document.getElementById('dr-sprint-history');
+            const histBox = document.getElementById('sp-sprint-history');
             if (hist && hist.recentSprints && hist.recentSprints.length > 0) {
                 histBox.innerHTML = hist.recentSprints.map(s => `
                     <div class="p-3 bg-white/5 rounded-xl flex items-center justify-between">
@@ -878,11 +995,6 @@
             } else {
                 histBox.innerHTML = `<div class="text-slate-500 text-xs text-center py-4">No recent sprint history.</div>`;
             }
-        }
-
-        function closeWriterDrawer() {
-            document.getElementById('writer-drawer').classList.remove('open');
-            document.getElementById('writer-drawer-overlay').classList.add('hidden');
         }
 
         function copyWriterProfileLink() {
@@ -906,8 +1018,36 @@
             const res = await api('/api/admin/user/set-pin', { userId: activeDrawerUserId });
             if (res?.success) {
                 showToast("New PIN Generated: " + res.webPin);
-                document.getElementById('dr-pin-display').innerText = res.webPin;
+                document.getElementById('sp-pin-display').innerText = res.webPin;
                 loadWritersGrid();
+            }
+        }
+
+        async function toggleWriterArchive() {
+            if (!activeDrawerUserId) return;
+            const u = writersCache.find(x => x._id === activeDrawerUserId);
+            const archiveState = !u?.isArchived;
+            const ok = await showConfirm(`Are you sure you want to ${archiveState ? 'ARCHIVE' : 'UNARCHIVE'} this user?`);
+            if (ok) {
+                const res = await api('/api/admin/writers/archive', { userId: activeDrawerUserId, archive: archiveState });
+                if (res?.success) {
+                    showToast(archiveState ? "User Archived" : "User Unarchived");
+                    loadWritersGrid();
+                }
+            }
+        }
+
+        async function toggleWriterInactive() {
+            if (!activeDrawerUserId) return;
+            const u = writersCache.find(x => x._id === activeDrawerUserId);
+            const inactState = !u?.isInactive;
+            const ok = await showConfirm(`Mark user as ${inactState ? 'INACTIVE' : 'ACTIVE'}?`);
+            if (ok) {
+                const res = await api('/api/admin/writers/inactive', { userId: activeDrawerUserId, isInactive: inactState });
+                if (res?.success) {
+                    showToast(inactState ? "Marked Inactive" : "Marked Active");
+                    loadWritersGrid();
+                }
             }
         }
 
@@ -919,7 +1059,6 @@
             if (confirmed) {
                 await api('/api/admin/ban', { userId: activeDrawerUserId, action: isBanning ? 'ban' : 'unban' });
                 showToast(isBanning ? "Writer Banned" : "Writer Unbanned");
-                closeWriterDrawer();
                 loadWritersGrid();
             }
         }
@@ -931,7 +1070,6 @@
             if (val !== null) {
                 await api('/api/admin/update', { userId: activeDrawerUserId, type: 'set', amount: parseInt(val, 10) });
                 showToast("Total words updated!");
-                closeWriterDrawer();
                 loadWritersGrid();
             }
         }
@@ -944,50 +1082,7 @@
                 const streakNum = parseInt(val, 10);
                 await api('/api/admin/update', { userId: activeDrawerUserId, type: 'streak', currentStreak: streakNum, bestStreak: Math.max(streakNum, u?.bestStreak || 0) });
                 showToast("Streak updated!");
-                closeWriterDrawer();
                 loadWritersGrid();
-            }
-        }
-
-        function toggleWriterSelection(id) {
-            if (selectedWriters.includes(id)) selectedWriters = selectedWriters.filter(i => i !== id);
-            else selectedWriters.push(id);
-            updateBulkBar();
-        }
-
-        function selectAllWriters() {
-            if (selectedWriters.length === writersCache.length) selectedWriters = [];
-            else selectedWriters = writersCache.map(u => u._id);
-            loadWritersGrid();
-        }
-
-        function clearSelection() { selectedWriters = []; loadWritersGrid(); }
-
-        function updateBulkBar() {
-            const bar = document.getElementById('bulk-bar');
-            if (selectedWriters.length > 0) {
-                document.getElementById('bulk-count').textContent = selectedWriters.length;
-                bar.classList.remove('hidden');
-            } else { bar.classList.add('hidden'); }
-        }
-
-        async function bulkBan() {
-            if (!selectedWriters.length) return;
-            const ok = await showConfirm(`Ban ${selectedWriters.length} selected writers?`);
-            if (ok) {
-                for (const id of selectedWriters) await api('/api/admin/ban', { userId: id, action: 'ban' });
-                showToast(`${selectedWriters.length} writers banned`);
-                clearSelection();
-            }
-        }
-
-        async function bulkFreeze() {
-            if (!selectedWriters.length) return;
-            const num = await showPrompt("Enter number of streak freezes to grant:", "1");
-            if (num) {
-                for (const id of selectedWriters) await api('/api/admin/writers/freeze', { userId: id, amount: parseInt(num, 10) });
-                showToast(`Granted ${num} freeze(s) to selected writers!`);
-                clearSelection();
             }
         }
 
@@ -996,21 +1091,6 @@
             if (num) {
                 const res = await api('/api/admin/writers/freeze', { userId, amount: parseInt(num, 10) });
                 if (res?.success) showToast(`Granted ${num} freeze(s)! New total: ${res.newTotal}`);
-            }
-        }
-
-        function togglePinReveal(userId) {
-            if (revealedPins.has(userId)) revealedPins.delete(userId);
-            else revealedPins.add(userId);
-            loadWritersGrid();
-        }
-
-        async function resetUserPin(userId) {
-            const res = await api('/api/admin/user/set-pin', { userId });
-            if (res?.success) {
-                revealedPins.add(userId);
-                showToast(`New PIN generated for ${userId.split('@')[0]}: ${res.webPin}`);
-                loadWritersGrid();
             }
         }
 
@@ -1035,48 +1115,6 @@
             const pin = document.getElementById('qp-pin').innerText;
             navigator.clipboard.writeText(pin);
             showToast("PIN copied: " + pin);
-        }
-
-        function openWriterEditModal(userId) {
-            editingUserId = userId;
-            const u = writersCache.find(x => x._id === userId);
-            if (!u) return;
-            document.getElementById('edit-w-name').value = u.name;
-            document.getElementById('edit-w-streak').value = u.streak || 0;
-            document.getElementById('edit-w-pin').value = u.webPin || '';
-            document.getElementById('writer-edit-modal').classList.remove('hidden');
-        }
-
-        function closeWriterEditModal() {
-            document.getElementById('writer-edit-modal').classList.add('hidden');
-        }
-
-        function generateEditPin() {
-            document.getElementById('edit-w-pin').value = Math.floor(1000 + Math.random() * 9000).toString();
-        }
-
-        async function saveWriterEdit() {
-            if (!editingUserId) return;
-            const name = document.getElementById('edit-w-name').value.trim();
-            const streak = parseInt(document.getElementById('edit-w-streak').value, 10);
-            const pin = document.getElementById('edit-w-pin').value.trim();
-
-            if (name) await api('/api/admin/update', { userId: editingUserId, type: 'name', name });
-            if (!isNaN(streak)) await api('/api/admin/update', { userId: editingUserId, type: 'streak', currentStreak: streak, bestStreak: streak });
-            if (pin && pin.length === 4) await api('/api/admin/user/set-pin', { userId: editingUserId, pin });
-
-            closeWriterEditModal();
-            showToast("Writer details saved!");
-            loadWritersGrid();
-        }
-
-        async function toggleWriterBan(userId, isBanning) {
-            const confirmed = await showConfirm(`Are you sure you want to ${isBanning ? 'BAN' : 'UNBAN'} this writer?`);
-            if (confirmed) {
-                await api('/api/admin/ban', { userId, action: isBanning ? 'ban' : 'unban' });
-                showToast(isBanning ? "Writer Banned" : "Writer Unbanned");
-                loadWritersGrid();
-            }
         }
 
         async function loadAnalytics(range = 'weekly') {
@@ -1117,15 +1155,13 @@
         async function loadSprints() {
             const sprints = await api('/api/admin/sprints');
             const list = document.getElementById('active-sprints-list');
-            const hudList = document.getElementById('live-hud-container');
 
             if (!sprints || sprints.length === 0) {
                 list.innerHTML = `<div class="text-center py-6 text-slate-500 text-xs">No active sprints running.</div>`;
-                if (hudList) hudList.innerHTML = `<div class="text-slate-500 text-xs py-4 text-center">No active sprints running currently.</div>`;
                 return;
             }
 
-            const html = sprints.map(s => `
+            list.innerHTML = sprints.map(s => `
                 <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
                     <div>
                         <div class="font-bold text-sm text-white">${s.name}</div>
@@ -1134,9 +1170,6 @@
                     <button onclick="stopSprint('${s.id}')" class="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-xs font-bold hover:bg-red-500/30 transition">Stop Sprint</button>
                 </div>
             `).join('');
-
-            list.innerHTML = html;
-            if (hudList) hudList.innerHTML = html;
         }
 
         async function stopSprint(chatId) {
@@ -1273,6 +1306,51 @@
                 bcImageBase64 = null;
             } else {
                 showToast(res?.error || "Failed to send broadcast", "error");
+            }
+        }
+
+        async function loadScheduledBroadcasts() {
+            const items = await api('/api/admin/broadcasts/scheduled');
+            const list = document.getElementById('sch-bc-list');
+            if (!items || items.length === 0) {
+                list.innerHTML = `<div class="text-center py-6 text-slate-500 text-xs">No scheduled broadcasts.</div>`;
+                return;
+            }
+            list.innerHTML = items.map(b => `
+                <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+                    <div>
+                        <div class="font-bold text-sm text-white truncate max-w-xs">${b.message || 'Image Broadcast'}</div>
+                        <div class="text-xs text-slate-400">Send At: ${new Date(b.sendAt).toLocaleString()}</div>
+                    </div>
+                    <button onclick="cancelScheduledBroadcast('${b._id}')" class="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-xs font-bold hover:bg-red-500/30 transition">Cancel</button>
+                </div>
+            `).join('');
+        }
+
+        async function createScheduledBroadcast() {
+            const msg = document.getElementById('sch-bc-msg').value.trim();
+            const sendAt = document.getElementById('sch-bc-time').value;
+
+            if (!msg && !bcImageBase64) return showToast("Please enter message or attach image", "error");
+            if (!sendAt) return showToast("Please select send date & time", "error");
+
+            const res = await api('/api/admin/broadcasts/schedule', { message: msg, image: bcImageBase64, sendAt });
+            if (res?.success) {
+                showToast("Broadcast scheduled successfully!");
+                document.getElementById('sch-bc-msg').value = '';
+                document.getElementById('sch-bc-time').value = '';
+                loadScheduledBroadcasts();
+            } else {
+                showToast(res?.error || "Failed to schedule broadcast", "error");
+            }
+        }
+
+        async function cancelScheduledBroadcast(id) {
+            const confirmed = await showConfirm("Cancel this scheduled broadcast?");
+            if (confirmed) {
+                await api('/api/admin/broadcasts/cancel', { id });
+                showToast("Broadcast cancelled!");
+                loadScheduledBroadcasts();
             }
         }
 
