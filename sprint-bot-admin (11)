@@ -1010,11 +1010,27 @@
         }
 
         async function unpairWhatsApp() {
-            const ok = await showConfirm("Unpair current WhatsApp account and delete stored credentials? This will restart the bot server so you can scan a new QR code.", "Unpair WhatsApp");
+            const ok = await showConfirm("Unpair current WhatsApp account and delete stored credentials? The server will restart so you can scan a new QR code.", "Unpair WhatsApp");
             if (ok) {
-                showToast("Unpairing... Server will restart now for a new QR code scan.");
-                await api('/api/admin/system/unpair');
-                setTimeout(() => { location.reload(); }, 6000);
+                showToast("Unpairing... Server is restarting now for a new QR code scan.");
+                try { await api('/api/admin/system/unpair'); } catch(e) {}
+                
+                let attempts = 0;
+                const pollInterval = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const r = await fetch('/api/stats');
+                        if (r.ok) {
+                            clearInterval(pollInterval);
+                            showToast("Server restarted! Loading new QR code...");
+                            setTimeout(() => location.reload(), 1000);
+                        }
+                    } catch(e) {}
+                    if (attempts > 30) {
+                        clearInterval(pollInterval);
+                        location.reload();
+                    }
+                }, 2000);
             }
         }
 
