@@ -874,8 +874,10 @@
             ]);
 
             if (sys) {
-                document.getElementById('sys-mem').innerText = sys.memory + " MB";
-                document.getElementById('sys-uptime').innerText = Math.floor(sys.uptime / 3600) + "h " + Math.floor((sys.uptime % 3600)/60) + "m";
+                const sysMemEl = document.getElementById('sys-mem');
+                const sysUptimeEl = document.getElementById('sys-uptime');
+                if (sysMemEl) sysMemEl.innerText = sys.memory + " MB";
+                if (sysUptimeEl) sysUptimeEl.innerText = Math.floor(sys.uptime / 3600) + "h " + Math.floor((sys.uptime % 3600)/60) + "m";
                 const sprintsCountEl = document.getElementById('sys-sprints-count');
                 if (sprintsCountEl) sprintsCountEl.innerText = sys.activeSprintsCount || 0;
                 
