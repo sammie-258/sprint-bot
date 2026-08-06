@@ -64,16 +64,13 @@ router.get('/', (req, res) => res.redirect('/sprint-bot-dashboard'));
 
 router.get('/sprint-bot-dashboard', (req, res) => {
     res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.sendFile(path.join(__dirname, '../../sprint-bot-dashboard (2)'));
 });
 
-router.get('/sprint-bot-admin', (req, res) => {
+router.get(['/sprint-bot-admin', '/admin', '/admin/*'], (req, res) => {
     res.setHeader('Content-Type', 'text/html');
-    res.sendFile(path.join(__dirname, '../../sprint-bot-admin (11)'));
-});
-
-router.get('/admin', (req, res) => {
-    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.sendFile(path.join(__dirname, '../../sprint-bot-admin (11)'));
 });
 
