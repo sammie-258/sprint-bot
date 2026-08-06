@@ -215,6 +215,29 @@ router.get('/api/admin/system', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+router.post('/api/admin/system/unpair', requireAdmin, async (req, res) => {
+    try {
+        if (appState.sock) {
+            try { await appState.sock.logout(); } catch(e) {}
+        }
+        appState.isConnected = false;
+        appState.qrCodeData = null;
+
+        const fs = require('fs');
+        const path = require('path');
+        const authPath = path.join(process.cwd(), '.auth_info_baileys');
+        if (fs.existsSync(authPath)) {
+            fs.rmSync(authPath, { recursive: true, force: true });
+        }
+
+        res.json({ success: true, message: "Unpaired and auth directory cleared. Server restarting for new QR scan." });
+
+        setTimeout(() => { process.exit(0); }, 1000);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 router.post('/api/admin/maintenance', requireAdmin, (req, res) => {
     appState.maintenanceMode = req.body.status;
     res.json({ success: true, status: appState.maintenanceMode });

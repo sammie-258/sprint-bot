@@ -877,7 +877,13 @@
                     connBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Connected`;
                     connBadge.className = "text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5";
                     connDisplay.innerHTML = `<i class="fas fa-circle-check text-emerald-400 text-2xl"></i><span class="font-bold text-sm text-slate-200">Online & Ready</span>`;
-                    qrBox.innerHTML = `<div class="text-emerald-500 font-bold text-xs text-center"><i class="fas fa-circle-check text-2xl mb-1 block"></i>WhatsApp Paired</div>`;
+                    qrBox.innerHTML = `
+                        <div class="text-center">
+                            <i class="fas fa-circle-check text-2xl text-emerald-400 mb-1 block"></i>
+                            <div class="text-emerald-400 font-bold text-xs">WhatsApp Paired</div>
+                            <button onclick="unpairWhatsApp()" class="mt-2 px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg text-[10px] font-bold transition">Unpair & Re-pair</button>
+                        </div>
+                    `;
                 } else {
                     connBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Pairing Required`;
                     connBadge.className = "text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1.5";
@@ -985,6 +991,15 @@
             const status = document.getElementById('maint-status').innerText !== "ACTIVE";
             await api('/api/admin/maintenance', { status });
             loadOverview();
+        }
+
+        async function unpairWhatsApp() {
+            const ok = await showConfirm("Unpair current WhatsApp account and delete stored credentials? This will restart the bot server so you can scan a new QR code.", "Unpair WhatsApp");
+            if (ok) {
+                showToast("Unpairing... Server will restart now for a new QR code scan.");
+                await api('/api/admin/system/unpair');
+                setTimeout(() => { location.reload(); }, 6000);
+            }
         }
 
         // ZOHO BOOKS 2-LEVEL ARCHITECTURE
