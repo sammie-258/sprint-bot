@@ -169,8 +169,8 @@
             <header class="h-16 border-b border-white/10 flex items-center justify-between px-6 shrink-0 bg-[#111827]">
                 <div class="flex items-center gap-3">
                     <h2 id="view-title" class="font-bold text-lg text-white">Overview & Live HUD</h2>
-                    <span id="conn-badge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Connected
+                    <span id="conn-badge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></span> Connecting...
                     </span>
                 </div>
                 
@@ -917,6 +917,12 @@
                         const timeStr = isNaN(dateObj.getTime()) ? new Date().toLocaleTimeString() : dateObj.toLocaleTimeString();
                         return `<div><span class="text-slate-500">[${timeStr}]</span> ${a.text}</div>`;
                     }).join('');
+                }
+            } else {
+                const connBadge = document.getElementById('conn-badge');
+                if (connBadge) {
+                    connBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-400"></span> Disconnected`;
+                    connBadge.className = "text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 flex items-center gap-1.5";
                 }
             }
 
