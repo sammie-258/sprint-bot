@@ -114,8 +114,8 @@
             <h1 class="text-2xl font-bold mb-1">Sprint Bot Admin</h1>
             <p class="text-xs text-slate-400 mb-6">Enter your security key to access the command center</p>
             
-            <input type="password" id="admin-pass" placeholder="Enter Access Key" class="w-full bg-white/5 border border-white/10 px-5 py-3.5 rounded-xl font-mono text-center text-lg tracking-[0.4em] mb-4 focus:border-[#10b981] outline-none transition-all">
-            <button onclick="login()" class="w-full py-3.5 bg-[#10b981] hover:bg-[#059669] text-white font-bold rounded-xl transition-all shadow-lg shadow-[#10b981]/20">Login to Command Center</button>
+            <input type="password" id="admin-pass" onkeyup="if(event.key === 'Enter') login()" placeholder="Enter Access Key" class="w-full bg-white/5 border border-white/10 px-5 py-3.5 rounded-xl font-mono text-center text-lg tracking-[0.4em] mb-4 focus:border-[#10b981] outline-none transition-all">
+            <button id="login-btn" onclick="login()" class="w-full py-3.5 bg-[#10b981] hover:bg-[#059669] text-white font-bold rounded-xl transition-all shadow-lg shadow-[#10b981]/20">Login to Command Center</button>
         </div>
     </div>
 
@@ -704,16 +704,33 @@
         }
 
         async function login() {
-            adminPass = document.getElementById('admin-pass').value.trim();
+            const passInput = document.getElementById('admin-pass');
+            const loginBtn = document.getElementById('login-btn');
+            adminPass = passInput.value.trim();
             if (!adminPass) return showToast("Please enter access key", "error");
-            const res = await api('/api/admin/system');
-            if (res && !res.error) {
-                localStorage.setItem('admin_pass', adminPass);
-                document.getElementById('auth-modal').classList.add('hidden');
-                document.getElementById('app').classList.remove('hidden');
-                switchTab('overview');
-            } else {
-                showToast("Invalid Access Key", "error");
+            
+            if (loginBtn) {
+                loginBtn.disabled = true;
+                loginBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> Authenticating...`;
+            }
+
+            try {
+                const res = await api('/api/admin/system');
+                if (res && !res.error) {
+                    localStorage.setItem('admin_pass', adminPass);
+                    document.getElementById('auth-modal').classList.add('hidden');
+                    document.getElementById('app').classList.remove('hidden');
+                    switchTab('overview');
+                } else {
+                    showToast("Invalid Access Key", "error");
+                }
+            } catch(e) {
+                showToast("Connection Error. Check server logs.", "error");
+            } finally {
+                if (loginBtn) {
+                    loginBtn.disabled = false;
+                    loginBtn.innerText = "Login to Command Center";
+                }
             }
         }
 
@@ -757,7 +774,8 @@
             if (sys) {
                 document.getElementById('sys-mem').innerText = sys.memory + " MB";
                 document.getElementById('sys-uptime').innerText = Math.floor(sys.uptime / 3600) + "h " + Math.floor((sys.uptime % 3600)/60) + "m";
-                document.getElementById('sys-[#10b981] s-count')?.innerText = sys.activeSprintsCount || 0;
+                const sprintsCountEl = document.getElementById('sys-sprints-count');
+                if (sprintsCountEl) sprintsCountEl.innerText = sys.activeSprintsCount || 0;
                 
                 const connBadge = document.getElementById('conn-badge');
                 const connDisplay = document.getElementById('conn-display');
