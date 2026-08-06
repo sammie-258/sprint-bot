@@ -513,15 +513,15 @@ mongoose.connect(MONGO_URI).then(async () => {
 
             sock.ev.on('connection.update', async (update) => {
                 const { connection, lastDisconnect, qr } = update;
-                if (qr) { qrCodeData = qr; console.log('⚠️ New QR Code'); }
+                if (qr) { appState.qrCodeData = qr; console.log('⚠️ New QR Code'); }
                 if (connection === 'open') {
-                    isConnected = true; qrCodeData = null;
+                    isConnected = true; appState.isConnected = true; appState.qrCodeData = null;
                     reconnectAttempts = 0;
                     updateGroupCache(true);
                     console.log('✅ Bot Connected!');
                     pushActivity('connect', 'Bot connected to WhatsApp', '✅');
                 } else if (connection === 'close') {
-                    isConnected = false;
+                    isConnected = false; appState.isConnected = false;
                     const code = lastDisconnect?.error?.output?.statusCode;
                     console.log(`⚠️ Connection closed with status code: ${code}`);
 

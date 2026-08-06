@@ -132,14 +132,14 @@
                 </div>
                 <div>
                     <h2 class="font-bold text-base leading-tight">Sprint Bot</h2>
-                    <span class="text-[10px] text-[#10b981] font-semibold tracking-wider uppercase bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">Command Center v5.3</span>
+                    <span class="text-[10px] text-[#10b981] font-semibold tracking-wider uppercase bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">Command Center v5.4</span>
                 </div>
             </div>
 
             <!-- Navigation Links -->
             <div class="space-y-1 mb-6">
                 <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">Core Modules</div>
-                <button onclick="switchTab('overview')" id="nav-overview" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-[#10b981] fa-desktop text-xs w-4"></i> Overview & Live HUD</button>
+                <button onclick="switchTab('overview')" id="nav-overview" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-desktop text-xs w-4 text-emerald-400"></i> Overview & Live HUD</button>
                 <button onclick="switchTab('writers')" id="nav-writers" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-users-gear text-xs w-4"></i> Writers & PIN Access</button>
                 <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-link w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white transition"><i class="fas fa-chart-line text-xs w-4"></i> Performance Analytics</button>
             </div>
@@ -187,7 +187,7 @@
                 <!-- VIEW 1: OVERVIEW & LIVE HUD (MATCHES SPRINT BOT PUBLIC DASHBOARD LOOK) -->
                 <div id="view-overview" class="space-y-6">
                     
-                    <!-- Top KPI Cards (Screenshot 1 Match) -->
+                    <!-- Top KPI Cards -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                         <div class="panel p-5 flex items-center justify-between">
                             <div>
@@ -230,7 +230,7 @@
                         </div>
                     </div>
 
-                    <!-- Sprint Velocity Curve Chart (Screenshot 1 Match) -->
+                    <!-- Sprint Velocity Curve Chart -->
                     <div class="panel p-6">
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-base font-bold text-white">Sprint Velocity</h3>
@@ -241,7 +241,7 @@
                         <div class="h-64"><canvas id="hud-chart-velocity"></canvas></div>
                     </div>
 
-                    <!-- 3-Column Live Leaderboards Grid (Screenshot 2 Match) -->
+                    <!-- 3-Column Live Leaderboards Grid -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         
                         <!-- Hall of Fame -->
@@ -323,132 +323,222 @@
 
                 </div>
 
-                <!-- VIEW 2: WRITERS & PIN ACCESS (ZOHO BOOKS 2-COLUMN SPLIT VIEW) -->
+                <!-- VIEW 2: WRITERS & PIN ACCESS (ZOHO BOOKS 2-LEVEL ARCHITECTURE) -->
                 <div id="view-writers" class="hidden space-y-6">
                     
-                    <!-- Header Bar -->
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div class="flex items-center gap-2 w-full sm:w-auto">
-                            <input type="text" id="writer-search" oninput="loadWritersGrid()" placeholder="Search writers by name or phone..." class="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-xs w-full sm:w-64 outline-none focus:border-emerald-400">
-                            
-                            <select id="writer-filter" onchange="loadWritersGrid()" class="bg-[#1f2937] border border-white/10 px-3 py-2 rounded-xl text-xs outline-none">
-                                <option value="all">All Writers</option>
-                                <option value="active">Active Only</option>
-                                <option value="inactive">Inactive</option>
-                                <option value="archived">Archived</option>
-                                <option value="banned">Banned</option>
-                            </select>
-                        </div>
-
-                        <div class="text-xs text-slate-400 font-medium">
-                            Total: <span id="writers-count" class="font-bold text-white">0</span> writers
-                        </div>
-                    </div>
-
-                    <!-- ZOHO BOOKS 2-COLUMN SPLIT CONTAINER -->
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- LEVEL 1: ALL WRITERS FULL TABLE VIEW (MATCHES SCREENSHOT 3) -->
+                    <div id="writers-table-view" class="space-y-6">
                         
-                        <!-- Left Pane: Writers List (~4 columns) -->
-                        <div class="lg:col-span-4 panel p-4 space-y-2 max-h-[700px] overflow-y-auto">
-                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider px-2 mb-3">Writer Accounts</div>
-                            <div id="writers-split-list" class="space-y-2">
-                                <!-- Populated dynamically -->
-                            </div>
-                        </div>
+                        <!-- Quick PIN Lookup Header Card -->
+                        <div class="panel p-6 bg-gradient-to-r from-[#111827] to-[#1f2937] border-emerald-500/30 relative overflow-hidden">
+                            <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                <div>
+                                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                        <i class="fas fa-key text-emerald-400"></i> Quick Writer PIN Lookup
+                                    </h3>
+                                    <p class="text-xs text-slate-400 mt-1">Search any writer's phone or name to view or issue their 4-digit web logging PIN</p>
+                                </div>
 
-                        <!-- Right Pane: Selected Writer Detail & Actions (~8 columns) -->
-                        <div class="lg:col-span-8 panel p-6 space-y-6">
-                            <div id="split-detail-empty" class="text-center py-20 text-slate-500 text-xs">
-                                Select a writer from the left list to view details and manage access.
+                                <div class="flex items-center gap-2 w-full md:w-auto">
+                                    <input type="text" id="quick-pin-search" oninput="quickPinLookup(this.value)" placeholder="Enter phone or name..." class="bg-black/30 border border-white/15 px-4 py-2.5 rounded-xl text-xs w-full md:w-64 outline-none focus:border-emerald-400">
+                                </div>
                             </div>
 
-                            <div id="split-detail-content" class="hidden space-y-6">
+                            <!-- Quick Result Display Box -->
+                            <div id="quick-pin-result" class="hidden mt-4 pt-4 border-t border-white/10 flex items-center justify-between bg-black/40 p-4 rounded-xl">
+                                <div class="flex items-center gap-3">
+                                    <div id="qp-avatar" class="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-sm"></div>
+                                    <div>
+                                        <div id="qp-name" class="font-bold text-sm"></div>
+                                        <div id="qp-phone" class="text-xs text-slate-400 font-mono"></div>
+                                    </div>
+                                </div>
                                 
-                                <!-- Selected Writer Header -->
-                                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
-                                    <div class="flex items-center gap-4">
-                                        <div id="sp-avatar" class="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xl border border-emerald-500/30"></div>
-                                        <div>
-                                            <div class="flex items-center gap-2">
-                                                <h3 id="sp-name" class="font-bold text-xl text-white"></h3>
-                                                <span id="sp-status-badge"></span>
-                                            </div>
-                                            <div id="sp-phone" class="text-xs font-mono text-slate-400 mt-0.5"></div>
-                                        </div>
+                                <div class="flex items-center gap-4">
+                                    <div class="text-right">
+                                        <div class="text-[10px] text-slate-400 uppercase font-bold">4-Digit Web PIN</div>
+                                        <div id="qp-pin" class="text-2xl font-bold font-mono text-emerald-400 tracking-widest"></div>
                                     </div>
-                                </div>
-
-                                <!-- Action Toolbar -->
-                                <div class="flex flex-wrap gap-2">
-                                    <button onclick="copyWriterProfileLink()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
-                                        <i class="fas fa-link text-emerald-400"></i> Copy Profile Link
-                                    </button>
-                                    <button onclick="copyWriterPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
-                                        <i class="fas fa-key text-amber-400"></i> Copy Web PIN
-                                    </button>
-                                    <button onclick="resetDrawerPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
-                                        <i class="fas fa-dice text-indigo-400"></i> Reset PIN
-                                    </button>
-                                    <button onclick="toggleWriterArchive()" id="sp-archive-btn" class="py-2 px-3 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
-                                        <i class="fas fa-box-archive"></i> Archive User
-                                    </button>
-                                    <button onclick="toggleWriterInactive()" id="sp-inactive-btn" class="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
-                                        <i class="fas fa-moon"></i> Toggle Inactive
-                                    </button>
-                                    <button onclick="grantFreezeModal(activeDrawerUserId)" class="py-2 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
-                                        🛡️ Grant Freeze
-                                    </button>
-                                    <button onclick="toggleDrawerBan()" id="sp-ban-btn" class="py-2 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
-                                        <i class="fas fa-ban"></i> Ban User
+                                    <button onclick="copyQuickPin()" class="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
+                                        <i class="fas fa-copy"></i> Copy PIN
                                     </button>
                                 </div>
-
-                                <!-- Editable Stats Grid -->
-                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    <div class="panel p-4 bg-white/5">
-                                        <div class="text-[10px] text-slate-400 font-bold uppercase">Total Words</div>
-                                        <div class="flex items-center justify-between mt-1">
-                                            <div id="sp-total-words" class="text-xl font-bold font-mono text-white"></div>
-                                            <button onclick="editWriterWords()" class="text-xs text-slate-400 hover:text-emerald-400 p-1" title="Edit Total Words"><i class="fas fa-pen"></i></button>
-                                        </div>
-                                    </div>
-
-                                    <div class="panel p-4 bg-white/5">
-                                        <div class="text-[10px] text-slate-400 font-bold uppercase">Current Streak</div>
-                                        <div class="flex items-center justify-between mt-1">
-                                            <div id="sp-streak" class="text-xl font-bold font-mono text-amber-400"></div>
-                                            <button onclick="editWriterStreak()" class="text-xs text-slate-400 hover:text-amber-400 p-1" title="Edit Streak"><i class="fas fa-pen"></i></button>
-                                        </div>
-                                    </div>
-
-                                    <div class="panel p-4 bg-white/5">
-                                        <div class="text-[10px] text-slate-400 font-bold uppercase">Web Logging PIN</div>
-                                        <div id="sp-pin-display" class="text-xl font-bold font-mono text-emerald-400 mt-1 tracking-widest"></div>
-                                    </div>
-
-                                    <div class="panel p-4 bg-white/5">
-                                        <div class="text-[10px] text-slate-400 font-bold uppercase">Rank</div>
-                                        <div id="sp-rank" class="text-sm font-bold text-emerald-400 mt-1"></div>
-                                    </div>
-
-                                    <div class="panel p-4 bg-white/5">
-                                        <div class="text-[10px] text-slate-400 font-bold uppercase">Best Sprint WPM</div>
-                                        <div id="sp-wpm" class="text-sm font-bold text-indigo-400 mt-1"></div>
-                                    </div>
-                                </div>
-
-                                <!-- Sprint & Activity Log Stream -->
-                                <div class="space-y-3 pt-2">
-                                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Recent Sprints & Performance</h4>
-                                    <div id="sp-sprint-history" class="space-y-2 font-mono text-xs">
-                                        <!-- Populated dynamically -->
-                                    </div>
-                                </div>
-
                             </div>
                         </div>
 
+                        <!-- Bulk Actions Bar -->
+                        <div id="bulk-bar" class="hidden panel p-4 bg-indigo-950/40 border-indigo-500/30 flex items-center justify-between">
+                            <div class="text-xs font-bold text-indigo-300">
+                                Selected <span id="bulk-count" class="font-mono text-white">0</span> writers
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="bulkBan()" class="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-lg text-xs font-bold transition">Bulk Ban</button>
+                                <button onclick="bulkFreeze()" class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-bold transition">Grant Freezes</button>
+                                <button onclick="clearSelection()" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 rounded-lg text-xs font-bold transition">Clear</button>
+                            </div>
+                        </div>
+
+                        <!-- Table & Filters Panel (Matches Screenshot 3) -->
+                        <div class="panel p-5 space-y-4">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <input type="text" id="writer-search" oninput="loadWritersGrid()" placeholder="Search writers by name or phone..." class="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-xs w-full sm:w-64 outline-none focus:border-emerald-400">
+                                    
+                                    <select id="writer-filter" onchange="loadWritersGrid()" class="bg-[#1f2937] border border-white/10 px-3 py-2 rounded-xl text-xs outline-none">
+                                        <option value="all">All Writers</option>
+                                        <option value="active">Active Only</option>
+                                        <option value="inactive">Inactive</option>
+                                        <option value="archived">Archived</option>
+                                        <option value="banned">Banned</option>
+                                    </select>
+
+                                    <button onclick="selectAllWriters()" class="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition">Select All</button>
+                                </div>
+
+                                <div class="text-xs text-slate-400 font-medium">
+                                    Total: <span id="writers-count" class="font-bold text-white">0</span> writers
+                                </div>
+                            </div>
+
+                            <!-- Full Writers Table -->
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs">
+                                    <thead>
+                                        <tr class="border-b border-white/10 text-slate-400 uppercase text-[10px] tracking-wider font-bold">
+                                            <th class="py-3 px-4 w-10">Select</th>
+                                            <th class="py-3 px-4">Writer Details</th>
+                                            <th class="py-3 px-4">Phone ID</th>
+                                            <th class="py-3 px-4">Rank & Words</th>
+                                            <th class="py-3 px-4">Streak</th>
+                                            <th class="py-3 px-4">Web PIN</th>
+                                            <th class="py-3 px-4">Status</th>
+                                            <th class="py-3 px-4 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="writers-full-table-body" class="divide-y divide-white/5 font-medium">
+                                        <!-- Populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- LEVEL 2: 2-COLUMN SPLIT VIEW (MATCHES SCREENSHOT 1 - REVEALED ON WRITER CLICK) -->
+                    <div id="writers-split-view" class="hidden space-y-4">
+                        
+                        <!-- Top Bar with Back Button -->
+                        <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                            <button onclick="showWritersFullTable()" class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition flex items-center gap-2">
+                                <i class="fas fa-arrow-left"></i> Back to All Writers
+                            </button>
+
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="split-writer-search" oninput="filterSplitList(this.value)" placeholder="Filter list..." class="bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs w-48 outline-none focus:border-emerald-400">
+                            </div>
+                        </div>
+
+                        <!-- 2-Column Split Container -->
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                            
+                            <!-- Left Pane: Scrollable User List (~4 cols) -->
+                            <div class="lg:col-span-4 panel p-4 space-y-2 max-h-[700px] overflow-y-auto">
+                                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider px-2 mb-3">Writer Accounts</div>
+                                <div id="writers-split-list" class="space-y-2">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- Right Pane: Writer Cards & Details (~8 cols - Screenshot 1 Match) -->
+                            <div class="lg:col-span-8 panel p-6 space-y-6">
+                                <div id="split-detail-content" class="space-y-6">
+                                    
+                                    <!-- Selected Writer Header -->
+                                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+                                        <div class="flex items-center gap-4">
+                                            <div id="sp-avatar" class="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xl border border-emerald-500/30"></div>
+                                            <div>
+                                                <div class="flex items-center gap-2">
+                                                    <h3 id="sp-name" class="font-bold text-xl text-white"></h3>
+                                                    <span id="sp-status-badge"></span>
+                                                </div>
+                                                <div id="sp-phone" class="text-xs font-mono text-slate-400 mt-0.5"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Action Toolbar -->
+                                    <div class="flex flex-wrap gap-2">
+                                        <button onclick="copyWriterProfileLink()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
+                                            <i class="fas fa-link text-emerald-400"></i> Copy Profile Link
+                                        </button>
+                                        <button onclick="copyWriterPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
+                                            <i class="fas fa-key text-amber-400"></i> Copy Web PIN
+                                        </button>
+                                        <button onclick="resetDrawerPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
+                                            <i class="fas fa-dice text-indigo-400"></i> Reset PIN
+                                        </button>
+                                        <button onclick="toggleWriterArchive()" id="sp-archive-btn" class="py-2 px-3 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                            <i class="fas fa-box-archive"></i> Archive User
+                                        </button>
+                                        <button onclick="toggleWriterInactive()" id="sp-inactive-btn" class="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                            <i class="fas fa-moon"></i> Toggle Inactive
+                                        </button>
+                                        <button onclick="grantFreezeModal(activeDrawerUserId)" class="py-2 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                            🛡️ Grant Freeze
+                                        </button>
+                                        <button onclick="toggleDrawerBan()" id="sp-ban-btn" class="py-2 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                            <i class="fas fa-ban"></i> Ban User
+                                        </button>
+                                    </div>
+
+                                    <!-- Editable Stats Cards Grid (Screenshot 1 Match) -->
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div class="panel p-5 bg-white/5">
+                                            <div class="text-[10px] text-slate-400 font-bold uppercase">Total Words</div>
+                                            <div class="flex items-center justify-between mt-2">
+                                                <div id="sp-total-words" class="text-2xl font-extrabold font-mono text-white"></div>
+                                                <button onclick="editWriterWords()" class="text-xs text-slate-400 hover:text-emerald-400 p-1.5 bg-white/5 rounded-lg" title="Edit Total Words"><i class="fas fa-pen"></i></button>
+                                            </div>
+                                        </div>
+
+                                        <div class="panel p-5 bg-white/5">
+                                            <div class="text-[10px] text-slate-400 font-bold uppercase">Current Streak</div>
+                                            <div class="flex items-center justify-between mt-2">
+                                                <div id="sp-streak" class="text-2xl font-extrabold font-mono text-amber-400"></div>
+                                                <button onclick="editWriterStreak()" class="text-xs text-slate-400 hover:text-amber-400 p-1.5 bg-white/5 rounded-lg" title="Edit Streak"><i class="fas fa-pen"></i></button>
+                                            </div>
+                                        </div>
+
+                                        <div class="panel p-5 bg-white/5">
+                                            <div class="text-[10px] text-slate-400 font-bold uppercase">Web Logging PIN</div>
+                                            <div id="sp-pin-display" class="text-2xl font-extrabold font-mono text-emerald-400 mt-2 tracking-widest"></div>
+                                        </div>
+
+                                        <div class="panel p-5 bg-white/5">
+                                            <div class="text-[10px] text-slate-400 font-bold uppercase">Rank</div>
+                                            <div id="sp-rank" class="text-base font-bold text-emerald-400 mt-2"></div>
+                                        </div>
+
+                                        <div class="panel p-5 bg-white/5">
+                                            <div class="text-[10px] text-slate-400 font-bold uppercase">Best Sprint WPM</div>
+                                            <div id="sp-wpm" class="text-base font-bold text-indigo-400 mt-2"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Recent Sprints & Activity Stream -->
+                                    <div class="space-y-3 pt-2">
+                                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Recent Sprints & Performance</h4>
+                                        <div id="sp-sprint-history" class="space-y-2 font-mono text-xs">
+                                            <!-- Populated dynamically -->
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- VIEW 3: ANALYTICS -->
@@ -643,7 +733,9 @@
         let adminPass = localStorage.getItem('admin_pass') || '';
         let currentTab = 'overview';
         let writersCache = [];
+        let selectedWriters = [];
         let activeDrawerUserId = null;
+        let revealedPins = new Set();
         let bcImageBase64 = null;
         let velocityChart = null, hoursChart = null, hudVelocityChart = null;
 
@@ -819,7 +911,7 @@
                 }
             }
 
-            // POPULATE LIVE HUD FROM /api/stats (MATCHES SCREENSHOTS 1 & 2)
+            // POPULATE LIVE HUD FROM /api/stats
             if (stats) {
                 const totalW = (stats.totalWords || 0);
                 const formattedW = totalW >= 1000000 ? (totalW / 1000000).toFixed(1) + 'M' : totalW.toLocaleString();
@@ -850,7 +942,7 @@
                     });
                 }
 
-                // Leaderboards: Hall of Fame, Today's Top, Top Groups
+                // Leaderboards
                 if (stats.topWriters) {
                     document.getElementById('hud-hall-of-fame').innerHTML = stats.topWriters.map((w, i) => `
                         <div class="flex items-center justify-between py-2">
@@ -895,7 +987,7 @@
             loadOverview();
         }
 
-        // ZOHO BOOKS 2-COLUMN SPLIT VIEW IMPLEMENTATION
+        // ZOHO BOOKS 2-LEVEL ARCHITECTURE
         async function loadWritersGrid() {
             const query = document.getElementById('writer-search').value;
             const filter = document.getElementById('writer-filter').value;
@@ -909,47 +1001,101 @@
             else if (filter === 'archived') list = list.filter(u => u.isArchived);
             else if (filter === 'banned') list = list.filter(u => u.isBanned);
 
-            const listContainer = document.getElementById('writers-split-list');
+            // Populate Level 1 Full Table (Screenshot 3 Match)
+            const tbody = document.getElementById('writers-full-table-body');
             if (list.length === 0) {
-                listContainer.innerHTML = `<div class="py-8 text-center text-slate-500 text-xs">No writers found.</div>`;
-                return;
+                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-500">No writers found.</td></tr>`;
+            } else {
+                tbody.innerHTML = list.map(u => {
+                    const isSelected = selectedWriters.includes(u._id);
+                    const isRevealed = revealedPins.has(u._id);
+                    const pinDisplay = isRevealed ? (u.webPin || '----') : '••••';
+                    let statusBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">Active</span>`;
+                    if (u.isBanned) statusBadge = `<span class="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-[10px]">Banned</span>`;
+                    else if (u.isArchived) statusBadge = `<span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[10px]">Archived</span>`;
+                    else if (u.isInactive) statusBadge = `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[10px]">Inactive</span>`;
+
+                    return `
+                        <tr class="hover:bg-white/5 transition cursor-pointer" onclick="openWriterSplitView('${u._id}')">
+                            <td class="py-3 px-4" onclick="event.stopPropagation()">
+                                <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleWriterSelection('${u._id}')" class="w-4 h-4 accent-emerald-500 cursor-pointer">
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs">
+                                        ${u.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div class="font-bold text-white">${u.name}</div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4 font-mono text-slate-400">${u._id.split('@')[0]}</td>
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-white font-mono">${(u.totalWords || 0).toLocaleString()}</div>
+                                <div class="text-[10px] text-emerald-400">${u.rank || 'Novice'}</div>
+                            </td>
+                            <td class="py-3 px-4 font-mono font-bold text-amber-400">${u.streak || 0}🔥</td>
+                            <td class="py-3 px-4 font-mono" onclick="event.stopPropagation()">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-emerald-400 tracking-wider">${pinDisplay}</span>
+                                    <button onclick="togglePinReveal('${u._id}')" class="text-slate-400 hover:text-white p-1"><i class="fas ${isRevealed ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4">${statusBadge}</td>
+                            <td class="py-3 px-4 text-right space-x-1" onclick="event.stopPropagation()">
+                                <button onclick="grantFreezeModal('${u._id}')" class="px-2 py-1 bg-amber-500/10 text-amber-400 rounded-lg text-xs">🛡️</button>
+                                <button onclick="toggleWriterBan('${u._id}', ${!u.isBanned})" class="px-2.5 py-1 ${u.isBanned ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'} rounded-lg"><i class="fas ${u.isBanned ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             }
 
-            listContainer.innerHTML = list.map(u => {
-                const isSelected = activeDrawerUserId === u._id;
-                let badge = `<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold">Active</span>`;
-                if (u.isBanned) badge = `<span class="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-[9px] font-bold">Banned</span>`;
-                else if (u.isArchived) badge = `<span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 text-[9px] font-bold">Archived</span>`;
-                else if (u.isInactive) badge = `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[9px] font-bold">Inactive</span>`;
+            // Populate Level 2 Left Pane List
+            const splitList = document.getElementById('writers-split-list');
+            if (splitList) {
+                splitList.innerHTML = list.map(u => {
+                    const isSelected = activeDrawerUserId === u._id;
+                    let badge = `<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold">Active</span>`;
+                    if (u.isBanned) badge = `<span class="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-[9px] font-bold">Banned</span>`;
+                    else if (u.isArchived) badge = `<span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 text-[9px] font-bold">Archived</span>`;
+                    else if (u.isInactive) badge = `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[9px] font-bold">Inactive</span>`;
 
-                return `
-                    <div onclick="selectWriterSplit('${u._id}')" class="p-3 rounded-xl cursor-pointer transition flex items-center justify-between border ${isSelected ? 'bg-emerald-500/15 border-emerald-500/40' : 'bg-white/5 border-transparent hover:bg-white/10'}">
-                        <div class="flex items-center gap-3 min-w-0">
-                            <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs shrink-0">
-                                ${u.name.charAt(0).toUpperCase()}
+                    return `
+                        <div onclick="selectWriterSplit('${u._id}')" class="p-3 rounded-xl cursor-pointer transition flex items-center justify-between border ${isSelected ? 'bg-emerald-500/15 border-emerald-500/40' : 'bg-white/5 border-transparent hover:bg-white/10'}">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs shrink-0">
+                                    ${u.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="font-bold text-xs text-white truncate">${u.name}</div>
+                                    <div class="text-[10px] text-slate-400 font-mono">${(u.totalWords||0).toLocaleString()} words</div>
+                                </div>
                             </div>
-                            <div class="min-w-0">
-                                <div class="font-bold text-xs text-white truncate">${u.name}</div>
-                                <div class="text-[10px] text-slate-400 font-mono">${(u.totalWords||0).toLocaleString()} words</div>
-                            </div>
+                            <div>${badge}</div>
                         </div>
-                        <div>${badge}</div>
-                    </div>
-                `;
-            }).join('');
-
-            if (!activeDrawerUserId && list.length > 0) {
-                selectWriterSplit(list[0]._id);
+                    `;
+                }).join('');
             }
+
+            updateBulkBar();
+        }
+
+        // Open 2-Column Split View when clicking a row in Full Table
+        function openWriterSplitView(userId) {
+            document.getElementById('writers-table-view').classList.add('hidden');
+            document.getElementById('writers-split-view').classList.remove('hidden');
+            selectWriterSplit(userId);
+        }
+
+        function showWritersFullTable() {
+            document.getElementById('writers-split-view').classList.add('hidden');
+            document.getElementById('writers-table-view').classList.remove('hidden');
         }
 
         async function selectWriterSplit(userId) {
             activeDrawerUserId = userId;
             const u = writersCache.find(x => x._id === userId);
             if (!u) return;
-
-            document.getElementById('split-detail-empty').classList.add('hidden');
-            document.getElementById('split-detail-content').classList.remove('hidden');
 
             document.getElementById('sp-avatar').innerText = u.name.charAt(0).toUpperCase();
             document.getElementById('sp-name').innerText = u.name;
@@ -994,8 +1140,8 @@
                 banBtn.innerHTML = `<i class="fas fa-ban"></i> Ban User`;
             }
 
-            // Re-render list selection indicator
-            document.querySelectorAll('#writers-split-list > div').forEach(el => el.classList.remove('bg-emerald-500/15', 'border-emerald-500/40'));
+            // Re-render selection highlight in Left Pane
+            loadWritersGrid();
 
             // Load writer sprint history
             const hist = await api('/api/admin/writer/' + encodeURIComponent(userId) + '/history');
@@ -1104,12 +1250,60 @@
             }
         }
 
+        function toggleWriterSelection(id) {
+            if (selectedWriters.includes(id)) selectedWriters = selectedWriters.filter(i => i !== id);
+            else selectedWriters.push(id);
+            updateBulkBar();
+        }
+
+        function selectAllWriters() {
+            if (selectedWriters.length === writersCache.length) selectedWriters = [];
+            else selectedWriters = writersCache.map(u => u._id);
+            loadWritersGrid();
+        }
+
+        function clearSelection() { selectedWriters = []; loadWritersGrid(); }
+
+        function updateBulkBar() {
+            const bar = document.getElementById('bulk-bar');
+            if (selectedWriters.length > 0) {
+                document.getElementById('bulk-count').textContent = selectedWriters.length;
+                bar.classList.remove('hidden');
+            } else { bar.classList.add('hidden'); }
+        }
+
+        async function bulkBan() {
+            if (!selectedWriters.length) return;
+            const ok = await showConfirm(`Ban ${selectedWriters.length} selected writers?`);
+            if (ok) {
+                for (const id of selectedWriters) await api('/api/admin/ban', { userId: id, action: 'ban' });
+                showToast(`${selectedWriters.length} writers banned`);
+                clearSelection();
+            }
+        }
+
+        async function bulkFreeze() {
+            if (!selectedWriters.length) return;
+            const num = await showPrompt("Enter number of streak freezes to grant:", "1");
+            if (num) {
+                for (const id of selectedWriters) await api('/api/admin/writers/freeze', { userId: id, amount: parseInt(num, 10) });
+                showToast(`Granted ${num} freeze(s) to selected writers!`);
+                clearSelection();
+            }
+        }
+
         async function grantFreezeModal(userId) {
             const num = await showPrompt("Enter streak freezes to grant:", "1");
             if (num) {
                 const res = await api('/api/admin/writers/freeze', { userId, amount: parseInt(num, 10) });
                 if (res?.success) showToast(`Granted ${num} freeze(s)! New total: ${res.newTotal}`);
             }
+        }
+
+        function togglePinReveal(userId) {
+            if (revealedPins.has(userId)) revealedPins.delete(userId);
+            else revealedPins.add(userId);
+            loadWritersGrid();
         }
 
         function quickPinLookup(val) {
@@ -1133,6 +1327,15 @@
             const pin = document.getElementById('qp-pin').innerText;
             navigator.clipboard.writeText(pin);
             showToast("PIN copied: " + pin);
+        }
+
+        async function toggleWriterBan(userId, isBanning) {
+            const confirmed = await showConfirm(`Are you sure you want to ${isBanning ? 'BAN' : 'UNBAN'} this writer?`);
+            if (confirmed) {
+                await api('/api/admin/ban', { userId, action: isBanning ? 'ban' : 'unban' });
+                showToast(isBanning ? "Writer Banned" : "Writer Unbanned");
+                loadWritersGrid();
+            }
         }
 
         async function loadAnalytics(range = 'weekly') {
