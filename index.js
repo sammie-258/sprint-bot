@@ -481,13 +481,13 @@ mongoose.connect(MONGO_URI).then(async () => {
     });
     //   BAILEYS INIT
     // =======================
-    const { state, saveCreds } = await useMultiFileAuthState('.auth_info_baileys');
-
     let isInitializing = false;
     const initializeBot = async () => {
         if (isInitializing) return;
         isInitializing = true;
         try {
+            const { state, saveCreds } = await useMultiFileAuthState('.auth_info_baileys');
+
             if (sock) {
                 console.log('🔄 Cleaning up previous socket instance...');
                 try {
@@ -528,7 +528,18 @@ mongoose.connect(MONGO_URI).then(async () => {
                     console.log(`⚠️ Connection closed with status code: ${code}`);
 
                     if (code === DisconnectReason.loggedOut) {
-                        console.log("🛑 Logged out. Delete .auth_info_baileys and restart.");
+                        console.log("🛑 Logged out. Deleting .auth_info_baileys and auto-restarting...");
+                        try {
+                            const authPath = path.join(process.cwd(), '.auth_info_baileys');
+                            if (fs.existsSync(authPath)) {
+                                fs.rmSync(authPath, { recursive: true, force: true });
+                            }
+                        } catch (err) { console.error("Error clearing auth directory:", err); }
+                        qrCodeData = null;
+                        setTimeout(() => {
+                            isInitializing = false;
+                            initializeBot();
+                        }, 2000);
                     } else if (code === DisconnectReason.connectionReplaced || code === 440) {
                         console.log("🛑 Connection replaced! Another session was opened. Stopping auto-reconnect.");
                     } else {

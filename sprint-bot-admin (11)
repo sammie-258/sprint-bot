@@ -860,6 +860,13 @@
             else if (currentTab === 'feedback') loadFeedback();
         }
 
+        // Auto refresh overview tab every 3 seconds to catch QR code generation
+        setInterval(() => {
+            if (currentTab === 'overview' && adminPass) {
+                loadOverview();
+            }
+        }, 3000);
+
         async function loadOverview() {
             const [sys, stats] = await Promise.all([
                 api('/api/admin/system'),
