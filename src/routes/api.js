@@ -36,6 +36,17 @@ const escapeHtml = (str) => {
         .replace(/'/g, '&#039;');
 };
 
+const generatePin = () => Math.floor(1000 + Math.random() * 9000).toString();
+
+const ensureUserPin = async (profile) => {
+    if (!profile) return null;
+    if (!profile.webPin) {
+        profile.webPin = generatePin();
+        await profile.save();
+    }
+    return profile.webPin;
+};
+
 const templatePath = path.join(__dirname, '../../profile.html');
 let profileTemplateCache = null;
 try {
@@ -269,18 +280,27 @@ router.post('/api/admin/search', requireAdmin, async (req, res) => {
         const { query, exact } = req.body;
         const escapeRegex = (str) => (str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const safeQuery = escapeRegex(query);
-        let filter = { $or: [{ name: { $regex: safeQuery, $options: 'i' } }, { userId: { $regex: safeQuery, $options: 'i' } }] };
-        if (exact) filter = { userId: query };
+        let filter = {};
+        if (query && query.trim()) {
+            filter = { $or: [{ name: { $regex: safeQuery, $options: 'i' } }, { userId: { $regex: safeQuery, $options: 'i' } }] };
+            if (exact) filter = { userId: query };
+        }
 
-        const limit = Math.min(parseInt(req.body.limit, 10) || 100, 500);
-        const profiles = await UserProfile.find(filter).limit(limit);
+        const limit = Math.min(parseInt(req.body.limit, 10) || 200, 500);
+        const profiles = await UserProfile.find(filter).sort({ totalWordsAllTime: -1 }).limit(limit);
+        
+        // Ensure all fetched profiles have a webPin
+        for (const p of profiles) {
+            await ensureUserPin(p);
+        }
+
         const blacklisted = new Set(
             (await Blacklist.find({ userId: { $in: profiles.map(p => p.userId) } }, 'userId'))
             .map(b => b.userId)
         );
 
         const enriched = profiles.map(p => ({
-            _id: p.userId, name: p.name,
+            _id: p.userId, name: p.name || p.userId.split('@')[0],
             totalWords: p.totalWordsAllTime, lastActive: p.lastActiveDate,
             rank: getRank(p.totalWordsAllTime), streak: p.currentStreak,
             bestStreak: p.bestStreak, trueTotal: p.totalWordsAllTime,
@@ -288,10 +308,139 @@ router.post('/api/admin/search', requireAdmin, async (req, res) => {
             isInactive: !!p.isInactive,
             isArchived: !!p.isArchived,
             badges: p.badges || [],
+            webPin: p.webPin || '----',
             bestSprintWords: p.bestSprintWords, bestSprintWpm: p.bestSprintWpm,
             sprintCount: p.sprintCount, activityLog: p.activityLog
         }));
         res.json(enriched);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin: Set or Reset User Web PIN
+router.post('/api/admin/user/set-pin', requireAdmin, async (req, res) => {
+    try {
+        const { userId, pin } = req.body;
+        if (!userId) return res.status(400).json({ error: "userId is required" });
+        const newPin = (pin && String(pin).trim().length === 4) ? String(pin).trim() : generatePin();
+        const profile = await UserProfile.findOneAndUpdate({ userId }, { webPin: newPin }, { new: true, upsert: true });
+        res.json({ success: true, webPin: profile.webPin, userId: profile.userId });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Public: Verify Web PIN for profile logging
+router.post('/api/verify-pin', async (req, res) => {
+    try {
+        const { userId, pin } = req.body;
+        if (!userId || !pin) return res.status(400).json({ error: "userId and pin are required" });
+        const potentialJids = [
+            userId.includes('@') ? userId : userId + '@s.whatsapp.net',
+            userId.includes('@') ? userId : userId + '@lid'
+        ];
+        const profile = await UserProfile.findOne({ userId: { $in: potentialJids } });
+        if (!profile) return res.status(404).json({ error: "User profile not found" });
+
+        await ensureUserPin(profile);
+
+        if (String(profile.webPin).trim() !== String(pin).trim()) {
+            return res.status(401).json({ error: "Invalid PIN code" });
+        }
+
+        res.json({ success: true, userId: profile.userId, name: profile.name });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Public: Log words from Web Profile page
+router.post('/api/web-log', async (req, res) => {
+    try {
+        const { userId, pin, words } = req.body;
+        const count = parseInt(words, 10);
+        if (isNaN(count) || count <= 0 || count > 50000) {
+            return res.status(400).json({ error: "Invalid word count (must be between 1 and 50,000)" });
+        }
+
+        const potentialJids = [
+            userId.includes('@') ? userId : userId + '@s.whatsapp.net',
+            userId.includes('@') ? userId : userId + '@lid'
+        ];
+        const profile = await UserProfile.findOne({ userId: { $in: potentialJids } });
+        if (!profile) return res.status(404).json({ error: "User profile not found" });
+
+        await ensureUserPin(profile);
+
+        if (String(profile.webPin).trim() !== String(pin).trim()) {
+            return res.status(401).json({ error: "Invalid PIN code" });
+        }
+
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+        
+        // 1. Update DailyStats
+        let dailyDoc = await DailyStats.findOne({ userId: profile.userId, date: todayStr });
+        if (!dailyDoc) {
+            dailyDoc = await DailyStats.create({
+                userId: profile.userId,
+                name: profile.name || profile.userId.split('@')[0],
+                groupId: "Web_Log",
+                date: todayStr,
+                words: 0
+            });
+        }
+        dailyDoc.words += count;
+        dailyDoc.timestamp = new Date();
+        await dailyDoc.save();
+
+        // 2. Update Streak & UserProfile
+        const prevActive = profile.lastActiveDate;
+        let newStreak = profile.currentStreak;
+        if (!prevActive) {
+            newStreak = 1;
+        } else if (prevActive !== todayStr) {
+            const lastDate = new Date(prevActive);
+            const currDate = new Date(todayStr);
+            const diffDays = Math.round((currDate - lastDate) / (1000 * 60 * 60 * 24));
+            if (diffDays === 1) newStreak += 1;
+            else if (diffDays > 1) newStreak = 1;
+        }
+
+        profile.totalWordsAllTime += count;
+        profile.currentStreak = newStreak;
+        profile.bestStreak = Math.max(profile.bestStreak || 0, newStreak);
+        profile.lastActiveDate = todayStr;
+
+        let log = profile.activityLog || '0'.repeat(35);
+        log = '1' + log.substring(0, 34);
+        profile.activityLog = log;
+
+        await profile.save();
+
+        // 3. Update Personal Goal
+        const goal = await PersonalGoal.findOne({ userId: profile.userId, isActive: true });
+        if (goal) {
+            goal.current += count;
+            if (goal.current >= goal.target && !goal.completedAt) {
+                goal.completedAt = new Date();
+            }
+            await goal.save();
+        }
+
+        // Today's total words across all groups for user
+        const todayAgg = await DailyStats.aggregate([
+            { $match: { userId: profile.userId, date: todayStr } },
+            { $group: { _id: null, total: { $sum: "$words" } } }
+        ]);
+        const dailyWords = todayAgg[0]?.total || 0;
+        const rank = getRank(profile.totalWordsAllTime);
+        const nextRank = getNextRank(profile.totalWordsAllTime);
+
+        res.json({
+            success: true,
+            totalWords: profile.totalWordsAllTime,
+            dailyWords,
+            currentStreak: profile.currentStreak,
+            rank,
+            nextRankName: nextRank ? nextRank.name : 'MAX RANK',
+            nextRankPct: nextRank ? Math.min(100, (profile.totalWordsAllTime / nextRank.threshold) * 100).toFixed(1) : '100',
+            nextRankLeft: nextRank ? Math.max(0, nextRank.threshold - profile.totalWordsAllTime).toLocaleString() : '0'
+        });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

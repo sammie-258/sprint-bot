@@ -14,7 +14,8 @@ const userProfileSchema = new mongoose.Schema({
     sprintCount:       { type: Number,   default: 0 },
     totalSprintWords:  { type: Number,   default: 0 },
     isInactive:        { type: Boolean,  default: false },
-    isArchived:        { type: Boolean,  default: false }
+    isArchived:        { type: Boolean,  default: false },
+    webPin:            { type: String,   default: null }
 });
 
 userProfileSchema.index({ userId: 1 }, { unique: true });

@@ -124,13 +124,27 @@
             cursor: pointer; transition: transform 0.2s;
         }
 
+        .edit-btn {
+            position: fixed; top: 20px; right: 70px; z-index: 100;
+            width: 40px; height: 40px; border-radius: 50%;
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            backdrop-filter: blur(10px);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: transform 0.2s;
+        }
+        .edit-btn:hover { transform: scale(1.1); }
+
         .fade-in { opacity: 0; transform: translateY(15px); animation: fadeIn 0.5s forwards; }
         @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
-<div class="theme-btn" onclick="toggleTheme()">
+<div class="edit-btn" onclick="openLogModal()" title="Log Words">
+    <i class="fas fa-pencil-alt" style="color:#22d3a0"></i>
+</div>
+
+<div class="theme-btn" onclick="toggleTheme()" title="Toggle Theme">
     <i id="theme-icon" class="fas fa-sun" style="color:#fbbf24"></i>
 </div>
 
@@ -463,6 +477,167 @@ async function drawCanvas(cb) {
 function downloadImage(){ drawCanvas(c => { const a = document.createElement('a'); a.download = `sprint-bot-${USER_DATA.name}.png`; a.href = c.toDataURL('image/png'); a.click(); }); }
 function shareImage(){ drawCanvas(c => { c.toBlob(async blob => { const file = new File([blob], 'profile.png', {type:'image/png'}); if(navigator.canShare && navigator.canShare({files:[file]})){ try { await navigator.share({files:[file], title:'My Profile'}); } catch(e){} } else { downloadImage(); } }); }); }
 initUI();
+
+// ── WEB LOGGING & PIN MODALS ──────────────────────────────────────────
+const userIdFromPath = window.location.pathname.split('/profile/')[1] || '';
+const localStorageKey = 'sprint_pin_' + userIdFromPath;
+
+function openLogModal() {
+    const savedPin = localStorage.getItem(localStorageKey);
+    if (savedPin) {
+        document.getElementById('log-modal').classList.remove('hidden');
+    } else {
+        document.getElementById('pin-modal').classList.remove('hidden');
+    }
+}
+
+function closePinModal() { document.getElementById('pin-modal').classList.add('hidden'); }
+function closeLogModal() { document.getElementById('log-modal').classList.add('hidden'); }
+
+async function submitPin() {
+    const pin = document.getElementById('pin-input').value.trim();
+    const errEl = document.getElementById('pin-error');
+    errEl.classList.add('hidden');
+    if (!pin || pin.length !== 4) {
+        errEl.innerText = "Please enter a valid 4-digit PIN";
+        errEl.classList.remove('hidden');
+        return;
+    }
+    try {
+        const res = await fetch('/api/verify-pin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: userIdFromPath, pin })
+        });
+        const data = await res.json();
+        if (data.success) {
+            localStorage.setItem(localStorageKey, pin);
+            closePinModal();
+            document.getElementById('log-modal').classList.remove('hidden');
+        } else {
+            errEl.innerText = data.error || "Incorrect PIN";
+            errEl.classList.remove('hidden');
+        }
+    } catch (e) {
+        errEl.innerText = "Error verifying PIN";
+        errEl.classList.remove('hidden');
+    }
+}
+
+function addPresetWords(num) {
+    const input = document.getElementById('log-words-input');
+    const val = parseInt(input.value || 0, 10);
+    input.value = val + num;
+}
+
+async function submitWordLog() {
+    const words = parseInt(document.getElementById('log-words-input').value, 10);
+    const pin = localStorage.getItem(localStorageKey);
+    const errEl = document.getElementById('log-error');
+    const btn = document.getElementById('log-submit-btn');
+    errEl.classList.add('hidden');
+
+    if (isNaN(words) || words <= 0) {
+        errEl.innerText = "Please enter a valid positive word count";
+        errEl.classList.remove('hidden');
+        return;
+    }
+    if (!pin) {
+        closeLogModal();
+        openLogModal();
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Saving...`;
+
+    try {
+        const res = await fetch('/api/web-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: userIdFromPath, pin, words })
+        });
+        const data = await res.json();
+        if (data.success) {
+            USER_DATA.total = data.totalWords.toLocaleString();
+            USER_DATA.dailyWords = data.dailyWords.toLocaleString();
+            USER_DATA.streak = data.currentStreak;
+            USER_DATA.rank = data.rank;
+            USER_DATA.nextRankName = data.nextRankName;
+            USER_DATA.nextRankPct = parseFloat(data.nextRankPct) || 0;
+            USER_DATA.nextRankLeft = data.nextRankLeft;
+
+            initUI();
+            closeLogModal();
+            document.getElementById('log-words-input').value = '';
+            alert(`🎉 Logged ${words.toLocaleString()} words! Your total is now ${data.totalWords.toLocaleString()}`);
+        } else {
+            if (data.error && data.error.toLowerCase().includes("pin")) {
+                localStorage.removeItem(localStorageKey);
+                closeLogModal();
+                openLogModal();
+            } else {
+                errEl.innerText = data.error || "Failed to submit words";
+                errEl.classList.remove('hidden');
+            }
+        }
+    } catch (e) {
+        errEl.innerText = "Network error submitting words";
+        errEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Submit Words</span> <i class="fas fa-check"></i>`;
+    }
+}
 </script>
+
+<!-- PIN Verification Modal -->
+<div id="pin-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] hidden flex items-center justify-center p-4">
+    <div class="panel max-w-sm w-full relative text-center">
+        <button onclick="closePinModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+        <div class="w-12 h-12 rounded-full bg-[#22d3a0]/10 text-[#22d3a0] flex items-center justify-center mx-auto mb-4 text-xl border border-[#22d3a0]/30">
+            <i class="fas fa-lock"></i>
+        </div>
+        <h3 class="text-lg font-bold mb-1" style="font-family:'Syne'">Enter 4-Digit Web PIN</h3>
+        <p class="text-xs text-slate-400 mb-4">Ask your admin for your 4-digit web logging PIN if you don't have one.</p>
+        <input type="password" id="pin-input" maxlength="4" placeholder="••••" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] mb-3 focus:border-[#22d3a0] outline-none">
+        <div id="pin-error" class="text-red-400 text-xs hidden mb-3 font-semibold"></div>
+        <button onclick="submitPin()" class="btn-primary">Unlock Web Log</button>
+    </div>
+</div>
+
+<!-- Word Log Modal -->
+<div id="log-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] hidden flex items-center justify-center p-4">
+    <div class="panel max-w-sm w-full relative">
+        <button onclick="closeLogModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-[#22d3a0]/10 text-[#22d3a0] flex items-center justify-center text-lg border border-[#22d3a0]/30">
+                <i class="fas fa-pen-nib"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold leading-tight" style="font-family:'Syne'">Log Written Words</h3>
+                <p class="text-xs text-slate-400">Add words written today to your profile</p>
+            </div>
+        </div>
+        
+        <div class="mb-4">
+            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Word Count</label>
+            <input type="number" id="log-words-input" placeholder="e.g. 500" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-lg font-bold mb-2 focus:border-[#22d3a0] outline-none">
+            
+            <div class="flex gap-2">
+                <button onclick="addPresetWords(100)" class="flex-1 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-bold transition">+100</button>
+                <button onclick="addPresetWords(500)" class="flex-1 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-bold transition">+500</button>
+                <button onclick="addPresetWords(1000)" class="flex-1 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-bold transition">+1,000</button>
+            </div>
+        </div>
+
+        <div id="log-error" class="text-red-400 text-xs hidden mb-3 font-semibold"></div>
+        <button id="log-submit-btn" onclick="submitWordLog()" class="btn-primary flex items-center justify-center gap-2">
+            <span>Submit Words</span>
+            <i class="fas fa-check"></i>
+        </button>
+    </div>
+</div>
+
 </body>
 </html>
