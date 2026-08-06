@@ -143,7 +143,9 @@ const apiRoutes = require('./src/routes/api');
 app.use('/', apiRoutes({
     get sock() { return sock; },
     get isConnected() { return isConnected; },
+    set isConnected(v) { isConnected = v; },
     get qrCodeData() { return qrCodeData; },
+    set qrCodeData(v) { qrCodeData = v; },
     get maintenanceMode() { return maintenanceMode; },
     set maintenanceMode(v) { maintenanceMode = v; },
     get activeSprints() { return activeSprints; },
