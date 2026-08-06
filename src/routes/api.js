@@ -192,12 +192,20 @@ router.get('/api/admin/system', requireAdmin, async (req, res) => {
         const unreadFeedback = await Feedback.countDocuments({ isRead: false });
         const cpus = os.cpus();
         const cpuModel = (cpus && cpus.length > 0 && cpus[0].model) ? cpus[0].model : 'Standard Processor';
+        
+        let qrImage = null;
+        if (!appState.isConnected && appState.qrCodeData) {
+            try { qrImage = await QR.toDataURL(appState.qrCodeData); } catch (e) {}
+        }
+
         res.json({
             uptime:    process.uptime(),
             memory:    Math.round(memory.heapUsed / 1024 / 1024),
             platform:  os.platform() + " " + os.release(),
             cpu:       cpuModel,
             maintenance: appState.maintenanceMode,
+            isConnected: appState.isConnected,
+            qrCode:      qrImage,
             activeSprintsCount:    Object.keys(appState.activeSprints).length,
             activeDuelsCount:      Object.keys(appState.activeDuels).length,
             activePomodorosCount:  Object.keys(appState.activePomodoros).length,
