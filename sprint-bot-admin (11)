@@ -122,18 +122,24 @@
     <!-- Main Dashboard Application -->
     <div id="app" class="hidden flex-1 flex flex-col md:flex-row overflow-hidden relative w-full">
         
+        <!-- Mobile Sidebar Overlay Backdrop -->
+        <div id="sidebar-overlay" onclick="toggleMobileSidebar(false)" class="fixed inset-0 bg-black/70 backdrop-blur-xs z-[140] hidden md:hidden"></div>
+
         <!-- Sidebar Navigation -->
-        <aside id="sidebar" class="w-64 bg-[#111827] border-r border-white/10 flex flex-col shrink-0 p-5 overflow-y-auto">
-            <div class="flex items-center gap-3 mb-8 px-2">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#10b981] to-[#6366f1] p-0.5 shadow-md shrink-0">
-                    <div class="w-full h-full rounded-xl bg-[#0b0f19] flex items-center justify-center text-[#10b981] font-bold text-lg">
-                        <i class="fas fa-robot"></i>
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-[150] w-64 bg-[#111827] border-r border-white/10 flex flex-col shrink-0 p-5 overflow-y-auto transform -translate-x-full md:translate-x-0 md:static transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none">
+            <div class="flex items-center justify-between mb-8 px-2">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#10b981] to-[#6366f1] p-0.5 shadow-md shrink-0">
+                        <div class="w-full h-full rounded-xl bg-[#0b0f19] flex items-center justify-center text-[#10b981] font-bold text-lg">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-base leading-tight">Sprint Bot</h2>
+                        <span class="text-[10px] text-[#10b981] font-semibold tracking-wider uppercase bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">Command Center v5.4</span>
                     </div>
                 </div>
-                <div>
-                    <h2 class="font-bold text-base leading-tight">Sprint Bot</h2>
-                    <span class="text-[10px] text-[#10b981] font-semibold tracking-wider uppercase bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">Command Center v5.4</span>
-                </div>
+                <button onclick="toggleMobileSidebar(false)" class="md:hidden text-slate-400 hover:text-white p-2 rounded-lg"><i class="fas fa-xmark text-lg"></i></button>
             </div>
 
             <!-- Navigation Links -->
@@ -166,15 +172,18 @@
         <main class="flex-1 flex flex-col overflow-hidden relative bg-[#0b0f19]">
             
             <!-- Top App Bar -->
-            <header class="h-16 border-b border-white/10 flex items-center justify-between px-6 shrink-0 bg-[#111827]">
-                <div class="flex items-center gap-3">
-                    <h2 id="view-title" class="font-bold text-lg text-white">Overview & Live HUD</h2>
-                    <span id="conn-badge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1.5">
+            <header class="h-16 border-b border-white/10 flex items-center justify-between px-4 md:px-6 shrink-0 bg-[#111827]">
+                <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                    <button onclick="toggleMobileSidebar(true)" title="Open Navigation Menu" class="md:hidden w-9 h-9 rounded-lg bg-white/5 border border-white/10 text-slate-300 flex items-center justify-center hover:bg-white/10 transition shrink-0">
+                        <i class="fas fa-bars text-sm"></i>
+                    </button>
+                    <h2 id="view-title" class="font-bold text-base sm:text-lg text-white truncate">Overview & Live HUD</h2>
+                    <span id="conn-badge" class="text-[10px] sm:text-[11px] font-semibold px-2 sm:px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1.5 shrink-0">
                         <span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></span> Connecting...
                     </span>
                 </div>
                 
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 sm:gap-3 shrink-0">
                     <button onclick="refreshData()" title="Refresh Dashboard" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 flex items-center justify-center transition">
                         <i class="fas fa-sync-alt text-xs"></i>
                     </button>
@@ -182,7 +191,7 @@
             </header>
 
             <!-- Tab Content Views -->
-            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+            <div class="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 space-y-4 sm:space-y-6">
                 
                 <!-- VIEW 1: OVERVIEW & LIVE HUD (MATCHES SPRINT BOT PUBLIC DASHBOARD LOOK) -->
                 <div id="view-overview" class="space-y-6">
@@ -422,46 +431,41 @@
                                         <!-- Populated dynamically -->
                                     </tbody>
                                 </table>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- LEVEL 2: 2-COLUMN SPLIT VIEW (MATCHES SCREENSHOT 1 - REVEALED ON WRITER CLICK) -->
                     <div id="writers-split-view" class="hidden space-y-4">
-                        
                         <!-- Top Bar with Back Button -->
-                        <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                            <button onclick="showWritersFullTable()" class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition flex items-center gap-2">
+                        <div class="flex items-center justify-between gap-3 pb-2 border-b border-white/10">
+                            <button onclick="showWritersFullTable()" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition flex items-center gap-2 shrink-0">
                                 <i class="fas fa-arrow-left"></i> Back to All Writers
                             </button>
 
-                            <div class="flex items-center gap-2">
+                            <div class="hidden lg:flex items-center gap-2">
                                 <input type="text" id="split-writer-search" oninput="filterSplitList(this.value)" placeholder="Filter list..." class="bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs w-48 outline-none focus:border-emerald-400">
                             </div>
                         </div>
 
                         <!-- 2-Column Split Container -->
-                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
                             
-                            <!-- Left Pane: Scrollable User List (~4 cols) -->
-                            <div class="lg:col-span-4 panel p-4 space-y-2 max-h-[700px] overflow-y-auto">
+                            <!-- Left Pane: Scrollable User List (Desktop only) -->
+                            <div class="hidden lg:block lg:col-span-4 panel p-4 space-y-2 max-h-[700px] overflow-y-auto">
                                 <div class="text-xs font-bold text-slate-400 uppercase tracking-wider px-2 mb-3">Writer Accounts</div>
                                 <div id="writers-split-list" class="space-y-2">
                                     <!-- Populated dynamically -->
                                 </div>
                             </div>
 
-                            <!-- Right Pane: Writer Cards & Details (~8 cols - Screenshot 1 Match) -->
-                            <div class="lg:col-span-8 panel p-6 space-y-6">
-                                <div id="split-detail-content" class="space-y-6">
+                            <!-- Right Pane: Writer Cards & Details -->
+                            <div class="lg:col-span-8 panel p-4 sm:p-6 space-y-4 sm:space-y-6">
+                                <div id="split-detail-content" class="space-y-4 sm:space-y-6">
                                     
                                     <!-- Selected Writer Header -->
                                     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
-                                        <div class="flex items-center gap-4">
-                                            <div id="sp-avatar" class="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xl border border-emerald-500/30"></div>
+                                        <div class="flex items-center gap-3 sm:gap-4">
+                                            <div id="sp-avatar" class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-lg sm:text-xl border border-emerald-500/30 shrink-0"></div>
                                             <div>
-                                                <div class="flex items-center gap-2">
-                                                    <h3 id="sp-name" class="font-bold text-xl text-white"></h3>
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <h3 id="sp-name" class="font-bold text-lg sm:text-xl text-white"></h3>
                                                     <span id="sp-status-badge"></span>
                                                 </div>
                                                 <div id="sp-phone" class="text-xs font-mono text-slate-400 mt-0.5"></div>
@@ -470,33 +474,33 @@
                                     </div>
 
                                     <!-- Action Toolbar -->
-                                    <div class="flex flex-wrap gap-2">
-                                        <button onclick="copyWriterProfileLink()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
-                                            <i class="fas fa-link text-emerald-400"></i> Copy Profile Link
+                                    <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                                        <button onclick="copyWriterProfileLink()" class="py-2.5 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1.5">
+                                            <i class="fas fa-link text-emerald-400"></i> Profile Link
                                         </button>
-                                        <button onclick="copyWriterPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
-                                            <i class="fas fa-key text-amber-400"></i> Copy Web PIN
+                                        <button onclick="copyWriterPin()" class="py-2.5 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1.5">
+                                            <i class="fas fa-key text-amber-400"></i> Web PIN
                                         </button>
-                                        <button onclick="resetDrawerPin()" class="py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
+                                        <button onclick="resetDrawerPin()" class="py-2.5 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1.5">
                                             <i class="fas fa-dice text-indigo-400"></i> Reset PIN
                                         </button>
-                                        <button onclick="toggleWriterArchive()" id="sp-archive-btn" class="py-2 px-3 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                        <button onclick="toggleWriterArchive()" id="sp-archive-btn" class="py-2.5 px-3 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
                                             <i class="fas fa-box-archive"></i> Archive User
                                         </button>
-                                        <button onclick="toggleWriterInactive()" id="sp-inactive-btn" class="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                        <button onclick="toggleWriterInactive()" id="sp-inactive-btn" class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
                                             <i class="fas fa-moon"></i> Toggle Inactive
                                         </button>
-                                        <button onclick="grantFreezeModal(activeDrawerUserId)" class="py-2 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                        <button onclick="grantFreezeModal(activeDrawerUserId)" class="py-2.5 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
                                             🛡️ Grant Freeze
                                         </button>
-                                        <button onclick="toggleDrawerBan()" id="sp-ban-btn" class="py-2 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                        <button onclick="toggleDrawerBan()" id="sp-ban-btn" class="col-span-2 sm:col-span-1 py-2.5 px-3 bg-red-500/20 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
                                             <i class="fas fa-ban"></i> Ban User
                                         </button>
                                     </div>
 
                                     <!-- Editable Stats Cards Grid (Screenshot 1 Match) -->
-                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        <div class="panel p-5 bg-white/5">
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-4">
+                                        <div class="panel p-3.5 sm:p-5 bg-white/5">
                                             <div class="text-[10px] text-slate-400 font-bold uppercase">Total Words</div>
                                             <div class="flex items-center justify-between mt-2">
                                                 <div id="sp-total-words" class="text-2xl font-extrabold font-mono text-white"></div>
@@ -504,7 +508,7 @@
                                             </div>
                                         </div>
 
-                                        <div class="panel p-5 bg-white/5">
+                                        <div class="panel p-3.5 sm:p-5 bg-white/5">
                                             <div class="text-[10px] text-slate-400 font-bold uppercase">Today's Words</div>
                                             <div class="flex items-center justify-between mt-2">
                                                 <div id="sp-today-words" class="text-2xl font-extrabold font-mono text-cyan-400">0</div>
@@ -512,7 +516,7 @@
                                             </div>
                                         </div>
 
-                                        <div class="panel p-5 bg-white/5">
+                                        <div class="panel p-3.5 sm:p-5 bg-white/5">
                                             <div class="text-[10px] text-slate-400 font-bold uppercase">Current Streak</div>
                                             <div class="flex items-center justify-between mt-2">
                                                 <div id="sp-streak" class="text-2xl font-extrabold font-mono text-amber-400"></div>
@@ -520,17 +524,17 @@
                                             </div>
                                         </div>
 
-                                        <div class="panel p-5 bg-white/5">
+                                        <div class="panel p-3.5 sm:p-5 bg-white/5">
                                             <div class="text-[10px] text-slate-400 font-bold uppercase">Web Logging PIN</div>
                                             <div id="sp-pin-display" class="text-2xl font-extrabold font-mono text-emerald-400 mt-2 tracking-widest"></div>
                                         </div>
 
-                                        <div class="panel p-5 bg-white/5">
+                                        <div class="panel p-3.5 sm:p-5 bg-white/5">
                                             <div class="text-[10px] text-slate-400 font-bold uppercase">Rank</div>
                                             <div id="sp-rank" class="text-base font-bold text-emerald-400 mt-2"></div>
                                         </div>
 
-                                        <div class="panel p-5 bg-white/5">
+                                        <div class="panel p-3.5 sm:p-5 bg-white/5">
                                             <div class="text-[10px] text-slate-400 font-bold uppercase">Best Sprint WPM</div>
                                             <div id="sp-wpm" class="text-base font-bold text-indigo-400 mt-2"></div>
                                         </div>
@@ -844,8 +848,23 @@
             document.getElementById('auth-modal').classList.remove('hidden');
         }
 
+        function toggleMobileSidebar(show) {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (!sidebar || !overlay) return;
+            if (show === undefined) show = sidebar.classList.contains('-translate-x-full');
+            if (show) {
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+            }
+        }
+
         function switchTab(tab) {
             currentTab = tab;
+            toggleMobileSidebar(false);
             document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
             const navEl = document.getElementById('nav-' + tab);
             if (navEl) navEl.classList.add('active');
