@@ -431,6 +431,10 @@
                                         <!-- Populated dynamically -->
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- LEVEL 2: 2-COLUMN SPLIT VIEW (MATCHES SCREENSHOT 1 - REVEALED ON WRITER CLICK) -->
                     <div id="writers-split-view" class="hidden space-y-4">
                         <!-- Top Bar with Back Button -->
@@ -466,6 +470,7 @@
                                             <div>
                                                 <div class="flex flex-wrap items-center gap-2">
                                                     <h3 id="sp-name" class="font-bold text-lg sm:text-xl text-white"></h3>
+                                                    <button onclick="editWriterName()" class="text-xs text-slate-400 hover:text-emerald-400 p-1.5 bg-white/5 rounded-lg transition" title="Edit Writer Name"><i class="fas fa-pen"></i></button>
                                                     <span id="sp-status-badge"></span>
                                                 </div>
                                                 <div id="sp-phone" class="text-xs font-mono text-slate-400 mt-0.5"></div>
@@ -1322,6 +1327,25 @@
                 await api('/api/admin/ban', { userId: activeDrawerUserId, action: isBanning ? 'ban' : 'unban' });
                 showToast(isBanning ? "Writer Banned" : "Writer Unbanned");
                 loadWritersGrid();
+            }
+        }
+
+        async function editWriterName() {
+            if (!activeDrawerUserId) return;
+            const u = writersCache.find(x => x._id === activeDrawerUserId);
+            const val = await showPrompt("Set New Writer Name:", u?.name || "");
+            if (val !== null && val.trim()) {
+                const newName = val.trim();
+                const res = await api('/api/admin/update', { userId: activeDrawerUserId, type: 'name', name: newName });
+                if (res?.success) {
+                    showToast("Writer name updated!");
+                    if (u) u.name = newName;
+                    const nameEl = document.getElementById('sp-name');
+                    if (nameEl) nameEl.innerText = newName;
+                    const avatarEl = document.getElementById('sp-avatar');
+                    if (avatarEl) avatarEl.innerText = newName.charAt(0).toUpperCase();
+                    loadWritersGrid();
+                }
             }
         }
 
