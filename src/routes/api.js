@@ -352,10 +352,14 @@ router.post('/api/admin/search', requireAdmin, async (req, res) => {
         const limit = Math.min(parseInt(req.body.limit, 10) || 200, 500);
         const profiles = await UserProfile.find(filter).sort({ totalWordsAllTime: -1 }).limit(limit);
         
-        // Ensure all fetched profiles have a webPin
-        for (const p of profiles) {
-            await ensureUserPin(p);
-        }
+        // Fetch today's words for all returned profiles
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+        const todayStats = await DailyStats.aggregate([
+            { $match: { date: todayStr, userId: { $in: profiles.map(p => p.userId) } } },
+            { $group: { _id: "$userId", total: { $sum: "$words" } } }
+        ]);
+        const todayMap = {};
+        todayStats.forEach(s => todayMap[s._id] = s.total);
 
         const blacklisted = new Set(
             (await Blacklist.find({ userId: { $in: profiles.map(p => p.userId) } }, 'userId'))
@@ -364,7 +368,9 @@ router.post('/api/admin/search', requireAdmin, async (req, res) => {
 
         const enriched = profiles.map(p => ({
             _id: p.userId, name: p.name || p.userId.split('@')[0],
-            totalWords: p.totalWordsAllTime, lastActive: p.lastActiveDate,
+            totalWords: p.totalWordsAllTime,
+            todayWords: todayMap[p.userId] || 0,
+            lastActive: p.lastActiveDate,
             rank: getRank(p.totalWordsAllTime), streak: p.currentStreak,
             bestStreak: p.bestStreak, trueTotal: p.totalWordsAllTime,
             isBanned: blacklisted.has(p.userId),
@@ -551,8 +557,35 @@ router.post('/api/admin/update', requireAdmin, async (req, res) => {
             return res.json({ success: true });
         }
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+        
+        if (type === 'todayWords') {
+            const history = await DailyStats.findOne({ userId }).sort({ timestamp: -1 });
+            let doc = await DailyStats.findOne({ userId, date: todayStr });
+            if (!doc) {
+                doc = await DailyStats.create({
+                    userId,
+                    name: history?.name || userId,
+                    groupId: history?.groupId || "Manual_Correction",
+                    date: todayStr,
+                    words: 0
+                });
+            }
+            const parsedAmount = Math.max(0, parseInt(amount, 10) || 0);
+            const diff = parsedAmount - doc.words;
+            doc.words = parsedAmount;
+            doc.timestamp = new Date();
+            await doc.save();
+
+            if (diff !== 0) {
+                await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: diff } });
+                await UserProfile.findOneAndUpdate({ userId }, { $inc: { totalWordsAllTime: diff } }, { upsert: true });
+            }
+            const updatedProfile = await UserProfile.findOne({ userId });
+            return res.json({ success: true, todayWords: doc.words, totalWords: updatedProfile?.totalWordsAllTime || 0 });
+        }
+
         const history  = await DailyStats.findOne({ userId }).sort({ timestamp: -1 });
-        let doc = await DailyStats.findOne({ userId, date: todayStr, groupId: history?.groupId || "Manual_Correction" });
+        let doc = await DailyStats.findOne({ userId, date: todayStr });
         if (!doc) doc = await DailyStats.create({ userId, name: history?.name || userId, groupId: history?.groupId || "Manual_Correction", date: todayStr, words: 0 });
         const parsedAmount = parseInt(amount, 10);
         if (isNaN(parsedAmount)) {
@@ -565,7 +598,8 @@ router.post('/api/admin/update', requireAdmin, async (req, res) => {
         await doc.save();
         await PersonalGoal.findOneAndUpdate({ userId, isActive: true }, { $inc: { current: diff } });
         await UserProfile.findOneAndUpdate({ userId }, { $inc: { totalWordsAllTime: diff } }, { upsert: true });
-        res.json({ success: true, newTotal: doc.words });
+        const updatedProfile = await UserProfile.findOne({ userId });
+        res.json({ success: true, newTotal: doc.words, totalWords: updatedProfile?.totalWordsAllTime || 0 });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

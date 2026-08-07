@@ -500,7 +500,15 @@
                                             <div class="text-[10px] text-slate-400 font-bold uppercase">Total Words</div>
                                             <div class="flex items-center justify-between mt-2">
                                                 <div id="sp-total-words" class="text-2xl font-extrabold font-mono text-white"></div>
-                                                <button onclick="editWriterWords()" class="text-xs text-slate-400 hover:text-emerald-400 p-1.5 bg-white/5 rounded-lg" title="Edit Total Words"><i class="fas fa-pen"></i></button>
+                                                <button onclick="editWriterWords()" class="text-xs text-slate-400 hover:text-emerald-400 p-1.5 bg-white/5 rounded-lg transition" title="Edit Total Words"><i class="fas fa-pen"></i></button>
+                                            </div>
+                                        </div>
+
+                                        <div class="panel p-5 bg-white/5">
+                                            <div class="text-[10px] text-slate-400 font-bold uppercase">Today's Words</div>
+                                            <div class="flex items-center justify-between mt-2">
+                                                <div id="sp-today-words" class="text-2xl font-extrabold font-mono text-cyan-400">0</div>
+                                                <button onclick="editWriterTodayWords()" class="text-xs text-slate-400 hover:text-cyan-400 p-1.5 bg-white/5 rounded-lg transition" title="Edit Today's Words"><i class="fas fa-pen"></i></button>
                                             </div>
                                         </div>
 
@@ -508,7 +516,7 @@
                                             <div class="text-[10px] text-slate-400 font-bold uppercase">Current Streak</div>
                                             <div class="flex items-center justify-between mt-2">
                                                 <div id="sp-streak" class="text-2xl font-extrabold font-mono text-amber-400"></div>
-                                                <button onclick="editWriterStreak()" class="text-xs text-slate-400 hover:text-amber-400 p-1.5 bg-white/5 rounded-lg" title="Edit Streak"><i class="fas fa-pen"></i></button>
+                                                <button onclick="editWriterStreak()" class="text-xs text-slate-400 hover:text-amber-400 p-1.5 bg-white/5 rounded-lg transition" title="Edit Streak"><i class="fas fa-pen"></i></button>
                                             </div>
                                         </div>
 
@@ -1170,6 +1178,8 @@
             document.getElementById('sp-name').innerText = u.name;
             document.getElementById('sp-phone').innerText = u._id.split('@')[0];
             document.getElementById('sp-total-words').innerText = (u.totalWords || 0).toLocaleString();
+            const todayEl = document.getElementById('sp-today-words');
+            if (todayEl) todayEl.innerText = (u.todayWords || 0).toLocaleString();
             document.getElementById('sp-streak').innerText = (u.streak || 0) + "🔥";
             document.getElementById('sp-rank').innerText = u.rank || 'Novice';
             document.getElementById('sp-wpm').innerText = (u.bestSprintWpm || 0) + " WPM";
@@ -1301,9 +1311,39 @@
             const u = writersCache.find(x => x._id === activeDrawerUserId);
             const val = await showPrompt("Set New Total Word Count:", u?.totalWords || 0);
             if (val !== null) {
-                await api('/api/admin/update', { userId: activeDrawerUserId, type: 'set', amount: parseInt(val, 10) });
-                showToast("Total words updated!");
-                loadWritersGrid();
+                const num = parseInt(val, 10);
+                if (isNaN(num)) return showToast("Please enter a valid number", "error");
+                const res = await api('/api/admin/update', { userId: activeDrawerUserId, type: 'set', amount: num });
+                if (res?.success) {
+                    showToast("Total words updated!");
+                    if (u) u.totalWords = res.totalWords || num;
+                    const totalEl = document.getElementById('sp-total-words');
+                    if (totalEl) totalEl.innerText = (res.totalWords || num).toLocaleString();
+                    loadWritersGrid();
+                }
+            }
+        }
+
+        async function editWriterTodayWords() {
+            if (!activeDrawerUserId) return;
+            const u = writersCache.find(x => x._id === activeDrawerUserId);
+            const val = await showPrompt("Set Today's Word Count:", u?.todayWords || 0);
+            if (val !== null) {
+                const num = parseInt(val, 10);
+                if (isNaN(num)) return showToast("Please enter a valid number", "error");
+                const res = await api('/api/admin/update', { userId: activeDrawerUserId, type: 'todayWords', amount: num });
+                if (res?.success) {
+                    showToast("Today's words updated!");
+                    if (u) {
+                        u.todayWords = res.todayWords;
+                        u.totalWords = res.totalWords;
+                    }
+                    const todayEl = document.getElementById('sp-today-words');
+                    if (todayEl) todayEl.innerText = (res.todayWords || 0).toLocaleString();
+                    const totalEl = document.getElementById('sp-total-words');
+                    if (totalEl) totalEl.innerText = (res.totalWords || 0).toLocaleString();
+                    loadWritersGrid();
+                }
             }
         }
 
@@ -1313,8 +1353,12 @@
             const val = await showPrompt("Set Current Streak (Days):", u?.streak || 0);
             if (val !== null) {
                 const streakNum = parseInt(val, 10);
+                if (isNaN(streakNum)) return showToast("Please enter a valid number", "error");
                 await api('/api/admin/update', { userId: activeDrawerUserId, type: 'streak', currentStreak: streakNum, bestStreak: Math.max(streakNum, u?.bestStreak || 0) });
                 showToast("Streak updated!");
+                if (u) u.streak = streakNum;
+                const streakEl = document.getElementById('sp-streak');
+                if (streakEl) streakEl.innerText = streakNum + "🔥";
                 loadWritersGrid();
             }
         }
