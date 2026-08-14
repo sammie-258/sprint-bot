@@ -1,7 +1,9 @@
 // =======================
 //       IMPORTS
 // =======================
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
+const { default: makeWASocket, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require("@whiskeysockets/baileys");
+const pino = require("pino");
+const { useMongoDBAuthState } = require("./src/auth/useMongoDBAuthState");
 const mongoose = require("mongoose");
 const express = require('express');
 const http = require('http');
@@ -45,6 +47,7 @@ const requireAdmin = (req, res, next) => {
 let qrCodeData    = null;
 let isConnected   = false;
 let sock          = null;
+let clearAuthSession = null;
 let maintenanceMode = false;
 let groupCache    = {};
 let lastCacheUpdate = 0;
@@ -154,7 +157,10 @@ app.use('/', apiRoutes({
     get recentActivity() { return recentActivity; },
     get groupCache() { return groupCache; },
     pushActivity,
-    updateGroupCache
+    updateGroupCache,
+    clearAuthSession: async () => {
+        if (typeof clearAuthSession === 'function') await clearAuthSession();
+    }
 }));
 
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server on port ${PORT}`));
@@ -480,9 +486,13 @@ mongoose.connect(MONGO_URI).then(async () => {
         pushActivity
     });
     // =======================
-    //   BAILEYS INIT
+    //   BAILEYS INIT (MONGODB PERSISTENT AUTH)
     // =======================
-    const { state, saveCreds } = await useMultiFileAuthState('.auth_info_baileys');
+    const authCollection = mongoose.connection.collection('baileys_auth');
+    await authCollection.createIndex({ sessionId: 1, keyId: 1 }).catch(() => {});
+
+    const sessionId = process.env.SESSION_ID || 'sprint_bot_session';
+    const pinoLogger = pino({ level: 'silent' });
 
     let isInitializing = false;
     const initializeBot = async () => {
@@ -502,13 +512,24 @@ mongoose.connect(MONGO_URI).then(async () => {
                 }
             }
 
+            const { state, saveCreds, clearSession } = await useMongoDBAuthState(authCollection, sessionId);
+            clearAuthSession = clearSession;
+
             const { version } = await fetchLatestBaileysVersion();
             sock = makeWASocket({
-                version, auth: state, printQRInTerminal: true,
+                version,
+                auth: {
+                    creds: state.creds,
+                    keys: makeCacheableSignalKeyStore(state.keys, pinoLogger)
+                },
+                logger: pinoLogger,
+                printQRInTerminal: true,
                 browser: ['Sprint Bot', 'Chrome', '120.0'],
-                msgRetryCounterMax: 5, defaultQueryTimeoutMs: 60000,
+                msgRetryCounterMax: 5,
+                defaultQueryTimeoutMs: 60000,
                 shouldIgnoreJid: jid => !jid || jid === 'status@broadcast' || jid.includes('broadcast'),
-                syncFullHistory: false, generateHighQualityLinkPreview: false,
+                syncFullHistory: false,
+                generateHighQualityLinkPreview: false,
             });
 
             isInitializing = false; // Reset initialization lock once socket is spawned
@@ -525,7 +546,7 @@ mongoose.connect(MONGO_URI).then(async () => {
                     qrCodeData = null;
                     reconnectAttempts = 0;
                     updateGroupCache(true);
-                    console.log('✅ Bot Connected!');
+                    console.log('✅ Bot Connected (Session synchronized with MongoDB)!');
                     pushActivity('connect', 'Bot connected to WhatsApp', '✅');
                 } else if (connection === 'close') {
                     isConnected = false;
@@ -533,7 +554,12 @@ mongoose.connect(MONGO_URI).then(async () => {
                     console.log(`⚠️ Connection closed with status code: ${code}`);
 
                     if (code === DisconnectReason.loggedOut) {
-                        console.log("🛑 Logged out. Delete .auth_info_baileys and restart.");
+                        console.log("🛑 Logged out. Clearing MongoDB session and waiting for new QR scan.");
+                        if (clearAuthSession) await clearAuthSession();
+                        setTimeout(() => {
+                            isInitializing = false;
+                            initializeBot();
+                        }, 3000);
                     } else if (code === DisconnectReason.connectionReplaced || code === 440) {
                         console.log("🛑 Connection replaced! Another session was opened. Stopping auto-reconnect.");
                     } else {

@@ -232,14 +232,18 @@ router.post('/api/admin/system/unpair', requireAdmin, async (req, res) => {
         appState.isConnected = false;
         appState.qrCodeData = null;
 
+        if (typeof appState.clearAuthSession === 'function') {
+            await appState.clearAuthSession();
+        }
+
         const fs = require('fs');
         const path = require('path');
         const authPath = path.join(process.cwd(), '.auth_info_baileys');
         if (fs.existsSync(authPath)) {
-            fs.rmSync(authPath, { recursive: true, force: true });
+            try { fs.rmSync(authPath, { recursive: true, force: true }); } catch (e) {}
         }
 
-        res.json({ success: true, message: "Unpaired and auth directory cleared. Server restarting for new QR scan." });
+        res.json({ success: true, message: "Unpaired and auth credentials cleared from database. Server restarting for new QR scan." });
 
         setTimeout(() => { process.exit(0); }, 1000);
     } catch (e) {
