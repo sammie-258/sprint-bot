@@ -226,12 +226,13 @@ module.exports = async function(m, appState) {
 📊 *Stats & Profile*
 *!profile* → Your full stats
 *!wpm* → Sprint speed history
-*!daily* → Today's Leaderboard
-*!yesterday* → Yesterday's Leaderboard
-*!weekly* → Last 7 days
-*!monthly* → Last 30 days
-*!jan26* / *!dec25* → Specific month stats
-*!top10* → All-Time Hall of Fame
+*!daily [all]* → Today's Leaderboard
+*!yesterday [all]* → Yesterday's Leaderboard
+*!weekly [all]* → Last 7 days
+*!monthly [all]* → Last 30 days
+*!yearly [all]* → This year's Leaderboard
+*!sep26 [all]* → Specific month stats
+*!top10 [all]* → All-Time Hall of Fame
 *!myname Sam* → Set display name
 
 🔥 *Streaks*
@@ -541,13 +542,41 @@ module.exports = async function(m, appState) {
 
                 // ── !TOP10 ──────────────────────────────────────────────────────────
                 if (command === "!top10" || command === "!top") {
+                    const isGlobal = args[1]?.toLowerCase() === "all" || args[1]?.toLowerCase() === "global";
+                    const groupName = groupCache[chatId]?.subject || "This Group";
+                    const matchQuery = isGlobal ? {} : { groupId: chatId };
+
                     const top = await DailyStats.aggregate([
-                        { $group: { _id: "$name", total: { $sum: "$words" } } },
-                        { $sort: { total: -1 } }, { $limit: 10 }
+                        { $match: matchQuery },
+                        { $group: { _id: "$userId", total: { $sum: "$words" }, name: { $first: "$name" } } },
+                        { $sort: { total: -1 } },
+                        { $limit: 10 }
                     ]);
-                    if (!top.length) return sock.sendMessage(chatId, { text: "📉 No data." }, { quoted: msg });
-                    let txt = `🌎 *ALL-TIME HALL OF FAME*\n\n`;
-                    top.forEach((w, i) => { txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.'} ${w._id}: ${w.total.toLocaleString()} words\n`; });
+
+                    if (!top.length) {
+                        const emptyMsg = isGlobal
+                            ? "📉 No all-time stats found."
+                            : `📉 No stats found for *${groupName}* yet.\n\n\n💡 *Note:* To see rankings across all groups, use *${command} all*`;
+                        return sock.sendMessage(chatId, { text: emptyMsg }, { quoted: msg });
+                    }
+
+                    let title = isGlobal
+                        ? `🌎 *ALL-TIME HALL OF FAME — Worldwide (All Groups)*`
+                        : `🏆 *ALL-TIME TOP 10 — ${groupName}*`;
+
+                    let txt = `${title}\n\n`;
+                    for (let i = 0; i < top.length; i++) {
+                        const w = top[i];
+                        const p = await UserProfile.findOne({ userId: w._id });
+                        const fire = (p && p.currentStreak > 2) ? `🔥${toSuperscript(p.currentStreak)}` : "";
+                        txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.'} ${w.name || w._id.split('@')[0]} ${fire}: ${w.total.toLocaleString()} words\n`;
+                    }
+
+                    const note = isGlobal
+                        ? `💡 *Note:* To see rankings for this group only, use *${command}*`
+                        : `💡 *Note:* To see rankings across all groups, use *${command} all*`;
+
+                    txt += `\n\n${note}`;
                     await sock.sendMessage(chatId, { text: txt });
                 }
 
@@ -638,36 +667,47 @@ module.exports = async function(m, appState) {
                     }, { quoted: msg });
                 }
 
-                // ── !DAILY / !YESTERDAY / !WEEKLY / !MONTHLY / !MMM-YY ─────────────────
+                // ── !DAILY / !YESTERDAY / !WEEKLY / !MONTHLY / !YEARLY / !MMM-YY ─────────────────
                 const monthMatch = command.match(/^!([a-z]{3})(\d{2}|\d{4})$/i);
                 const isMonthCmd = monthMatch && MONTH_MAP[monthMatch[1].toLowerCase()];
 
-                if (["!daily", "!yesterday", "!weekly", "!monthly"].includes(command) || isMonthCmd) {
-                    let title = "";
+                if (["!daily", "!yesterday", "!weekly", "!monthly", "!yearly"].includes(command) || isMonthCmd) {
+                    const isGlobal = args[1]?.toLowerCase() === "all" || args[1]?.toLowerCase() === "global";
+                    const groupName = groupCache[chatId]?.subject || "This Group";
+
+                    let baseTitle = "";
                     let matchQuery = {};
 
                     if (command === "!daily") {
-                        title = `Daily (${todayStr})`;
+                        baseTitle = `Daily (${todayStr})`;
                         matchQuery = { date: todayStr };
                     } else if (command === "!yesterday") {
                         const yStr = getLagosDateString(Date.now() - 86400000);
-                        title = `Yesterday (${yStr})`;
+                        baseTitle = `Yesterday (${yStr})`;
                         matchQuery = { date: yStr };
                     } else if (command === "!weekly") {
                         const dt = new Date(); dt.setDate(dt.getDate() - 7); dt.setHours(0, 0, 0, 0);
-                        title = "Weekly (7 days)";
+                        baseTitle = "Weekly (Last 7 days)";
                         matchQuery = { timestamp: { $gte: dt } };
                     } else if (command === "!monthly") {
                         const dt = new Date(); dt.setDate(dt.getDate() - 30); dt.setHours(0, 0, 0, 0);
-                        title = "Monthly (30 days)";
+                        baseTitle = "Monthly (Last 30 days)";
                         matchQuery = { timestamp: { $gte: dt } };
+                    } else if (command === "!yearly") {
+                        const currentYear = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE }).slice(0, 4);
+                        baseTitle = `Yearly (${currentYear})`;
+                        matchQuery = { date: { $regex: `^${currentYear}` } };
                     } else if (isMonthCmd) {
                         const mKey = monthMatch[1].toLowerCase();
                         const yRaw = monthMatch[2];
                         const fullYear = yRaw.length === 2 ? '20' + yRaw : yRaw;
                         const mInfo = MONTH_MAP[mKey];
-                        title = `${mInfo.name} ${fullYear}`;
+                        baseTitle = `${mInfo.name} ${fullYear}`;
                         matchQuery = { date: { $regex: `^${fullYear}-${mInfo.num}` } };
+                    }
+
+                    if (!isGlobal) {
+                        matchQuery.groupId = chatId;
                     }
 
                     const stats = await DailyStats.aggregate([
@@ -677,15 +717,30 @@ module.exports = async function(m, appState) {
                         { $limit: 15 }
                     ]);
 
-                    if (!stats.length) return sock.sendMessage(chatId, { text: `📉 No stats found for *${title}*.` }, { quoted: msg });
+                    if (!stats.length) {
+                        const emptyMsg = isGlobal
+                            ? `📉 No stats found for *${baseTitle}*.`
+                            : `📉 No stats found in *${groupName}* for *${baseTitle}*.\n\n\n💡 *Note:* To see rankings across all groups, use *${command} all*`;
+                        return sock.sendMessage(chatId, { text: emptyMsg }, { quoted: msg });
+                    }
 
-                    let txt = `🏆 *${title}*\n\n`;
+                    let title = isGlobal
+                        ? `🌎 *${baseTitle} — Worldwide (All Groups)*`
+                        : `🏆 *${baseTitle} — ${groupName}*`;
+
+                    let txt = `${title}\n\n`;
                     for (let i = 0; i < stats.length; i++) {
                         const s = stats[i];
                         const p = await UserProfile.findOne({ userId: s._id });
                         const fire = (p && p.currentStreak > 2) ? `🔥${toSuperscript(p.currentStreak)}` : "";
-                        txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎖️'} ${s.name} ${fire}: ${s.totalWords.toLocaleString()} words\n`;
+                        txt += `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎖️'} ${s.name || s._id.split('@')[0]} ${fire}: ${s.totalWords.toLocaleString()} words\n`;
                     }
+
+                    const note = isGlobal
+                        ? `💡 *Note:* To see rankings for this group only, use *${command}*`
+                        : `💡 *Note:* To see rankings across all groups, use *${command} all*`;
+
+                    txt += `\n\n${note}`;
                     await sock.sendMessage(chatId, { text: txt });
                 }
 
