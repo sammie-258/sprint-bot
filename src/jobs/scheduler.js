@@ -55,15 +55,28 @@ module.exports = function(appState) {
             for (const broadcast of dueBroadcasts) {
                 try {
                     const groups = await appState.sock.groupFetchAllParticipating();
-                    console.log(`📢 Sending scheduled broadcast to ${Object.keys(groups).length} groups...`);
+                    let targetGids = (broadcast.targetGroups && broadcast.targetGroups.length > 0)
+                        ? broadcast.targetGroups
+                        : Object.keys(groups);
+                    console.log(`📢 Sending scheduled broadcast to ${targetGids.length} groups...`);
                     
-                    for (const gid of Object.keys(groups)) {
+                    for (const gid of targetGids) {
                         try {
+                            let mentions = [];
+                            if (broadcast.tagAll) {
+                                try {
+                                    const meta = await appState.sock.groupMetadata(gid);
+                                    if (meta && meta.participants) {
+                                        mentions = meta.participants.map(p => p.id);
+                                    }
+                                } catch (e) {}
+                            }
+
                             if (broadcast.image) {
                                 const buffer = Buffer.from(broadcast.image.split(",")[1], 'base64');
-                                await appState.sock.sendMessage(gid, { image: buffer, caption: broadcast.message || "" });
+                                await appState.sock.sendMessage(gid, { image: buffer, caption: broadcast.message || "", mentions });
                             } else {
-                                await appState.sock.sendMessage(gid, { text: broadcast.message });
+                                await appState.sock.sendMessage(gid, { text: broadcast.message, mentions });
                             }
                             await new Promise(r => setTimeout(r, 500));
                         } catch (e) {}

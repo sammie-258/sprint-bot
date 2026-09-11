@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const scheduledBroadcastSchema = new mongoose.Schema({
     message: String, image: String,
     sendAt: Date, sent: { type: Boolean, default: false },
+    targetGroups: [String],
+    tagAll: { type: Boolean, default: false },
     retryCount: { type: Number, default: 0 },
     status: { type: String, default: 'pending' },
     createdAt: { type: Date, default: Date.now }

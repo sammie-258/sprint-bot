@@ -678,11 +678,20 @@
                     <!-- Instant Broadcast Blast Box -->
                     <div class="panel p-6 border-indigo-500/30">
                         <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
-                            <i class="fas fa-bolt text-indigo-400"></i> Instant Group Broadcast Blast
+                            <i class="fas fa-bolt text-indigo-400"></i> Instant Group Broadcast / Direct Message
                         </h3>
 
                         <div class="space-y-4">
-                            <textarea id="bc-msg" rows="4" placeholder="Type your broadcast message... (Use @everyone to tag all members)" class="w-full bg-black/30 border border-white/10 p-4 rounded-xl text-xs outline-none focus:border-indigo-400"></textarea>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1 flex items-center gap-1.5">
+                                    <i class="fas fa-bullseye text-indigo-400"></i> Target Destination
+                                </label>
+                                <select id="bc-target-group" class="w-full bg-black/30 border border-white/10 p-3 rounded-xl text-xs outline-none focus:border-indigo-400 text-white font-medium">
+                                    <option value="all">📢 All Participating Groups (Worldwide Broadcast Blast)</option>
+                                </select>
+                            </div>
+
+                            <textarea id="bc-msg" rows="4" placeholder="Type your message... (Use @everyone to tag all members in selected group)" class="w-full bg-black/30 border border-white/10 p-4 rounded-xl text-xs outline-none focus:border-indigo-400"></textarea>
 
                             <div class="flex items-center gap-4">
                                 <label class="flex items-center gap-2 text-xs font-bold text-indigo-400 cursor-pointer">
@@ -701,7 +710,7 @@
                                 </div>
 
                                 <button onclick="sendBroadcast()" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-indigo-600/30 flex items-center gap-2">
-                                    <i class="fas fa-paper-plane"></i> Send Blast Now
+                                    <i class="fas fa-paper-plane"></i> Send Message Now
                                 </button>
                             </div>
                         </div>
@@ -710,18 +719,27 @@
                     <!-- Scheduled Broadcast Blast Form -->
                     <div class="panel p-6 border-purple-500/30">
                         <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
-                            <i class="fas fa-clock text-purple-400"></i> Schedule Future Broadcast Blast
+                            <i class="fas fa-clock text-purple-400"></i> Schedule Future Message / Broadcast
                         </h3>
 
                         <div class="space-y-4">
-                            <textarea id="sch-bc-msg" rows="3" placeholder="Type scheduled broadcast message..." class="w-full bg-black/30 border border-white/10 p-4 rounded-xl text-xs outline-none focus:border-purple-400"></textarea>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1 flex items-center gap-1.5">
+                                    <i class="fas fa-bullseye text-purple-400"></i> Target Destination
+                                </label>
+                                <select id="sch-bc-target-group" class="w-full bg-black/30 border border-white/10 p-3 rounded-xl text-xs outline-none focus:border-purple-400 text-white font-medium">
+                                    <option value="all">📢 All Participating Groups (Worldwide Broadcast Blast)</option>
+                                </select>
+                            </div>
+
+                            <textarea id="sch-bc-msg" rows="3" placeholder="Type scheduled message..." class="w-full bg-black/30 border border-white/10 p-4 rounded-xl text-xs outline-none focus:border-purple-400"></textarea>
 
                             <div>
                                 <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Send Date & Time</label>
                                 <input type="datetime-local" id="sch-bc-time" class="w-full bg-black/30 border border-white/10 p-2.5 rounded-xl text-xs outline-none">
                             </div>
 
-                            <button onclick="createScheduledBroadcast()" class="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-purple-600/30">Schedule Broadcast Blast</button>
+                            <button onclick="createScheduledBroadcast()" class="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-purple-600/30">Schedule Message</button>
                         </div>
                     </div>
 
@@ -1575,6 +1593,7 @@
                         ${g.participants} members • 7-day words: <b class="text-white font-mono">${(g.weekWords||0).toLocaleString()}</b>
                     </div>
                     <div class="flex justify-end gap-2 pt-2">
+                        <button onclick="messageSpecificGroup('${g.id}')" class="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-lg text-xs font-bold hover:bg-indigo-500/30 transition flex items-center gap-1.5"><i class="fas fa-paper-plane text-[10px]"></i> Message Group</button>
                         <button onclick="leaveGroup('${g.id}')" class="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-xs font-bold hover:bg-red-500/30 transition">Leave Group</button>
                     </div>
                 </div>
@@ -1609,10 +1628,36 @@
 
         async function populateGroupDropdowns() {
             const groups = await api('/api/admin/groups');
-            if (groups) {
+            if (groups && groups.length) {
                 const sel = document.getElementById('sch-group');
                 if (sel) sel.innerHTML = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+
+                const groupOptions = `<option value="all">📢 All Participating Groups (Worldwide Blast)</option>` +
+                    groups.map(g => `<option value="${g.id}">👥 ${g.name} (${g.participants || 0} members)</option>`).join('');
+
+                const bcSel = document.getElementById('bc-target-group');
+                if (bcSel) {
+                    const prev = bcSel.value;
+                    bcSel.innerHTML = groupOptions;
+                    if (prev) bcSel.value = prev;
+                }
+
+                const schBcSel = document.getElementById('sch-bc-target-group');
+                if (schBcSel) {
+                    const prev = schBcSel.value;
+                    schBcSel.innerHTML = groupOptions;
+                    if (prev) schBcSel.value = prev;
+                }
             }
+        }
+
+        function messageSpecificGroup(groupId) {
+            switchTab('broadcast');
+            setTimeout(() => {
+                const sel = document.getElementById('bc-target-group');
+                if (sel) sel.value = groupId;
+                document.getElementById('bc-msg')?.focus();
+            }, 100);
         }
 
         async function loadScheduledSprints() {
@@ -1671,18 +1716,26 @@
         async function sendBroadcast() {
             const msg = document.getElementById('bc-msg').value.trim();
             const tagAll = document.getElementById('bc-tag-all').checked;
+            const target = document.getElementById('bc-target-group')?.value || 'all';
 
             if (!msg && !bcImageBase64) return showToast("Please enter message or attach image", "error");
 
-            const res = await api('/api/admin/broadcast', { message: msg, image: bcImageBase64, tagAll });
+            const payload = {
+                message: msg,
+                image: bcImageBase64,
+                tagAll,
+                targetGroups: target !== 'all' ? [target] : null
+            };
+
+            const res = await api('/api/admin/broadcast', payload);
             if (res?.success) {
-                showToast(`Broadcast delivered to ${res.count} groups!`);
+                showToast(target !== 'all' ? "Message delivered to group!" : `Broadcast delivered to ${res.count} groups!`);
                 document.getElementById('bc-msg').value = '';
                 document.getElementById('bc-tag-all').checked = false;
                 document.getElementById('bc-img-name').innerText = '';
                 bcImageBase64 = null;
             } else {
-                showToast(res?.error || "Failed to send broadcast", "error");
+                showToast(res?.error || "Failed to send message", "error");
             }
         }
 
@@ -1693,27 +1746,38 @@
                 list.innerHTML = `<div class="text-center py-6 text-slate-500 text-xs">No scheduled broadcasts.</div>`;
                 return;
             }
-            list.innerHTML = items.map(b => `
+            list.innerHTML = items.map(b => {
+                const targetText = (b.targetGroups && b.targetGroups.length > 0) ? '🎯 1 Selected Group' : '📢 All Groups';
+                return `
                 <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
                     <div>
                         <div class="font-bold text-sm text-white truncate max-w-xs">${b.message || 'Image Broadcast'}</div>
-                        <div class="text-xs text-slate-400">Send At: ${new Date(b.sendAt).toLocaleString()}</div>
+                        <div class="text-xs text-slate-400">Send At: ${new Date(b.sendAt).toLocaleString()} • Target: <span class="text-indigo-400 font-medium">${targetText}</span></div>
                     </div>
                     <button onclick="cancelScheduledBroadcast('${b._id}')" class="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-xs font-bold hover:bg-red-500/30 transition">Cancel</button>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
 
         async function createScheduledBroadcast() {
             const msg = document.getElementById('sch-bc-msg').value.trim();
             const sendAt = document.getElementById('sch-bc-time').value;
+            const target = document.getElementById('sch-bc-target-group')?.value || 'all';
 
             if (!msg && !bcImageBase64) return showToast("Please enter message or attach image", "error");
             if (!sendAt) return showToast("Please select send date & time", "error");
 
-            const res = await api('/api/admin/broadcasts/schedule', { message: msg, image: bcImageBase64, sendAt });
+            const payload = {
+                message: msg,
+                image: bcImageBase64,
+                sendAt,
+                targetGroups: target !== 'all' ? [target] : null
+            };
+
+            const res = await api('/api/admin/broadcasts/schedule', payload);
             if (res?.success) {
-                showToast("Broadcast scheduled successfully!");
+                showToast(target !== 'all' ? "Group message scheduled successfully!" : "Broadcast scheduled successfully!");
                 document.getElementById('sch-bc-msg').value = '';
                 document.getElementById('sch-bc-time').value = '';
                 loadScheduledBroadcasts();
