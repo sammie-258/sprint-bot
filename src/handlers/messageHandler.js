@@ -266,26 +266,19 @@ module.exports = async function(m, appState) {
                     const count = parseInt(args[1]);
                     if (isNaN(count) || count <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!log 500`" }, { quoted: msg });
 
-                    // 1. Troll attempt (> 200,000 words) -> Auto-suspend 24 hours
-                    if (count > 200000) {
+                    // Troll or impossible attempt (> 150,000 words) -> Auto-suspend 24 hours without revealing limits
+                    if (count > 150000) {
                         const banUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
                         await Blacklist.findOneAndUpdate(
                             { userId: senderId },
-                            { userId: senderId, reason: `Troll log attempt (${count.toLocaleString()} words)`, bannedAt: new Date(), expiresAt: banUntil },
+                            { userId: senderId, reason: `Invalid log attempt (${count.toLocaleString()} words)`, bannedAt: new Date(), expiresAt: banUntil },
                             { upsert: true }
                         );
-                        pushActivity('ban', `${senderName} suspended 24h (troll log: ${count.toLocaleString()} words)`, '🚫');
+                        pushActivity('ban', `${senderName} suspended 24h (invalid log attempt)`, '🚫');
                         return sock.sendMessage(chatId, {
-                            text: `🚫 @${senderId.split('@')[0]} has been suspended for *24 hours* for attempting to log an impossible word count (*${count.toLocaleString()}* words).`,
+                            text: `🚫 @${senderId.split('@')[0]} has been suspended for *24 hours* for submitting an invalid word count.`,
                             mentions: [senderId]
                         });
-                    }
-
-                    // 2. High backlog warning (between 150,000 and 200,000)
-                    if (count > 150000) {
-                        return sock.sendMessage(chatId, {
-                            text: `⚠️ *Word count exceeds single log limit!*\nThe maximum allowed per single \`!log\` is *150,000 words*. If your novel backlog exceeds this, please log it in multiple sessions (e.g. \`!log 100000\`).`
-                        }, { quoted: msg });
                     }
 
                     try {
@@ -526,25 +519,25 @@ module.exports = async function(m, appState) {
                     const duration = sprint?.duration || duel?.duration || 20;
                     const maxSprintWords = Math.max(1500, duration * 250);
 
-                    // Troll sprint attempt (> 15,000 words in a live sprint) -> 24-hour suspension
+                    // Troll sprint attempt (> 15,000 words in a live sprint) -> 24-hour suspension without revealing limits
                     if (c > 15000) {
                         const banUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
                         await Blacklist.findOneAndUpdate(
                             { userId: senderId },
-                            { userId: senderId, reason: `Troll sprint submission (${c.toLocaleString()} words in ${duration}m sprint)`, bannedAt: new Date(), expiresAt: banUntil },
+                            { userId: senderId, reason: `Invalid sprint submission (${c.toLocaleString()} words in ${duration}m sprint)`, bannedAt: new Date(), expiresAt: banUntil },
                             { upsert: true }
                         );
-                        pushActivity('ban', `${senderName} suspended 24h (troll sprint: ${c.toLocaleString()} words)`, '🚫');
+                        pushActivity('ban', `${senderName} suspended 24h (invalid sprint submission)`, '🚫');
                         return sock.sendMessage(chatId, {
-                            text: `🚫 @${senderId.split('@')[0]} has been suspended for *24 hours* for attempting an impossible sprint word count (*${c.toLocaleString()}* words in a ${duration}-minute sprint).`,
+                            text: `🚫 @${senderId.split('@')[0]} has been suspended for *24 hours* for submitting an invalid sprint word count.`,
                             mentions: [senderId]
                         });
                     }
 
-                    // Sprint sanity cap (~250 WPM)
+                    // Sprint sanity check without revealing formula
                     if (c > maxSprintWords) {
                         return sock.sendMessage(chatId, {
-                            text: `❌ *Unrealistic sprint word count!* For a ${duration}-minute sprint, the maximum allowed is *${maxSprintWords.toLocaleString()} words* (~250 WPM). If you are logging an offline backlog, please use \`!log\` instead.`
+                            text: `❌ *Invalid sprint word count.* Pacing exceeds sprint limits. If this is an offline backlog, please use \`!log\` instead.`
                         }, { quoted: msg });
                     }
                     
