@@ -365,10 +365,21 @@ router.post('/api/admin/search', requireAdmin, async (req, res) => {
         const todayMap = {};
         todayStats.forEach(s => todayMap[s._id] = s.total);
 
-        const blacklisted = new Set(
-            (await Blacklist.find({ userId: { $in: profiles.map(p => p.userId) } }, 'userId'))
-            .map(b => b.userId)
-        );
+        const now = new Date();
+        const blacklistDocs = await Blacklist.find({ userId: { $in: profiles.map(p => p.userId) } });
+        const blacklisted = new Set();
+        const banDetails = {};
+        for (const b of blacklistDocs) {
+            if (b.expiresAt && new Date(b.expiresAt) <= now) {
+                await Blacklist.deleteOne({ _id: b._id }).catch(() => {});
+            } else {
+                blacklisted.add(b.userId);
+                banDetails[b.userId] = {
+                    reason: b.reason || "Suspended",
+                    expiresAt: b.expiresAt
+                };
+            }
+        }
 
         const enriched = profiles.map(p => ({
             _id: p.userId, name: p.name || p.userId.split('@')[0],
@@ -378,6 +389,7 @@ router.post('/api/admin/search', requireAdmin, async (req, res) => {
             rank: getRank(p.totalWordsAllTime), streak: p.currentStreak,
             bestStreak: p.bestStreak, trueTotal: p.totalWordsAllTime,
             isBanned: blacklisted.has(p.userId),
+            banInfo: banDetails[p.userId] || null,
             isInactive: !!p.isInactive,
             isArchived: !!p.isArchived,
             badges: p.badges || [],
@@ -608,11 +620,36 @@ router.post('/api/admin/update', requireAdmin, async (req, res) => {
 });
 
 router.post('/api/admin/ban', requireAdmin, async (req, res) => {
-    const { userId, action } = req.body;
+    const { userId, action, durationHours, reason } = req.body;
     try {
-        if (action === 'ban') await Blacklist.findOneAndUpdate({ userId }, { userId }, { upsert: true });
-        else await Blacklist.deleteMany({ userId });
+        if (action === 'ban') {
+            const expiresAt = durationHours ? new Date(Date.now() + durationHours * 3600000) : null;
+            await Blacklist.findOneAndUpdate(
+                { userId },
+                { userId, reason: reason || (durationHours ? `${durationHours}h suspension` : 'Admin ban'), bannedAt: new Date(), expiresAt },
+                { upsert: true }
+            );
+        } else {
+            await Blacklist.deleteMany({ userId });
+        }
         res.json({ success: true, isBanned: action === 'ban' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/admin/writers/purge', requireAdmin, async (req, res) => {
+    const { userId, ban, banHours } = req.body;
+    try {
+        await DailyStats.deleteMany({ userId });
+        await UserProfile.findOneAndUpdate({ userId }, { totalWordsAllTime: 0, currentStreak: 0, bestStreak: 0 });
+        if (ban) {
+            const expiresAt = banHours ? new Date(Date.now() + banHours * 3600000) : null;
+            await Blacklist.findOneAndUpdate(
+                { userId },
+                { userId, reason: "Stats purged & banned by admin", bannedAt: new Date(), expiresAt },
+                { upsert: true }
+            );
+        }
+        res.json({ success: true, message: "Writer stats purged" });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

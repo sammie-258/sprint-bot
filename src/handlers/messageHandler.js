@@ -74,7 +74,14 @@ module.exports = async function(m, appState) {
                 // Silently ignore ALL private/DM messages — bot never responds to DMs
                 if (!isGroup) return;
 
-                if (await Blacklist.exists({ userId: senderId })) return;
+                const ban = await Blacklist.findOne({ userId: senderId });
+                if (ban) {
+                    if (ban.expiresAt && new Date(ban.expiresAt) <= new Date()) {
+                        await Blacklist.deleteOne({ _id: ban._id }).catch(() => {});
+                    } else {
+                        return;
+                    }
+                }
 
                 const senderProfile = await UserProfile.findOne({ userId: senderId });
                 if (senderProfile && senderProfile.isArchived) return;
@@ -258,6 +265,29 @@ module.exports = async function(m, appState) {
                 if (command === "!log") {
                     const count = parseInt(args[1]);
                     if (isNaN(count) || count <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!log 500`" }, { quoted: msg });
+
+                    // 1. Troll attempt (> 200,000 words) -> Auto-suspend 24 hours
+                    if (count > 200000) {
+                        const banUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                        await Blacklist.findOneAndUpdate(
+                            { userId: senderId },
+                            { userId: senderId, reason: `Troll log attempt (${count.toLocaleString()} words)`, bannedAt: new Date(), expiresAt: banUntil },
+                            { upsert: true }
+                        );
+                        pushActivity('ban', `${senderName} suspended 24h (troll log: ${count.toLocaleString()} words)`, '🚫');
+                        return sock.sendMessage(chatId, {
+                            text: `🚫 @${senderId.split('@')[0]} has been suspended for *24 hours* for attempting to log an impossible word count (*${count.toLocaleString()}* words).`,
+                            mentions: [senderId]
+                        });
+                    }
+
+                    // 2. High backlog warning (between 150,000 and 200,000)
+                    if (count > 150000) {
+                        return sock.sendMessage(chatId, {
+                            text: `⚠️ *Word count exceeds single log limit!*\nThe maximum allowed per single \`!log\` is *150,000 words*. If your novel backlog exceeds this, please log it in multiple sessions (e.g. \`!log 100000\`).`
+                        }, { quoted: msg });
+                    }
+
                     try {
                         await DailyStats.findOneAndUpdate(
                             { userId: senderId, groupId: chatId, date: todayStr },
@@ -492,6 +522,31 @@ module.exports = async function(m, appState) {
                     const rawNum = isAdd ? args[2] : args[1];
                     const c      = parseInt(rawNum);
                     if (isNaN(c) || c < 0) return sock.sendMessage(chatId, { text: "❌ Use: `!wc 500`" }, { quoted: msg });
+
+                    const duration = sprint?.duration || duel?.duration || 20;
+                    const maxSprintWords = Math.max(1500, duration * 250);
+
+                    // Troll sprint attempt (> 15,000 words in a live sprint) -> 24-hour suspension
+                    if (c > 15000) {
+                        const banUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                        await Blacklist.findOneAndUpdate(
+                            { userId: senderId },
+                            { userId: senderId, reason: `Troll sprint submission (${c.toLocaleString()} words in ${duration}m sprint)`, bannedAt: new Date(), expiresAt: banUntil },
+                            { upsert: true }
+                        );
+                        pushActivity('ban', `${senderName} suspended 24h (troll sprint: ${c.toLocaleString()} words)`, '🚫');
+                        return sock.sendMessage(chatId, {
+                            text: `🚫 @${senderId.split('@')[0]} has been suspended for *24 hours* for attempting an impossible sprint word count (*${c.toLocaleString()}* words in a ${duration}-minute sprint).`,
+                            mentions: [senderId]
+                        });
+                    }
+
+                    // Sprint sanity cap (~250 WPM)
+                    if (c > maxSprintWords) {
+                        return sock.sendMessage(chatId, {
+                            text: `❌ *Unrealistic sprint word count!* For a ${duration}-minute sprint, the maximum allowed is *${maxSprintWords.toLocaleString()} words* (~250 WPM). If you are logging an offline backlog, please use \`!log\` instead.`
+                        }, { quoted: msg });
+                    }
                     
                     // Reactivate user if they log words
                     await UserProfile.findOneAndUpdate({ userId: senderId }, { isInactive: false });

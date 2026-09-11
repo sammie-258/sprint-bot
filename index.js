@@ -255,7 +255,7 @@ mongoose.connect(MONGO_URI).then(async () => {
         profile.totalWordsAllTime += wordsToAdd;
         const newRank = getRank(profile.totalWordsAllTime);
         const rankUp    = oldRank !== newRank ? newRank : null;
-        const isNovelGod = rankUp === "Novel God ⚡";
+        const isNovelGod = rankUp === "Novel God ⚡" && wordsToAdd <= 150000;
 
         if (profile.lastActiveDate === today) {
             // no change
