@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const streakFreezeSchema = new mongoose.Schema({
     userId: String,
     freezesAvailable: { type: Number, default: 0 },
+    fishScales:       { type: Number, default: 0 },
     lastEarnedDate:   { type: String, default: null }
 });
 

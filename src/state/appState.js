@@ -11,6 +11,8 @@ module.exports = {
     activeSprints: {},
     activePomodoros: {},
     activeDuels: {},
+    pendingFish: {},
+    fishCooldowns: {},
     recentActivity: [],
 
     pushActivity(type, text, icon = '📝') {

@@ -57,6 +57,8 @@ let lastDailyRunDate = "";
 let activeSprints    = {};
 let activePomodoros  = {};
 let activeDuels      = {}; // chatId -> { challenger, opponent, duration, endsAt, words:{uid:n}, challengerName, opponentName, isGracePeriod }
+let pendingFish      = {}; // chatId -> { caster, casterName, target, targetName, duration, timeout, createdAt }
+let fishCooldowns    = {}; // chatId -> timestamp
 
 // Rolling 20-event activity log for admin overview
 const recentActivity = [];
@@ -607,6 +609,8 @@ mongoose.connect(MONGO_URI).then(async () => {
                 get activeSprints() { return activeSprints; },
                 get activePomodoros() { return activePomodoros; },
                 get activeDuels() { return activeDuels; },
+                get pendingFish() { return pendingFish; },
+                get fishCooldowns() { return fishCooldowns; },
                 checkRateLimit, getTodayDateGMT1, awardBadge, checkAndAwardBadges,
                 updateStreak, updateChallenge, updateWeeklyChallenge,
                 startSprintSession, finishSprint, pushActivity

@@ -991,6 +991,7 @@ router.post('/api/admin/writers/merge', requireAdmin, async (req, res) => {
         if (oldFreeze) {
             if (newFreeze) {
                 newFreeze.freezesAvailable += oldFreeze.freezesAvailable;
+                newFreeze.fishScales = (newFreeze.fishScales || 0) + (oldFreeze.fishScales || 0);
                 if (oldFreeze.lastEarnedDate && (!newFreeze.lastEarnedDate || oldFreeze.lastEarnedDate > newFreeze.lastEarnedDate)) {
                     newFreeze.lastEarnedDate = oldFreeze.lastEarnedDate;
                 }

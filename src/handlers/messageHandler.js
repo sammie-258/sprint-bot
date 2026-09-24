@@ -36,6 +36,7 @@ const processedMessages = new Set();
 module.exports = async function(m, appState) {
     const { 
         sock, isConnected, groupCache, maintenanceMode, activeSprints, activePomodoros, activeDuels,
+        pendingFish, fishCooldowns,
         checkRateLimit, getTodayDateGMT1, awardBadge, checkAndAwardBadges, updateStreak,
         updateChallenge, updateWeeklyChallenge, startSprintSession, finishSprint, pushActivity
     } = appState;
@@ -224,8 +225,10 @@ module.exports = async function(m, appState) {
 *!finish* → End sprint & view results
 *!cancel* → Stop current timer
 
-⚔️ *Duels & Challenges*
+⚔️ *Duels & Fishing*
 *!duel @user 15* → 1v1 word battle (15 min)
+*!fish [mins]* → Hook a random writer into a duel!
+*!bite* → Accept fish hook (150+ words = 🪙 scale)
 *!challenge 5000* → Group boss battle
 *!challenge check* → View boss HP
 *!challenge stop* → Cancel manual challenge
@@ -242,8 +245,8 @@ module.exports = async function(m, appState) {
 *!top10 [all]* → All-Time Hall of Fame
 *!myname Sam* → Set display name
 
-🔥 *Streaks*
-*!streak status* → Streak & freeze info
+🔥 *Streaks & Freezes*
+*!streak status* → Streak, freezes & Fish Scales
 *!streak freeze* → Manually use a freeze
 
 🎯 *Goals*
@@ -384,15 +387,17 @@ module.exports = async function(m, appState) {
                         const rank     = getRank(profile?.totalWordsAllTime || 0);
                         const maxFr    = getMaxFreezes(rank);
                         const avail    = freeze?.freezesAvailable || 0;
+                        const scales   = freeze?.fishScales || 0;
                         const nextIn   = profile?.currentStreak ? 7 - (profile.currentStreak % 7) : 7;
                         let txt = `🔥 *STREAK STATUS — ${senderName}*\n━━━━━━━━━━━━━━━━\n`;
                         txt += `📅 Current Streak: *${profile?.currentStreak || 0} days*\n`;
                         txt += `🏆 Best Streak: ${profile?.bestStreak || 0} days\n\n`;
                         txt += `🛡️ *Freezes:* ${avail} / ${maxFr}\n`;
-                        if (maxFr === 0) txt += `_(Rank up to *Aspiring Author ✍️* to earn freezes)_`;
-                        else if (avail < maxFr) txt += `_(Next freeze in *${nextIn} writing day${nextIn !== 1 ? 's' : ''}*)_`;
-                        else txt += `_(Freeze cap reached for your rank)_`;
-                        return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
+                        txt += `🪙 *Fish Scales:* ${scales} / 3\n`;
+                        if (maxFr === 0) txt += `_(Rank up to *Aspiring Author ✍️* to earn weekly freezes or forge via *!fish*)_\n`;
+                        else if (avail < maxFr) txt += `_(Next weekly freeze in *${nextIn} writing day${nextIn !== 1 ? 's' : ''}*)_\n`;
+                        else txt += `_(Freeze cap reached for your rank)_\n`;
+                        return sock.sendMessage(chatId, { text: txt.trim() }, { quoted: msg });
                     }
 
                     if (sub === "freeze") {
@@ -414,48 +419,79 @@ module.exports = async function(m, appState) {
                     return sock.sendMessage(chatId, { text: `Use *!streak status* or *!streak freeze*` }, { quoted: msg });
                 }
 
-                // ── !DUEL ───────────────────────────────────────────────────────────
-                if (command === "!duel") {
-                    const mentioned  = msg.message.extendedTextMessage?.contextInfo?.mentionedJid;
-                    const opponentId = mentioned?.[0] || getTargetId(1);
-                    const duration   = parseInt(args[2]) || parseInt(args[1]) || 15;
+                // ── FISHING / DUEL HELPER FUNCTIONS ──────────────────────────────────
+                const awardFishScale = async (userId) => {
+                    let freeze = await StreakFreeze.findOne({ userId });
+                    if (!freeze) freeze = await StreakFreeze.create({ userId, freezesAvailable: 0, fishScales: 0 });
 
-                    if (!opponentId)             return sock.sendMessage(chatId, { text: "❌ Tag your opponent: `!duel @user 15`" }, { quoted: msg });
-                    if (opponentId === senderId) return sock.sendMessage(chatId, { text: "❌ You can't duel yourself!" }, { quoted: msg });
-                    if (activeDuels[chatId])     return sock.sendMessage(chatId, { text: "⚠️ A duel is already active here!" }, { quoted: msg });
-                    if (activeSprints[chatId])   return sock.sendMessage(chatId, { text: "⚠️ Can't start a duel during a sprint." }, { quoted: msg });
-                    if (duration < 5 || duration > 60) return sock.sendMessage(chatId, { text: "❌ Duration must be 5–60 minutes." }, { quoted: msg });
+                    const profile = await UserProfile.findOne({ userId });
+                    const rank = getRank(profile?.totalWordsAllTime || 0);
+                    const maxFr = Math.max(1, getMaxFreezes(rank)); // Allows at least 1 freeze holding capacity for fishing
 
+                    let scales = (freeze.fishScales || 0) + 1;
+                    let forged = false;
+
+                    if (scales >= 3) {
+                        if (freeze.freezesAvailable < maxFr) {
+                            scales -= 3;
+                            freeze.freezesAvailable = (freeze.freezesAvailable || 0) + 1;
+                            forged = true;
+                        } else {
+                            // Cap reached; bank at 3 scales so nothing is lost
+                            scales = 3;
+                        }
+                    }
+
+                    freeze.fishScales = scales;
+                    await freeze.save();
+
+                    return {
+                        scales,
+                        freezes: freeze.freezesAvailable,
+                        maxFreezes: maxFr,
+                        forged,
+                        atCap: !forged && scales >= 3 && freeze.freezesAvailable >= maxFr
+                    };
+                };
+
+                const startDuelSession = async ({ chatId, challenger, opponent, challengerName, opponentName, duration, isFish = false }) => {
                     const endsAt = Date.now() + duration * 60000;
                     activeDuels[chatId] = {
-                        challenger: senderId, opponent: opponentId, duration, endsAt,
-                        words: { [senderId]: 0, [opponentId]: 0 },
-                        challengerName: senderName, opponentName: opponentId.split('@')[0],
-                        isGracePeriod: false
+                        challenger, opponent, duration, endsAt,
+                        words: { [challenger]: 0, [opponent]: 0 },
+                        challengerName, opponentName,
+                        isGracePeriod: false,
+                        isFish
                     };
 
-                    await sock.sendMessage(chatId, {
-                        text: `⚔️ *WORD DUEL!* ⚔️\n━━━━━━━━━━━━━━━━\n🔴 @${senderId.split('@')[0]} vs 🔵 @${opponentId.split('@')[0]}\n⏱️ Duration: *${duration} minutes*\n\nUse *!wc [number]* to log words!\nMay the best writer win! 📝`,
-                        mentions: [senderId, opponentId]
-                    });
-
-                    pushActivity('duel', `Duel started by @${senderName}`, '⚔️');
+                    if (isFish) {
+                        await sock.sendMessage(chatId, {
+                            text: `🐟 *THE FISH BIT THE HOOK!* 🎣\n━━━━━━━━━━━━━━━━\n⚔️ *FISHING DUEL COMMENCED!*\n\n🎣 Caster: @${challenger.split('@')[0]}\n🐟 Catch: @${opponent.split('@')[0]}\n⏱️ Duration: *${duration} minutes*\n\n📝 Both of you grab your pens and write! Use *!wc [number]* to log words.\n🎯 *150+ words* needed to claim a Fish Scale 🪙!\n\nMay the swiftest pen triumph! 🚀`,
+                            mentions: [challenger, opponent]
+                        });
+                        pushActivity('duel', `Fishing duel started: ${challengerName} vs ${opponentName}`, '🎣');
+                    } else {
+                        await sock.sendMessage(chatId, {
+                            text: `⚔️ *WORD DUEL!* ⚔️\n━━━━━━━━━━━━━━━━\n🔴 @${challenger.split('@')[0]} vs 🔵 @${opponent.split('@')[0]}\n⏱️ Duration: *${duration} minutes*\n\nUse *!wc [number]* to log words!\nMay the best writer win! 📝`,
+                            mentions: [challenger, opponent]
+                        });
+                        pushActivity('duel', `Duel started by @${challengerName}`, '⚔️');
+                    }
 
                     const timer = setTimeout(async () => {
                         try {
                             const duel = activeDuels[chatId];
-                            if (!duel) return; // Might have been cancelled
+                            if (!duel) return;
                             
-                            // Enter Grace Period
                             duel.isGracePeriod = true;
-                            duel.endsAt = Date.now() + (5 * 60000); // Add 5 minutes to the clock for logging
+                            duel.endsAt = Date.now() + (5 * 60000);
 
+                            const prefix = duel.isFish ? "🛑 *FISHING DUEL TIME'S UP!*" : "🛑 *DUEL TIME'S UP!*";
                             await sock.sendMessage(chatId, { 
-                                text: `🛑 *DUEL TIME'S UP!*\n\n@${duel.challenger.split('@')[0]} and @${duel.opponent.split('@')[0]}, put your pens down!\n\nYou have *5 minutes* to submit your final words using *!wc [number]*!`, 
+                                text: `${prefix}\n\n@${duel.challenger.split('@')[0]} and @${duel.opponent.split('@')[0]}, put your pens down!\n\nYou have *5 minutes* to submit your final words using *!wc [number]*!`, 
                                 mentions: [duel.challenger, duel.opponent] 
                             });
 
-                            // Final resolution timer
                             const graceTimer = setTimeout(async () => {
                                 try {
                                     const finalDuel = activeDuels[chatId];
@@ -467,16 +503,62 @@ module.exports = async function(m, appState) {
                                     const draw     = cW === oW;
                                     const winnerId = cW > oW ? finalDuel.challenger : finalDuel.opponent;
                                     const loserId  = cW > oW ? finalDuel.opponent   : finalDuel.challenger;
+                                    const winWords = Math.max(cW, oW);
+                                    const loseWords = Math.min(cW, oW);
 
-                                    let txt = `⚔️ *DUEL OVER!* ⚔️\n━━━━━━━━━━━━━━━━\n`;
-                                    if (draw) {
-                                        txt += `🤝 *IT'S A DRAW!*\nBoth: *${cW.toLocaleString()} words*\n\nHonour among wordsmiths! 🙏`;
+                                    let txt = "";
+
+                                    if (finalDuel.isFish) {
+                                        txt += `🎣 *FISHING DUEL FINISHED!* 🎣\n━━━━━━━━━━━━━━━━\n`;
+                                        if (draw) {
+                                            txt += `🤝 *DEAD HEAT DRAW!*\nBoth writers: *${cW.toLocaleString()} words*\n`;
+                                            if (cW >= 150) {
+                                                const r1 = await awardFishScale(finalDuel.challenger);
+                                                const r2 = await awardFishScale(finalDuel.opponent);
+                                                txt += `\n🪙 Both reeled in *1 Fish Scale* (150+ words hit)!`;
+                                                if (r1.forged) txt += `\n✨ @${finalDuel.challenger.split('@')[0]} forged a *Streak Freeze* 🛡️! (Total: ${r1.freezes})`;
+                                                else if (r1.atCap) txt += `\n(@${finalDuel.challenger.split('@')[0]}: Freeze cap reached, banked 3/3 scales 🪙)`;
+                                                else txt += `\n(@${finalDuel.challenger.split('@')[0]}: ${r1.scales}/3 scales 🪙)`;
+
+                                                if (r2.forged) txt += `\n✨ @${finalDuel.opponent.split('@')[0]} forged a *Streak Freeze* 🛡️! (Total: ${r2.freezes})`;
+                                                else if (r2.atCap) txt += `\n(@${finalDuel.opponent.split('@')[0]}: Freeze cap reached, banked 3/3 scales 🪙)`;
+                                                else txt += `\n(@${finalDuel.opponent.split('@')[0]}: ${r2.scales}/3 scales 🪙)`;
+                                            } else {
+                                                txt += `\n⚠️ Neither reached the 150-word threshold for Fish Scales! Keep casting!`;
+                                            }
+                                        } else {
+                                            txt += `🏆 *BIG CATCH WINNER:* @${winnerId.split('@')[0]} — *${winWords.toLocaleString()} words*\n🐟 *CAUGHT:* @${loserId.split('@')[0]} — ${loseWords.toLocaleString()} words\n`;
+                                            
+                                            if (winWords >= 150) {
+                                                const res = await awardFishScale(winnerId);
+                                                txt += `\n🪙 @${winnerId.split('@')[0]} earned *1 Fish Scale*!`;
+                                                if (res.forged) {
+                                                    txt += `\n✨ *3 FISH SCALES FORGED!* @${winnerId.split('@')[0]} unlocked *1 STREAK FREEZE* 🛡️! (Total Freezes: ${res.freezes})`;
+                                                } else if (res.atCap) {
+                                                    txt += `\n_(Freeze cap reached for your rank. Scales banked at 3/3 until a freeze is used!)_`;
+                                                } else {
+                                                    txt += ` (${res.scales}/3 towards a Streak Freeze 🛡️)`;
+                                                }
+                                            } else {
+                                                txt += `\n⚠️ Winner logged less than 150 words, so no Fish Scale was awarded. Push harder next time!`;
+                                            }
+
+                                            try {
+                                                const winProf = await UserProfile.findOne({ userId: winnerId });
+                                                if (winProf) await awardBadge(winProf, 'duel_win', chatId);
+                                            } catch (e) {}
+                                        }
                                     } else {
-                                        txt += `🏆 *WINNER:* @${winnerId.split('@')[0]} — *${Math.max(cW, oW).toLocaleString()} words*\n💀 *LOSER:* @${loserId.split('@')[0]} — ${Math.min(cW, oW).toLocaleString()} words\n\nBetter luck next time! 😤`;
-                                        try {
-                                            const winProf = await UserProfile.findOne({ userId: winnerId });
-                                            if (winProf) await awardBadge(winProf, 'duel_win', chatId);
-                                        } catch (e) {}
+                                        txt += `⚔️ *DUEL OVER!* ⚔️\n━━━━━━━━━━━━━━━━\n`;
+                                        if (draw) {
+                                            txt += `🤝 *IT'S A DRAW!*\nBoth: *${cW.toLocaleString()} words*\n\nHonour among wordsmiths! 🙏`;
+                                        } else {
+                                            txt += `🏆 *WINNER:* @${winnerId.split('@')[0]} — *${winWords.toLocaleString()} words*\n💀 *LOSER:* @${loserId.split('@')[0]} — ${loseWords.toLocaleString()} words\n\nBetter luck next time! 😤`;
+                                            try {
+                                                const winProf = await UserProfile.findOne({ userId: winnerId });
+                                                if (winProf) await awardBadge(winProf, 'duel_win', chatId);
+                                            } catch (e) {}
+                                        }
                                     }
 
                                     // Log words to daily stats for both
@@ -488,20 +570,167 @@ module.exports = async function(m, appState) {
                                         }
                                     }
 
-                                    await sock.sendMessage(chatId, { text: txt, mentions: [finalDuel.challenger, finalDuel.opponent] });
-                                    pushActivity('duel', `Duel ended in ${groupCache[chatId]?.subject || chatId}`, '⚔️');
+                                    await sock.sendMessage(chatId, { text: txt.trim(), mentions: [finalDuel.challenger, finalDuel.opponent] });
+                                    pushActivity('duel', `${finalDuel.isFish ? 'Fishing duel' : 'Duel'} ended in ${groupCache[chatId]?.subject || chatId}`, finalDuel.isFish ? '🎣' : '⚔️');
                                 } catch (e) {
                                     console.error("⚠️ Error in duel resolution timer:", e);
                                 }
-                            }, 5 * 60000); // 5 minutes later
+                            }, 5 * 60000);
                             duel.graceTimer = graceTimer;
                         } catch (e) {
                             console.error("⚠️ Error in duel end timer:", e);
                         }
                     }, duration * 60000);
+
                     if (activeDuels[chatId]) {
                         activeDuels[chatId].timer = timer;
                     }
+                };
+
+                // ── !DUEL ───────────────────────────────────────────────────────────
+                if (command === "!duel") {
+                    const mentioned  = msg.message.extendedTextMessage?.contextInfo?.mentionedJid;
+                    const opponentId = mentioned?.[0] || getTargetId(1);
+                    const duration   = parseInt(args[2]) || parseInt(args[1]) || 15;
+
+                    if (!opponentId)             return sock.sendMessage(chatId, { text: "❌ Tag your opponent: `!duel @user 15`" }, { quoted: msg });
+                    if (opponentId === senderId) return sock.sendMessage(chatId, { text: "❌ You can't duel yourself!" }, { quoted: msg });
+                    if (activeDuels[chatId])     return sock.sendMessage(chatId, { text: "⚠️ A duel or fishing duel is already active here!" }, { quoted: msg });
+                    if (activeSprints[chatId])   return sock.sendMessage(chatId, { text: "⚠️ Can't start a duel during a sprint." }, { quoted: msg });
+                    if (duration < 5 || duration > 60) return sock.sendMessage(chatId, { text: "❌ Duration must be 5–60 minutes." }, { quoted: msg });
+
+                    await startDuelSession({
+                        chatId,
+                        challenger: senderId,
+                        opponent: opponentId,
+                        challengerName: senderName,
+                        opponentName: opponentId.split('@')[0],
+                        duration,
+                        isFish: false
+                    });
+                    return;
+                }
+
+                // ── !FISH ───────────────────────────────────────────────────────────
+                if (command === "!fish") {
+                    if (!chatId.endsWith('@g.us')) {
+                        return sock.sendMessage(chatId, { text: "❌ Fishing can only be cast in group chats!" }, { quoted: msg });
+                    }
+
+                    if (activeSprints[chatId]) {
+                        return sock.sendMessage(chatId, { text: "⚠️ A sprint is already running in this group!" }, { quoted: msg });
+                    }
+                    if (activeDuels[chatId]) {
+                        return sock.sendMessage(chatId, { text: "⚠️ A duel or fishing duel is already active here!" }, { quoted: msg });
+                    }
+                    if (pendingFish && pendingFish[chatId]) {
+                        return sock.sendMessage(chatId, { 
+                            text: `⚠️ A fishing line is already in the water! Waiting for @${pendingFish[chatId].target.split('@')[0]} to bite (or type *!bite*).`,
+                            mentions: [pendingFish[chatId].target]
+                        }, { quoted: msg });
+                    }
+
+                    // Cooldown: 30 minutes per group between casts
+                    const COOLDOWN_MS = 30 * 60 * 1000;
+                    if (fishCooldowns && fishCooldowns[chatId] && (Date.now() - fishCooldowns[chatId]) < COOLDOWN_MS) {
+                        const waitMins = Math.ceil((COOLDOWN_MS - (Date.now() - fishCooldowns[chatId])) / 60000);
+                        return sock.sendMessage(chatId, { text: `🌊 The waters need to calm down! You can cast another line in *${waitMins} minute${waitMins !== 1 ? 's' : ''}*.` }, { quoted: msg });
+                    }
+
+                    const duration = parseInt(args[1]) || 30;
+                    if (duration < 5 || duration > 60) {
+                        return sock.sendMessage(chatId, { text: "❌ Duration must be 5–60 minutes (default is 30 mins: `!fish`)." }, { quoted: msg });
+                    }
+
+                    // Find active writers in this group from the last 7 days
+                    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                    const activeUserIds = await DailyStats.distinct("userId", { 
+                        groupId: chatId, 
+                        timestamp: { $gte: sevenDaysAgo } 
+                    });
+
+                    const botJid = sock.user?.id?.split(':')[0] || '';
+                    let candidates = activeUserIds.filter(uid => uid !== senderId && !uid.includes(botJid));
+
+                    // Fallback to group participants if not enough recent active writers
+                    if (candidates.length === 0) {
+                        try {
+                            const meta = await sock.groupMetadata(chatId);
+                            candidates = (meta.participants || [])
+                                .map(p => p.id)
+                                .filter(uid => uid !== senderId && !uid.includes(botJid));
+                        } catch (e) {}
+                    }
+
+                    if (!candidates || candidates.length === 0) {
+                        return sock.sendMessage(chatId, { text: "❌ Not enough writers in this group to fish!" }, { quoted: msg });
+                    }
+
+                    const targetId = candidates[Math.floor(Math.random() * candidates.length)];
+                    const targetProfile = await UserProfile.findOne({ userId: targetId });
+                    const targetName = targetProfile?.name || targetId.split('@')[0];
+
+                    if (fishCooldowns) fishCooldowns[chatId] = Date.now();
+
+                    const timeout = setTimeout(async () => {
+                        try {
+                            if (pendingFish && pendingFish[chatId] && pendingFish[chatId].target === targetId) {
+                                delete pendingFish[chatId];
+                                await sock.sendMessage(chatId, {
+                                    text: `🐟 *THE FISH GOT AWAY!*\n\n@${targetId.split('@')[0]} didn't take the bait in time. The line reeled back empty! 🌊`,
+                                    mentions: [targetId]
+                                });
+                            }
+                        } catch (e) {
+                            console.error("Fish timeout error:", e);
+                        }
+                    }, 3 * 60 * 1000); // 3 minutes to bite
+
+                    if (pendingFish) {
+                        pendingFish[chatId] = {
+                            caster: senderId,
+                            casterName: senderName,
+                            target: targetId,
+                            targetName: targetName,
+                            duration,
+                            timeout,
+                            createdAt: Date.now()
+                        };
+                    }
+
+                    return sock.sendMessage(chatId, {
+                        text: `🎣 *FISHING LINE CAST!* 🎣\n━━━━━━━━━━━━━━━━\n🎣 @${senderId.split('@')[0]} cast a line into the deep waters and *HOOKED* @${targetId.split('@')[0]}!\n\nWill @${targetId.split('@')[0]} take the bait?\n👉 Type *!bite* within *3 minutes* to start a *${duration}-minute Fishing Duel*!\n\n🏆 *Reward:* Write *150+ words* to reel in *1 Fish Scale* 🪙!\nCollect *3 Fish Scales* to forge *1 Streak Freeze* 🛡️!\n\n⏱️ You have *3 minutes* to bite! 🐟`,
+                        mentions: [senderId, targetId]
+                    });
+                }
+
+                // ── !BITE ───────────────────────────────────────────────────────────
+                if (command === "!bite") {
+                    if (!pendingFish || !pendingFish[chatId]) {
+                        return sock.sendMessage(chatId, { text: "❌ No active fishing line in the water! Cast one with `!fish`" }, { quoted: msg });
+                    }
+
+                    const fish = pendingFish[chatId];
+                    if (senderId !== fish.target) {
+                        return sock.sendMessage(chatId, { 
+                            text: `❌ Hands off the reel! Only @${fish.target.split('@')[0]} was hooked on this line!`,
+                            mentions: [fish.target]
+                        }, { quoted: msg });
+                    }
+
+                    if (fish.timeout) clearTimeout(fish.timeout);
+                    delete pendingFish[chatId];
+
+                    await startDuelSession({
+                        chatId,
+                        challenger: fish.caster,
+                        opponent: fish.target,
+                        challengerName: fish.casterName,
+                        opponentName: fish.targetName,
+                        duration: fish.duration,
+                        isFish: true
+                    });
+                    return;
                 }
 
                 // ── !WC ─────────────────────────────────────────────────────────────
@@ -551,7 +780,8 @@ module.exports = async function(m, appState) {
                         if (isAdd) duel.words[senderId] = (duel.words[senderId] || 0) + c;
                         else duel.words[senderId] = c;
                         const left = Math.ceil((duel.endsAt - Date.now()) / 60000);
-                        return sock.sendMessage(chatId, { text: `✅ Duel: *${duel.words[senderId].toLocaleString()} words* | ${left}m left` }, { quoted: msg });
+                        const label = duel.isFish ? '🎣 Fishing Duel' : '⚔️ Duel';
+                        return sock.sendMessage(chatId, { text: `✅ ${label}: *${duel.words[senderId].toLocaleString()} words* | ${left}m left` }, { quoted: msg });
                     }
 
                     if (!sprint.participants[senderId]) sprint.participants[senderId] = { name: senderName, words: 0 };
@@ -936,7 +1166,10 @@ module.exports = async function(m, appState) {
                     const target = sprint || duel;
                     const r      = target.endsAt - Date.now();
                     if (r <= 0) return sock.sendMessage(chatId, { text: "🛑 Time's up!" }, { quoted: msg });
-                    const label  = sprint ? "Sprint" : (duel.isGracePeriod ? "Duel (Grace Period)" : "Duel");
+                    let label = "Duel";
+                    if (sprint) label = "Sprint";
+                    else if (duel.isFish) label = duel.isGracePeriod ? "Fishing Duel (Grace Period)" : "Fishing Duel";
+                    else if (duel.isGracePeriod) label = "Duel (Grace Period)";
                     const endStr = new Date(target.endsAt).toLocaleTimeString('en-GB', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit' });
                     return sock.sendMessage(chatId, { text: `⏳ *${label}:* ${Math.floor(r / 60000)}m ${Math.floor((r / 1000) % 60)}s remaining\n*(Ends at ~${endStr} GMT+1)*` }, { quoted: msg });
                 }
@@ -958,6 +1191,11 @@ module.exports = async function(m, appState) {
                 // ── !CANCEL ─────────────────────────────────────────────────────────
                 if (command === "!cancel" || command === "!stop") {
                     let txt = "";
+                    if (pendingFish && pendingFish[chatId]) {
+                        if (pendingFish[chatId].timeout) clearTimeout(pendingFish[chatId].timeout);
+                        delete pendingFish[chatId];
+                        txt += "🎣 Fishing line reeled in.\n";
+                    }
                     if (activeSprints[chatId]) {
                         const sprint = activeSprints[chatId];
                         if (sprint.warningTimer) clearTimeout(sprint.warningTimer);
@@ -977,7 +1215,7 @@ module.exports = async function(m, appState) {
                         if (duel.timer) clearTimeout(duel.timer);
                         if (duel.graceTimer) clearTimeout(duel.graceTimer);
                         delete activeDuels[chatId];
-                        txt += "🚫 Duel cancelled.";
+                        txt += duel.isFish ? "🎣 Fishing duel cancelled.\n" : "🚫 Duel cancelled.\n";
                     }
                     if (!txt) txt = "💤 Nothing to cancel.";
                     await sock.sendMessage(chatId, { text: txt.trim() }, { quoted: msg });
