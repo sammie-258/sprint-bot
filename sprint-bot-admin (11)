@@ -73,16 +73,16 @@
 <body class="h-screen w-screen flex overflow-hidden">
 
     <!-- Toast Notification Container -->
-    <div id="toast-container" class="fixed top-5 right-5 z-[300] space-y-2 pointer-events-none"></div>
+    <div id="toast-container" class="fixed top-5 right-5 z-[600] space-y-2 pointer-events-none"></div>
 
     <!-- Custom Confirmation Modal -->
-    <div id="confirm-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[280] hidden flex items-center justify-center p-4">
+    <div id="confirm-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[500] hidden flex items-center justify-center p-4">
         <div class="panel p-6 max-w-sm w-full border border-white/10 text-center space-y-4">
             <div class="w-12 h-12 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto text-xl">
                 <i class="fas fa-triangle-exclamation"></i>
             </div>
             <h3 id="confirm-title" class="font-bold text-base text-white">Confirmation</h3>
-            <p id="confirm-msg" class="text-xs text-slate-400"></p>
+            <p id="confirm-msg" class="text-xs text-slate-300 whitespace-pre-line text-left leading-relaxed"></p>
             <div class="flex gap-3 pt-2">
                 <button onclick="closeConfirmModal(false)" class="flex-1 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold transition">Cancel</button>
                 <button id="confirm-ok-btn" onclick="closeConfirmModal(true)" class="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition">Confirm</button>
@@ -91,7 +91,7 @@
     </div>
 
     <!-- Custom Prompt Input Modal -->
-    <div id="prompt-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[280] hidden flex items-center justify-center p-4">
+    <div id="prompt-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[500] hidden flex items-center justify-center p-4">
         <div class="panel p-6 max-w-sm w-full border border-white/10 text-center space-y-4">
             <div class="w-12 h-12 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mx-auto text-xl">
                 <i class="fas fa-pen-to-square"></i>
@@ -855,7 +855,11 @@
         }
         function closeConfirmModal(result) {
             document.getElementById('confirm-modal').classList.add('hidden');
-            if (confirmResolve) confirmResolve(result);
+            if (confirmResolve) {
+                const cb = confirmResolve;
+                confirmResolve = null;
+                cb(result);
+            }
         }
 
         // Custom Prompt Callback
@@ -870,7 +874,11 @@
         }
         function closePromptModal(val) {
             document.getElementById('prompt-modal').classList.add('hidden');
-            if (promptResolve) promptResolve(val);
+            if (promptResolve) {
+                const cb = promptResolve;
+                promptResolve = null;
+                cb(val);
+            }
         }
 
         // Custom Toast Notification
@@ -1609,7 +1617,7 @@
             const targetName = targetWriter ? `${targetWriter.name} (${targetWriter._id.split('@')[0]})` : newUserId;
 
             const confirmed = await showConfirm(
-                `TRANSFER ALL STATS from "${sourceName}" to "${targetName}"?\n\nThis will merge words, streaks, goals, freezes, and badges into the destination. The old profile will be removed.\nThis action cannot be undone.`,
+                `TRANSFER ALL STATS from:\n👉 ${sourceName}\n\nTO DESTINATION:\n👉 ${targetName}\n\nThis will merge all words, streaks, goals, freezes, and badges into the destination profile.\nThe old profile (${sourceName}) will be permanently deleted.\n\nThis action cannot be undone.`,
                 "Confirm Transfer & Merge"
             );
 
@@ -1623,7 +1631,7 @@
                     if (res?.success) {
                         showToast("Writer stats transferred successfully!");
                         closeTransferModal();
-                        if (activeDrawerUserId === oldUserId) {
+                        if (activeDrawerUserId === oldUserId || activeDrawerUserId === newUserId) {
                             showWritersFullTable();
                         }
                         loadWritersGrid();

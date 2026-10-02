@@ -929,11 +929,14 @@ router.post('/api/admin/writers/merge', requireAdmin, async (req, res) => {
             return res.status(400).json({ error: "Missing oldUserId or newUserId" });
         }
 
+        oldUserId = String(oldUserId).trim();
+        newUserId = String(newUserId).trim();
+
         // Clean & Normalize oldUserId
         if (!oldUserId.includes('@')) {
             const cleanOld = oldUserId.replace(/\D/g, '');
             const potentialOld = await UserProfile.findOne({
-                userId: { $in: [cleanOld, `${cleanOld}@s.whatsapp.net`, `${cleanOld}@c.us`] }
+                userId: { $in: [cleanOld, `${cleanOld}@s.whatsapp.net`, `${cleanOld}@c.us`, `${cleanOld}@lid`] }
             });
             oldUserId = potentialOld ? potentialOld.userId : `${cleanOld}@s.whatsapp.net`;
         }
@@ -942,7 +945,7 @@ router.post('/api/admin/writers/merge', requireAdmin, async (req, res) => {
         if (!newUserId.includes('@')) {
             const cleanNew = newUserId.replace(/\D/g, '');
             const potentialNew = await UserProfile.findOne({
-                userId: { $in: [cleanNew, `${cleanNew}@s.whatsapp.net`, `${cleanNew}@c.us`] }
+                userId: { $in: [cleanNew, `${cleanNew}@s.whatsapp.net`, `${cleanNew}@c.us`, `${cleanNew}@lid`] }
             });
             newUserId = potentialNew ? potentialNew.userId : `${cleanNew}@s.whatsapp.net`;
         }
@@ -951,12 +954,34 @@ router.post('/api/admin/writers/merge', requireAdmin, async (req, res) => {
             return res.status(400).json({ error: "Cannot merge a profile into itself" });
         }
 
-        const oldProfile = await UserProfile.findOne({ userId: oldUserId });
+        let oldProfile = await UserProfile.findOne({ userId: oldUserId });
         if (!oldProfile) {
-            return res.status(404).json({ error: "Old profile not found" });
+            const cleanOld = oldUserId.replace(/\D/g, '');
+            if (cleanOld) {
+                oldProfile = await UserProfile.findOne({
+                    userId: { $in: [cleanOld, `${cleanOld}@s.whatsapp.net`, `${cleanOld}@c.us`, `${cleanOld}@lid`] }
+                });
+                if (oldProfile) oldUserId = oldProfile.userId;
+            }
+        }
+
+        if (!oldProfile) {
+            return res.status(404).json({ error: `Old profile not found (${oldUserId})` });
         }
 
         let newProfile = await UserProfile.findOne({ userId: newUserId });
+        if (!newProfile) {
+            const cleanNew = newUserId.replace(/\D/g, '');
+            if (cleanNew) {
+                const foundNew = await UserProfile.findOne({
+                    userId: { $in: [cleanNew, `${cleanNew}@s.whatsapp.net`, `${cleanNew}@c.us`, `${cleanNew}@lid`] }
+                });
+                if (foundNew) {
+                    newProfile = foundNew;
+                    newUserId = foundNew.userId;
+                }
+            }
+        }
         if (!newProfile) {
             newProfile = new UserProfile({
                 userId: newUserId,
