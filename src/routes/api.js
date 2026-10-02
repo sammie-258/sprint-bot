@@ -924,10 +924,29 @@ router.post('/api/admin/broadcasts/cancel', requireAdmin, async (req, res) => {
 
 router.post('/api/admin/writers/merge', requireAdmin, async (req, res) => {
     try {
-        const { oldUserId, newUserId } = req.body;
+        let { oldUserId, newUserId } = req.body;
         if (!oldUserId || !newUserId) {
             return res.status(400).json({ error: "Missing oldUserId or newUserId" });
         }
+
+        // Clean & Normalize oldUserId
+        if (!oldUserId.includes('@')) {
+            const cleanOld = oldUserId.replace(/\D/g, '');
+            const potentialOld = await UserProfile.findOne({
+                userId: { $in: [cleanOld, `${cleanOld}@s.whatsapp.net`, `${cleanOld}@c.us`] }
+            });
+            oldUserId = potentialOld ? potentialOld.userId : `${cleanOld}@s.whatsapp.net`;
+        }
+
+        // Clean & Normalize newUserId
+        if (!newUserId.includes('@')) {
+            const cleanNew = newUserId.replace(/\D/g, '');
+            const potentialNew = await UserProfile.findOne({
+                userId: { $in: [cleanNew, `${cleanNew}@s.whatsapp.net`, `${cleanNew}@c.us`] }
+            });
+            newUserId = potentialNew ? potentialNew.userId : `${cleanNew}@s.whatsapp.net`;
+        }
+
         if (oldUserId === newUserId) {
             return res.status(400).json({ error: "Cannot merge a profile into itself" });
         }
@@ -942,6 +961,7 @@ router.post('/api/admin/writers/merge', requireAdmin, async (req, res) => {
             newProfile = new UserProfile({
                 userId: newUserId,
                 name: oldProfile.name,
+                webPin: oldProfile.webPin,
                 currentStreak: oldProfile.currentStreak,
                 bestStreak: oldProfile.bestStreak,
                 lastActiveDate: oldProfile.lastActiveDate,
@@ -955,6 +975,9 @@ router.post('/api/admin/writers/merge', requireAdmin, async (req, res) => {
                 isInactive: oldProfile.isInactive
             });
         } else {
+            if (!newProfile.webPin && oldProfile.webPin) {
+                newProfile.webPin = oldProfile.webPin;
+            }
             newProfile.totalWordsAllTime += oldProfile.totalWordsAllTime;
             newProfile.currentStreak = Math.max(newProfile.currentStreak || 0, oldProfile.currentStreak || 0);
             newProfile.bestStreak = Math.max(newProfile.bestStreak || 0, oldProfile.bestStreak || 0);

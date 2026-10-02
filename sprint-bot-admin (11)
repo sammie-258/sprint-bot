@@ -105,6 +105,68 @@
         </div>
     </div>
 
+    <!-- Transfer / Merge Stats Modal -->
+    <div id="transfer-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[280] hidden flex items-center justify-center p-4">
+        <div class="panel p-6 max-w-md w-full border border-blue-500/30 text-left space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-base">
+                        <i class="fas fa-arrow-right-arrow-left"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-white">Transfer / Merge Stats</h3>
+                        <p class="text-[11px] text-slate-400">Migrate writer data to a new number or ID</p>
+                    </div>
+                </div>
+                <button onclick="closeTransferModal()" class="text-slate-400 hover:text-white p-1 rounded-lg"><i class="fas fa-xmark text-lg"></i></button>
+            </div>
+
+            <!-- Source Writer -->
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1.5">
+                    <i class="fas fa-user-minus text-amber-400"></i> Source Writer (Stats to transfer)
+                </label>
+                <select id="transfer-source-select" onchange="onTransferSourceChange()" class="w-full bg-black/40 border border-white/15 p-2.5 rounded-xl text-xs outline-none focus:border-blue-400 text-white font-medium">
+                    <!-- Populated dynamically -->
+                </select>
+                <div id="transfer-source-info" class="mt-2 p-2.5 bg-white/5 rounded-xl text-xs text-slate-300 font-mono flex items-center justify-between">
+                    <span>Words: <b id="transfer-source-words" class="text-white">0</b></span>
+                    <span>Streak: <b id="transfer-source-streak" class="text-amber-400">0🔥</b></span>
+                    <span>Rank: <b id="transfer-source-rank" class="text-emerald-400">Novice</b></span>
+                </div>
+            </div>
+
+            <!-- Target Writer -->
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1.5">
+                    <i class="fas fa-user-plus text-emerald-400"></i> Destination (New Number or Existing Profile)
+                </label>
+                <div class="space-y-2">
+                    <select id="transfer-target-select" onchange="onTransferTargetSelectChange()" class="w-full bg-black/40 border border-white/15 p-2.5 rounded-xl text-xs outline-none focus:border-blue-400 text-white font-medium">
+                        <option value="">-- Choose Existing Writer --</option>
+                        <!-- Populated dynamically -->
+                    </select>
+                    <div class="text-[10px] text-slate-400 font-bold uppercase text-center">- OR Enter New Number / WhatsApp ID -</div>
+                    <input type="text" id="transfer-target-input" placeholder="e.g. 2348012345678 or 2348012345678@s.whatsapp.net" class="w-full bg-black/40 border border-white/15 p-2.5 rounded-xl text-xs font-mono outline-none focus:border-blue-400 text-white">
+                </div>
+            </div>
+
+            <!-- Notice / Warning -->
+            <div class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-300/90 leading-relaxed">
+                <i class="fas fa-triangle-exclamation mr-1"></i>
+                <b>Important:</b> Total words, streaks, sprint records, goals, freezes, and badges will be merged into the destination profile. The old source profile will be removed.
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-3 pt-2">
+                <button onclick="closeTransferModal()" class="flex-1 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold transition">Cancel</button>
+                <button onclick="executeTransfer()" id="transfer-submit-btn" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2">
+                    <i class="fas fa-arrow-right-arrow-left"></i> Execute Transfer
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Auth Modal -->
     <div id="auth-modal" class="fixed inset-0 bg-[#0b0f19]/98 z-[200] flex items-center justify-center p-4">
         <div class="panel p-8 w-full max-w-md border border-white/10 text-center">
@@ -405,6 +467,7 @@
                                     </select>
 
                                     <button onclick="selectAllWriters()" class="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition">Select All</button>
+                                    <button onclick="openTransferModal()" class="px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5"><i class="fas fa-arrow-right-arrow-left"></i> Transfer Stats</button>
                                 </div>
 
                                 <div class="text-xs text-slate-400 font-medium">
@@ -497,6 +560,9 @@
                                         </button>
                                         <button onclick="grantFreezeModal(activeDrawerUserId)" class="py-2.5 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
                                             🛡️ Grant Freeze
+                                        </button>
+                                        <button onclick="openTransferModal(activeDrawerUserId)" class="py-2.5 px-3 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5" title="Transfer / Merge Stats">
+                                            <i class="fas fa-arrow-right-arrow-left text-blue-400"></i> Transfer Stats
                                         </button>
                                         <button onclick="toggleDrawerBan()" id="sp-ban-btn" class="col-span-2 sm:col-span-1 py-2.5 px-3 bg-red-500/20 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
                                             <i class="fas fa-ban"></i> Ban User
@@ -1161,8 +1227,9 @@
                             </td>
                             <td class="py-3 px-4">${statusBadge}</td>
                             <td class="py-3 px-4 text-right space-x-1" onclick="event.stopPropagation()">
-                                <button onclick="grantFreezeModal('${u._id}')" class="px-2 py-1 bg-amber-500/10 text-amber-400 rounded-lg text-xs">🛡️</button>
-                                <button onclick="toggleWriterBan('${u._id}', ${!u.isBanned})" class="px-2.5 py-1 ${u.isBanned ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'} rounded-lg"><i class="fas ${u.isBanned ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
+                                <button onclick="openTransferModal('${u._id}')" class="px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg text-xs" title="Transfer / Merge Stats"><i class="fas fa-arrow-right-arrow-left"></i></button>
+                                <button onclick="grantFreezeModal('${u._id}')" class="px-2 py-1 bg-amber-500/10 text-amber-400 rounded-lg text-xs" title="Grant Freeze">🛡️</button>
+                                <button onclick="toggleWriterBan('${u._id}', ${!u.isBanned})" class="px-2.5 py-1 ${u.isBanned ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'} rounded-lg" title="${u.isBanned ? 'Unban Writer' : 'Ban Writer'}"><i class="fas ${u.isBanned ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
                             </td>
                         </tr>
                     `;
@@ -1471,6 +1538,104 @@
             if (num) {
                 const res = await api('/api/admin/writers/freeze', { userId, amount: parseInt(num, 10) });
                 if (res?.success) showToast(`Granted ${num} freeze(s)! New total: ${res.newTotal}`);
+            }
+        }
+
+        function openTransferModal(preselectedUserId = null) {
+            const sortedWriters = [...writersCache].sort((a,b) => (a.name||'').localeCompare(b.name||''));
+            
+            const sourceSelect = document.getElementById('transfer-source-select');
+            sourceSelect.innerHTML = sortedWriters.map(w => 
+                `<option value="${w._id}">${w.name || w._id} (${w._id.split('@')[0]} - ${(w.totalWords||0).toLocaleString()} words)</option>`
+            ).join('');
+
+            if (preselectedUserId) {
+                sourceSelect.value = preselectedUserId;
+            } else if (activeDrawerUserId) {
+                sourceSelect.value = activeDrawerUserId;
+            }
+
+            onTransferSourceChange();
+            document.getElementById('transfer-modal').classList.remove('hidden');
+        }
+
+        function closeTransferModal() {
+            document.getElementById('transfer-modal').classList.add('hidden');
+        }
+
+        function onTransferSourceChange() {
+            const sourceId = document.getElementById('transfer-source-select').value;
+            const sourceWriter = writersCache.find(w => w._id === sourceId);
+
+            if (sourceWriter) {
+                document.getElementById('transfer-source-words').innerText = (sourceWriter.totalWords || 0).toLocaleString();
+                document.getElementById('transfer-source-streak').innerText = (sourceWriter.streak || 0) + "🔥";
+                document.getElementById('transfer-source-rank').innerText = sourceWriter.rank || 'Novice';
+            }
+
+            const sortedWriters = [...writersCache].sort((a,b) => (a.name||'').localeCompare(b.name||''));
+            const targetSelect = document.getElementById('transfer-target-select');
+            targetSelect.innerHTML = `<option value="">-- Choose Existing Writer --</option>` +
+                sortedWriters
+                    .filter(w => w._id !== sourceId)
+                    .map(w => `<option value="${w._id}">${w.name || w._id} (${w._id.split('@')[0]} - ${(w.totalWords||0).toLocaleString()} words)</option>`)
+                    .join('');
+
+            document.getElementById('transfer-target-input').value = '';
+        }
+
+        function onTransferTargetSelectChange() {
+            const targetSelect = document.getElementById('transfer-target-select');
+            if (targetSelect.value) {
+                document.getElementById('transfer-target-input').value = targetSelect.value;
+            }
+        }
+
+        async function executeTransfer() {
+            const oldUserId = document.getElementById('transfer-source-select').value;
+            let newUserId = document.getElementById('transfer-target-input').value.trim();
+
+            if (!oldUserId) return showToast("Please select source writer", "error");
+            if (!newUserId) return showToast("Please select or enter destination number/ID", "error");
+
+            if (oldUserId === newUserId) {
+                return showToast("Cannot transfer a profile into itself", "error");
+            }
+
+            const sourceWriter = writersCache.find(w => w._id === oldUserId);
+            const sourceName = sourceWriter ? `${sourceWriter.name} (${oldUserId.split('@')[0]})` : oldUserId;
+            
+            const targetWriter = writersCache.find(w => w._id === newUserId || w._id.split('@')[0] === newUserId.replace(/\D/g, ''));
+            const targetName = targetWriter ? `${targetWriter.name} (${targetWriter._id.split('@')[0]})` : newUserId;
+
+            const confirmed = await showConfirm(
+                `TRANSFER ALL STATS from "${sourceName}" to "${targetName}"?\n\nThis will merge words, streaks, goals, freezes, and badges into the destination. The old profile will be removed.\nThis action cannot be undone.`,
+                "Confirm Transfer & Merge"
+            );
+
+            if (confirmed) {
+                const btn = document.getElementById('transfer-submit-btn');
+                btn.disabled = true;
+                btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Transferring...`;
+
+                try {
+                    const res = await api('/api/admin/writers/merge', { oldUserId, newUserId });
+                    if (res?.success) {
+                        showToast("Writer stats transferred successfully!");
+                        closeTransferModal();
+                        if (activeDrawerUserId === oldUserId) {
+                            showWritersFullTable();
+                        }
+                        loadWritersGrid();
+                    } else {
+                        showToast(res?.error || "Transfer failed", "error");
+                    }
+                } catch (e) {
+                    showToast("Transfer request failed: " + e.message, "error");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="fas fa-arrow-right-arrow-left"></i> Execute Transfer`;
+                }
             }
         }
 
