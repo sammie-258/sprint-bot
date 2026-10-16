@@ -214,6 +214,10 @@ const getActiveGoalsProgress = async (userId, todayStr) => {
     const goals = await PersonalGoal.find({ userId, isActive: true });
     if (!goals || goals.length === 0) return [];
 
+    // Sort order: Today -> Week -> Month -> Open Goal
+    const typeOrder = { day: 1, week: 2, month: 3, open: 4 };
+    goals.sort((a, b) => (typeOrder[a.type || 'open'] || 4) - (typeOrder[b.type || 'open'] || 4));
+
     const todayDate = todayStr || getLagosDateString();
     const weekDates = getCurrentLagosWeekDates();
     const monthPrefix = getCurrentLagosMonthPrefix();
@@ -250,7 +254,7 @@ const getActiveGoalsProgress = async (userId, todayStr) => {
             ]);
             current = agg[0]?.total || 0;
         } else {
-            label = g.name || 'Goal';
+            label = 'Open Goal';
             icon = '📖';
             current = g.current || 0;
         }
