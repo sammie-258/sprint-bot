@@ -16,7 +16,7 @@ const ScheduledBroadcast = require('../models/ScheduledBroadcast');
 const SprintRecord = require('../models/SprintRecord');
 const StreakFreeze = require('../models/StreakFreeze');
 
-const { getRank, getNextRank, getDurationString } = require('../utils/helpers');
+const { getRank, getNextRank, getDurationString, getActiveGoalsProgress } = require('../utils/helpers');
 
 const TIMEZONE = "Africa/Lagos";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
@@ -97,7 +97,6 @@ router.get('/profile/:userId', async (req, res) => {
         const profile = await UserProfile.findOne({ userId: { $in: potentialJids } });
         if (!profile) return res.status(404).send(`<h1>Profile Not Found</h1>`);
 
-        const goal      = await PersonalGoal.findOne({ userId: profile.userId, isActive: true });
         const rank      = getRank(profile.totalWordsAllTime);
         const nextRank  = getNextRank(profile.totalWordsAllTime);
         const todayStr  = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
@@ -106,6 +105,7 @@ router.get('/profile/:userId', async (req, res) => {
             { $group: { _id: null, total: { $sum: "$words" } } }
         ]);
         const dailyWords = todayAgg[0]?.total || 0;
+        const activeGoals = await getActiveGoalsProgress(profile.userId, todayStr);
 
         let html = profileTemplateCache;
         if (!html) {
@@ -133,15 +133,16 @@ router.get('/profile/:userId', async (req, res) => {
             .replace(/{{NEXT_RANK_NAME}}/g, nextRankName)
             .replace(/{{NEXT_RANK_PCT}}/g, nextRankPct)
             .replace(/{{NEXT_RANK_THRESHOLD}}/g, nextRankThres)
-            .replace(/{{NEXT_RANK_LEFT}}/g, nextRankLeft);
+            .replace(/{{NEXT_RANK_LEFT}}/g, nextRankLeft)
+            .replace(/{{ACTIVE_GOALS_JSON}}/g, JSON.stringify(activeGoals || []));
 
-        if (goal) {
-            const pct = Math.min(100, (goal.current / goal.target) * 100).toFixed(1);
+        if (activeGoals.length > 0) {
+            const primaryGoal = activeGoals.find(g => g.type === 'day') || activeGoals[0];
             html = html
                 .replace('{{GOAL_DISPLAY}}',  'block')
-                .replace('{{GOAL_CURRENT}}',  goal.current.toLocaleString())
-                .replace('{{GOAL_TARGET}}',   goal.target.toLocaleString())
-                .replace('{{GOAL_PERCENT}}',  pct);
+                .replace('{{GOAL_CURRENT}}',  primaryGoal.current.toLocaleString())
+                .replace('{{GOAL_TARGET}}',   primaryGoal.target.toLocaleString())
+                .replace('{{GOAL_PERCENT}}',  primaryGoal.pct);
         } else {
             html = html.replace('{{GOAL_DISPLAY}}', 'hidden');
         }

@@ -167,7 +167,8 @@ const USER_DATA = {
     goalActive:      "{{GOAL_DISPLAY}}" !== "hidden",
     goalCurrent:     "{{GOAL_CURRENT}}",
     goalTarget:      "{{GOAL_TARGET}}",
-    goalPercent:     parseFloat("{{GOAL_PERCENT}}") || 0
+    goalPercent:     parseFloat("{{GOAL_PERCENT}}") || 0,
+    activeGoals:     {{ACTIVE_GOALS_JSON}}
 };
 
 const BADGE_DEFS = [
@@ -308,7 +309,21 @@ function initUI() {
     setTimeout(() => {
         document.getElementById('rank-bar').style.width = USER_DATA.nextRankPct + '%';
         document.getElementById('ui-next-rank').textContent = USER_DATA.nextRankName + (USER_DATA.nextRankLeft && USER_DATA.nextRankLeft !== '0' ? ' (' + USER_DATA.nextRankLeft + ' left)' : '');
-        if (USER_DATA.goalActive) {
+        if (USER_DATA.activeGoals && USER_DATA.activeGoals.length > 0) {
+            const gSec = document.getElementById('goal-section');
+            gSec.classList.remove('hidden');
+            gSec.innerHTML = USER_DATA.activeGoals.map((g, idx) => `
+                <div class="${idx > 0 ? 'mt-3.5' : ''}">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">${g.icon || '🎯'} ${g.label}</span>
+                        <span class="text-[10px] font-bold text-slate-200">${Number(g.current).toLocaleString()} / ${Number(g.target).toLocaleString()} (${g.pct}%)</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width: ${Math.min(100, parseFloat(g.pct) || 0)}%"></div>
+                    </div>
+                </div>
+            `).join('');
+        } else if (USER_DATA.goalActive) {
             document.getElementById('goal-section').classList.remove('hidden');
             document.getElementById('goal-bar').style.width = USER_DATA.goalPercent + '%';
             document.getElementById('ui-goal-count').textContent = USER_DATA.goalCurrent + ' / ' + USER_DATA.goalTarget;
@@ -402,20 +417,31 @@ async function drawCanvas(cb) {
     ctx.fillStyle = p.sub; ctx.font = "bold 20px 'DM Sans', sans-serif"; ctx.fillText("STREAK", sX + PW + PGAP + PW/2, curY + PH/2 + 45);
     curY += PH + 80;
 
-    // Progress Section (DYNAMIC GOAL)
-    const goalH = USER_DATA.goalActive ? 320 : 180;
+    // Progress Section (DYNAMIC GOAL - OPTION B MULTI-BAR)
+    const goalsToDraw = (USER_DATA.activeGoals && USER_DATA.activeGoals.length > 0)
+        ? USER_DATA.activeGoals
+        : (USER_DATA.goalActive ? [{ label: 'CURRENT GOAL', current: USER_DATA.goalCurrent, target: USER_DATA.goalTarget, pct: USER_DATA.goalPercent }] : []);
+
+    const goalH = 180 + (goalsToDraw.length * 125);
     rr(ctx, BX, curY, BW, goalH, 40, p.card, p.border, 2);
     let py = curY + 70;
     ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.fillText("RANK PROGRESS", BX + 60, py);
     ctx.textAlign = 'right'; ctx.fillStyle = p.accent; ctx.fillText(USER_DATA.nextRankName, BX + BW - 60, py);
     py += 40; rr(ctx, BX + 60, py, BW - 120, 20, 10, light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)', '', 0);
     rr(ctx, BX + 60, py, (BW - 120) * (USER_DATA.nextRankPct/100), 20, 10, p.accent, '', 0);
-    
-    if(USER_DATA.goalActive) {
-        py += 80; ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif"; ctx.fillText("CURRENT GOAL", BX + 60, py);
-        ctx.textAlign = 'right'; ctx.fillStyle = p.text; ctx.fillText(USER_DATA.goalCurrent + ' / ' + USER_DATA.goalTarget, BX + BW - 60, py);
-        py += 40; rr(ctx, BX + 60, py, BW - 120, 20, 10, light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)', '', 0);
-        rr(ctx, BX + 60, py, (BW - 120) * (USER_DATA.goalPercent/100), 20, 10, p.accent, '', 0);
+
+    for (const ag of goalsToDraw) {
+        py += 80;
+        ctx.textAlign = 'left'; ctx.fillStyle = p.sub; ctx.font = "bold 26px 'DM Sans', sans-serif";
+        ctx.fillText((ag.label || 'GOAL').toUpperCase(), BX + 60, py);
+        ctx.textAlign = 'right'; ctx.fillStyle = p.text;
+        const curStr = Number(ag.current).toLocaleString();
+        const tarStr = Number(ag.target).toLocaleString();
+        ctx.fillText(`${curStr} / ${tarStr} (${ag.pct}%)`, BX + BW - 60, py);
+        py += 40;
+        rr(ctx, BX + 60, py, BW - 120, 20, 10, light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)', '', 0);
+        const agPct = Math.min(100, Math.max(0, parseFloat(ag.pct) || 0));
+        rr(ctx, BX + 60, py, (BW - 120) * (agPct/100), 20, 10, p.accent, '', 0);
     }
     curY += goalH + 60;
 

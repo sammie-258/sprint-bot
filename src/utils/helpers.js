@@ -69,10 +69,35 @@ const BADGE_DEFS = [
 ];
 
 // Date helpers for GMT+1 (Africa/Lagos, UTC+1)
+const getLagosDate = (ms = Date.now()) => {
+    const time = (ms instanceof Date) ? ms.getTime() : Number(ms || Date.now());
+    return new Date(time + 3600000);
+};
+
 const getLagosDateString = (ms = Date.now()) => {
     const time = (ms instanceof Date) ? ms.getTime() : Number(ms || Date.now());
     const d = new Date(time + 3600000);
     return d.toISOString().slice(0, 10);
+};
+
+const getCurrentLagosWeekDates = (ms = Date.now()) => {
+    const lagos = getLagosDate(ms);
+    const day = lagos.getUTCDay(); // 0 is Sunday, 1 is Monday...
+    const diffToMonday = (day === 0 ? -6 : 1) - day;
+    const mondayMs = lagos.getTime() + diffToMonday * 86400000;
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(mondayMs + i * 86400000);
+        dates.push(d.toISOString().slice(0, 10));
+    }
+    return dates;
+};
+
+const getCurrentLagosMonthPrefix = (ms = Date.now()) => {
+    const lagos = getLagosDate(ms);
+    const y = lagos.getUTCFullYear();
+    const m = String(lagos.getUTCMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
 };
 
 const getLagosMonthName = (ms = Date.now()) => {
@@ -85,13 +110,185 @@ const getLagosMonthName = (ms = Date.now()) => {
     return `${MONTH_NAMES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 };
 
+// Check and update goals when words are logged
+const checkAndUpdateGoals = async (userId, count, userName, todayStr) => {
+    const PersonalGoal = require('../models/PersonalGoal');
+    const DailyStats = require('../models/DailyStats');
+
+    const result = {
+        logMessages: [],
+        sprintMessages: []
+    };
+
+    if (!userId || !count || count <= 0) return result;
+
+    const goals = await PersonalGoal.find({ userId, isActive: true });
+    if (!goals || goals.length === 0) return result;
+
+    const todayDate = todayStr || getLagosDateString();
+    const weekDates = getCurrentLagosWeekDates();
+    const monthPrefix = getCurrentLagosMonthPrefix();
+
+    for (const g of goals) {
+        const target = g.target;
+        if (!target || target <= 0) continue;
+
+        if (g.type === 'day') {
+            const agg = await DailyStats.aggregate([
+                { $match: { userId, date: todayDate } },
+                { $group: { _id: null, total: { $sum: "$words" } } }
+            ]);
+            const wordsAfter = agg[0]?.total || 0;
+            const wordsBefore = Math.max(0, wordsAfter - count);
+
+            if (wordsBefore < target * 0.5 && wordsAfter >= target * 0.5) {
+                result.logMessages.push(`🎯 *DAILY GOAL: 50% REACHED!* (${wordsAfter.toLocaleString()} / ${target.toLocaleString()} words) 💪`);
+                result.sprintMessages.push(`🎯 *50% Daily Goal!* (${wordsAfter.toLocaleString()} / ${target.toLocaleString()})`);
+            }
+            if (wordsBefore < target && wordsAfter >= target) {
+                result.logMessages.push(`🎉 *DAILY GOAL CRUSHED!* Smashed *${target.toLocaleString()} words* today! 🏆`);
+                result.sprintMessages.push(`🎉 *Daily Goal Crushed!* (${wordsAfter.toLocaleString()} / ${target.toLocaleString()})`);
+            }
+        } else if (g.type === 'week') {
+            const agg = await DailyStats.aggregate([
+                { $match: { userId, date: { $in: weekDates } } },
+                { $group: { _id: null, total: { $sum: "$words" } } }
+            ]);
+            const wordsAfter = agg[0]?.total || 0;
+            const wordsBefore = Math.max(0, wordsAfter - count);
+
+            if (wordsBefore < target * 0.5 && wordsAfter >= target * 0.5) {
+                result.logMessages.push(`🎯 *WEEKLY GOAL: 50% REACHED!* (${wordsAfter.toLocaleString()} / ${target.toLocaleString()} words) 💪`);
+                result.sprintMessages.push(`🎯 *50% Weekly Goal!* (${wordsAfter.toLocaleString()} / ${target.toLocaleString()})`);
+            }
+            if (wordsBefore < target && wordsAfter >= target) {
+                result.logMessages.push(`🏆 *WEEKLY GOAL CRUSHED!* Smashed *${target.toLocaleString()} words* this week! ⚡`);
+                result.sprintMessages.push(`🏆 *Weekly Goal Crushed!* (${wordsAfter.toLocaleString()} / ${target.toLocaleString()})`);
+            }
+        } else if (g.type === 'month') {
+            const agg = await DailyStats.aggregate([
+                { $match: { userId, date: { $regex: '^' + monthPrefix } } },
+                { $group: { _id: null, total: { $sum: "$words" } } }
+            ]);
+            const wordsAfter = agg[0]?.total || 0;
+            const wordsBefore = Math.max(0, wordsAfter - count);
+
+            if (wordsBefore < target * 0.5 && wordsAfter >= target * 0.5) {
+                result.logMessages.push(`🎯 *MONTHLY GOAL: 50% REACHED!* (${wordsAfter.toLocaleString()} / ${target.toLocaleString()} words) 💪`);
+                result.sprintMessages.push(`🎯 *50% Monthly Goal!* (${wordsAfter.toLocaleString()} / ${target.toLocaleString()})`);
+            }
+            if (wordsBefore < target && wordsAfter >= target) {
+                result.logMessages.push(`🌟 *MONTHLY GOAL CRUSHED!* Smashed *${target.toLocaleString()} words* this month! 👑`);
+                result.sprintMessages.push(`🌟 *Monthly Goal Crushed!* (${wordsAfter.toLocaleString()} / ${target.toLocaleString()})`);
+            }
+        } else {
+            // 'open' or indefinite
+            const wordsBefore = g.current || 0;
+            g.current = wordsBefore + count;
+            const wordsAfter = g.current;
+
+            if (wordsBefore < target * 0.5 && wordsAfter >= target * 0.5 && !g.milestone50Hit) {
+                g.milestone50Hit = true;
+                result.logMessages.push(`🎯 *GOAL: 50% REACHED!* (${wordsAfter.toLocaleString()} / ${target.toLocaleString()} words) 💪`);
+                result.sprintMessages.push(`🎯 *50% Goal Milestone!* (${wordsAfter.toLocaleString()} / ${target.toLocaleString()})`);
+            }
+
+            if (wordsAfter >= target) {
+                g.isActive = false;
+                g.completedAt = new Date();
+                result.logMessages.push(`🎉 *GOAL ACHIEVED!* Smashed *${target.toLocaleString()} words* in ${getDurationString(g.startedAt)}! 🏆`);
+                result.sprintMessages.push(`🎉 *Goal Achieved!* (${target.toLocaleString()} words smashed!)`);
+            }
+            await g.save();
+        }
+    }
+
+    return result;
+};
+
+// Retrieve active goals formatted with progress
+const getActiveGoalsProgress = async (userId, todayStr) => {
+    const PersonalGoal = require('../models/PersonalGoal');
+    const DailyStats = require('../models/DailyStats');
+
+    const goals = await PersonalGoal.find({ userId, isActive: true });
+    if (!goals || goals.length === 0) return [];
+
+    const todayDate = todayStr || getLagosDateString();
+    const weekDates = getCurrentLagosWeekDates();
+    const monthPrefix = getCurrentLagosMonthPrefix();
+
+    const result = [];
+
+    for (const g of goals) {
+        let current = 0;
+        let label = 'Open Goal';
+        let icon = '📖';
+
+        if (g.type === 'day') {
+            label = 'Today';
+            icon = '📅';
+            const agg = await DailyStats.aggregate([
+                { $match: { userId, date: todayDate } },
+                { $group: { _id: null, total: { $sum: "$words" } } }
+            ]);
+            current = agg[0]?.total || 0;
+        } else if (g.type === 'week') {
+            label = 'Week';
+            icon = '🗓️';
+            const agg = await DailyStats.aggregate([
+                { $match: { userId, date: { $in: weekDates } } },
+                { $group: { _id: null, total: { $sum: "$words" } } }
+            ]);
+            current = agg[0]?.total || 0;
+        } else if (g.type === 'month') {
+            label = 'Month';
+            icon = '📆';
+            const agg = await DailyStats.aggregate([
+                { $match: { userId, date: { $regex: '^' + monthPrefix } } },
+                { $group: { _id: null, total: { $sum: "$words" } } }
+            ]);
+            current = agg[0]?.total || 0;
+        } else {
+            label = g.name || 'Goal';
+            icon = '📖';
+            current = g.current || 0;
+        }
+
+        const rawPct = (current / g.target) * 100;
+        const pct = Math.min(100, Math.max(0, rawPct));
+        const bar = "🟩".repeat(Math.round(pct / 10)) + "⬜".repeat(10 - Math.round(pct / 10));
+
+        result.push({
+            id: g._id,
+            type: g.type,
+            label,
+            icon,
+            target: g.target,
+            current,
+            pct: pct.toFixed(1),
+            rawPct,
+            bar,
+            startedAt: g.startedAt,
+            startDate: g.startDate
+        });
+    }
+
+    return result;
+};
+
 module.exports = {
     toSuperscript,
     getRank,
     getNextRank,
     getMaxFreezes,
     getDurationString,
+    getLagosDate,
     getLagosDateString,
+    getCurrentLagosWeekDates,
+    getCurrentLagosMonthPrefix,
     getLagosMonthName,
+    checkAndUpdateGoals,
+    getActiveGoalsProgress,
     BADGE_DEFS
 };

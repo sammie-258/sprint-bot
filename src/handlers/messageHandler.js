@@ -10,7 +10,7 @@ const Feedback       = require('../models/Feedback');
 const SprintRecord   = require('../models/SprintRecord');
 const StreakFreeze   = require('../models/StreakFreeze');
 const ActiveSprint   = require('../models/ActiveSprint');
-const { getDurationString, getNextRank, getRank, getMaxFreezes, toSuperscript, BADGE_DEFS, getLagosDateString, getLagosMonthName } = require('../utils/helpers');
+const { getDurationString, getNextRank, getRank, getMaxFreezes, toSuperscript, BADGE_DEFS, getLagosDateString, getLagosMonthName, checkAndUpdateGoals, getActiveGoalsProgress } = require('../utils/helpers');
 
 const BASE_URL     = process.env.BASE_URL || 'https://sprint-bot-9bll.onrender.com';
 const TIMEZONE     = 'Africa/Lagos';
@@ -127,7 +127,7 @@ module.exports = async function(m, appState) {
                 const savedProfile = await DailyStats.findOne({ userId: senderId }).sort({ timestamp: -1 });
                 if (savedProfile?.name) senderName = savedProfile.name;
 
-                const args    = body.trim().split(" ");
+                const args    = body.trim().split(/\s+/);
                 const command = args[0].toLowerCase();
                 const todayStr = getTodayDateGMT1();
 
@@ -250,10 +250,12 @@ module.exports = async function(m, appState) {
 *!streak freeze* → Manually use a freeze
 
 🎯 *Goals*
-*!goal set 1000* → Set daily target
-*!goal update 5000* → Change target
-*!goal cancel* → Stop active goal
-*!goal check* → View progress
+*!goal day 1000* → Daily recurring target
+*!goal week 5000* → Weekly recurring target
+*!goal month 20000* → Monthly recurring target
+*!goal set 50000* → Open-ended milestone
+*!goal cancel [type]* → Stop goal (day/week/month/open/all)
+*!goal check* → View goal progress
 *!goal history* → Past records
 
 ⚙️ *Utils*
@@ -291,31 +293,12 @@ module.exports = async function(m, appState) {
                             { upsert: true, new: true }
                         );
 
-                        // Goal with milestones
-                        const goal = await PersonalGoal.findOne({ userId: senderId, isActive: true });
-                        if (goal) {
-                            const prevPct = (goal.current / goal.target) * 100;
-                            goal.current += count;
-                            const newPct  = (goal.current / goal.target) * 100;
-                            if (goal.current >= goal.target) {
-                                goal.isActive = false; goal.completedAt = new Date();
-                                await goal.save();
-                                await sock.sendMessage(chatId, {
-                                    text: `🎉 *GOAL ACHIEVED!* 🏆\n\n@${senderId.split('@')[0]} smashed *${goal.target.toLocaleString()} words*!\n⏱️ Completed in: ${getDurationString(goal.startedAt)}\n\nSet a new one with *!goal set [number]* 🎯`,
-                                    mentions: [senderId]
-                                });
-                            } else {
-                                await goal.save();
-                                for (const mile of [25, 50, 75]) {
-                                    if (prevPct < mile && newPct >= mile) {
-                                        const e = { 25: '🌱', 50: '🔥', 75: '⚡' };
-                                        await sock.sendMessage(chatId, {
-                                            text: `${e[mile]} *${mile}% MILESTONE!*\n\n@${senderId.split('@')[0]} is ${mile}% of their goal!\n${goal.current.toLocaleString()} / ${goal.target.toLocaleString()} words 💪`,
-                                            mentions: [senderId]
-                                        });
-                                    }
-                                }
-                            }
+                        // Goal progress and milestone tracking (appended to response without group spam)
+                        let goalResult = { logMessages: [] };
+                        try {
+                            goalResult = await checkAndUpdateGoals(senderId, count, senderName, todayStr);
+                        } catch (e) {
+                            console.error("Goal update error:", e);
                         }
 
                         // Streak + badges
@@ -329,6 +312,9 @@ module.exports = async function(m, appState) {
 
                         let responseText = `✅ Logged *${count.toLocaleString()}* words.\n📈 Streak: ${streakIcon} days`;
                         if (rankUp && !isNovelGod) responseText += `\n\n🎓 *RANK UP!* You are now *${rankUp}*!`;
+                        if (goalResult?.logMessages?.length) {
+                            responseText += `\n\n` + goalResult.logMessages.join('\n');
+                        }
 
                         if (isNovelGod) {
                             responseText += `\n\n⚡ *1,000,000 WORDS! NOVEL GOD!*`;
@@ -877,7 +863,7 @@ module.exports = async function(m, appState) {
 
                     const todayAgg   = await DailyStats.aggregate([{ $match: { userId: senderId, date: todayStr } }, { $group: { _id: null, total: { $sum: "$words" } } }]);
                     const dailyWords = todayAgg[0]?.total || 0;
-                    const goal       = await PersonalGoal.findOne({ userId: senderId, isActive: true });
+                    const activeGoals = await getActiveGoalsProgress(senderId, todayStr);
                     const freeze     = await StreakFreeze.findOne({ userId: senderId });
                     const rank       = getRank(profile.totalWordsAllTime);
                     const nextRank   = getNextRank(profile.totalWordsAllTime);
@@ -901,10 +887,11 @@ module.exports = async function(m, appState) {
                     }
                     txt += `\n🔗 *Card:* ${profileLink}`;
 
-                    if (goal) {
-                        const pct = Math.min(100, Math.max(0, (goal.current / goal.target) * 100));
-                        const bar = "🟩".repeat(Math.round(pct / 10)) + "⬜".repeat(10 - Math.round(pct / 10));
-                        txt += `\n\n🎯 *Goal:* \`${goal.current.toLocaleString()} / ${goal.target.toLocaleString()}\` (${pct.toFixed(1)}%)\n${bar}`;
+                    if (activeGoals.length) {
+                        txt += `\n\n🎯 *Active Goals:*`;
+                        for (const g of activeGoals) {
+                            txt += `\n• ${g.icon} *${g.label}:* \`${g.current.toLocaleString()} / ${g.target.toLocaleString()}\` (${g.pct}%)\n  ${g.bar}`;
+                        }
                     }
                     return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
                 }
@@ -1025,63 +1012,117 @@ module.exports = async function(m, appState) {
                 // ── !GOAL ────────────────────────────────────────────────────────────
                 if (command === "!goal") {
                     const sub = args[1]?.toLowerCase();
+
+                    // 1. !goal day [number] or !goal daily [number]
+                    if (sub === "day" || sub === "daily") {
+                        const t = parseInt(args[2]);
+                        if (isNaN(t) || t <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!goal day 1000`" }, { quoted: msg });
+                        await PersonalGoal.updateMany({ userId: senderId, type: "day" }, { isActive: false });
+                        await PersonalGoal.create({ userId: senderId, name: senderName, type: "day", target: t, isActive: true });
+                        return sock.sendMessage(chatId, { text: `📅 *Daily Goal Set: ${t.toLocaleString()} words!*\nResets every midnight (Lagos time). You've got this! 💪` }, { quoted: msg });
+                    }
+
+                    // 2. !goal week [number] or !goal weekly [number]
+                    if (sub === "week" || sub === "weekly") {
+                        const t = parseInt(args[2]);
+                        if (isNaN(t) || t <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!goal week 5000`" }, { quoted: msg });
+                        await PersonalGoal.updateMany({ userId: senderId, type: "week" }, { isActive: false });
+                        await PersonalGoal.create({ userId: senderId, name: senderName, type: "week", target: t, isActive: true });
+                        return sock.sendMessage(chatId, { text: `🗓️ *Weekly Goal Set: ${t.toLocaleString()} words!*\nResets every Monday at 00:00. Let's make it count! 🚀` }, { quoted: msg });
+                    }
+
+                    // 3. !goal month [number] or !goal monthly [number]
+                    if (sub === "month" || sub === "monthly") {
+                        const t = parseInt(args[2]);
+                        if (isNaN(t) || t <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!goal month 20000`" }, { quoted: msg });
+                        await PersonalGoal.updateMany({ userId: senderId, type: "month" }, { isActive: false });
+                        await PersonalGoal.create({ userId: senderId, name: senderName, type: "month", target: t, isActive: true });
+                        return sock.sendMessage(chatId, { text: `📆 *Monthly Goal Set: ${t.toLocaleString()} words!*\nResets on the 1st of every month. Go create magic! 🌟` }, { quoted: msg });
+                    }
+
+                    // 4. !goal set [number] (Open-ended goal)
                     if (sub === "set") {
                         const t = parseInt(args[2]);
-                        if (isNaN(t) || t <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!goal set 5000`" }, { quoted: msg });
-                        await PersonalGoal.updateMany({ userId: senderId }, { isActive: false });
-                        await PersonalGoal.create({ userId: senderId, name: senderName, target: t, current: 0 });
-                        return sock.sendMessage(chatId, { text: `🎯 Goal set: *${t.toLocaleString()} words*\nYou've got this! 💪` }, { quoted: msg });
+                        if (isNaN(t) || t <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!goal set 50000`" }, { quoted: msg });
+                        await PersonalGoal.updateMany({ userId: senderId, type: "open" }, { isActive: false });
+                        await PersonalGoal.create({ userId: senderId, name: senderName, type: "open", target: t, current: 0, isActive: true });
+                        return sock.sendMessage(chatId, { text: `🎯 *Open-Ended Goal Set: ${t.toLocaleString()} words!*\nRuns until you crush it. Write on! ✍️` }, { quoted: msg });
                     }
-                    if (sub === "update" || sub === "edit" || sub === "change") {
-                        const t = parseInt(args[2]);
-                        if (isNaN(t) || t <= 0) return sock.sendMessage(chatId, { text: "❌ Use: `!goal update 5000`" }, { quoted: msg });
-                        const g = await PersonalGoal.findOne({ userId: senderId, isActive: true });
-                        if (!g) return sock.sendMessage(chatId, { text: "❌ No active goal. Set one with `!goal set [number]`" }, { quoted: msg });
-                        g.target = t;
-                        if (g.current >= g.target) {
-                            g.isActive = false;
-                            g.completedAt = new Date();
-                            await g.save();
-                            return sock.sendMessage(chatId, {
-                                text: `🎉 *GOAL ACHIEVED!* 🏆\n\n@${senderId.split('@')[0]} smashed *${g.target.toLocaleString()} words*!\n⏱️ Completed in: ${getDurationString(g.startedAt)}\n\nSet a new one with *!goal set [number]* 🎯`,
-                                mentions: [senderId]
-                            }, { quoted: msg });
+
+                    // 5. !goal cancel [day/week/month/open/all]
+                    if (sub === "cancel" || sub === "stop" || sub === "delete") {
+                        const targetType = args[2]?.toLowerCase();
+                        if (targetType === "day" || targetType === "daily") {
+                            const res = await PersonalGoal.updateMany({ userId: senderId, type: "day", isActive: true }, { isActive: false });
+                            if (!res.modifiedCount) return sock.sendMessage(chatId, { text: "❌ No active daily goal to cancel." }, { quoted: msg });
+                            return sock.sendMessage(chatId, { text: "🚫 *Daily Goal Cancelled.*" }, { quoted: msg });
                         }
-                        await g.save();
-                        const rawPct = (g.current / g.target) * 100;
-                        const pct    = Math.min(100, Math.max(0, rawPct));
-                        const bar    = "🟩".repeat(Math.round(pct / 10)) + "⬜".repeat(10 - Math.round(pct / 10));
+                        if (targetType === "week" || targetType === "weekly") {
+                            const res = await PersonalGoal.updateMany({ userId: senderId, type: "week", isActive: true }, { isActive: false });
+                            if (!res.modifiedCount) return sock.sendMessage(chatId, { text: "❌ No active weekly goal to cancel." }, { quoted: msg });
+                            return sock.sendMessage(chatId, { text: "🚫 *Weekly Goal Cancelled.*" }, { quoted: msg });
+                        }
+                        if (targetType === "month" || targetType === "monthly") {
+                            const res = await PersonalGoal.updateMany({ userId: senderId, type: "month", isActive: true }, { isActive: false });
+                            if (!res.modifiedCount) return sock.sendMessage(chatId, { text: "❌ No active monthly goal to cancel." }, { quoted: msg });
+                            return sock.sendMessage(chatId, { text: "🚫 *Monthly Goal Cancelled.*" }, { quoted: msg });
+                        }
+                        if (targetType === "open" || targetType === "set") {
+                            const res = await PersonalGoal.updateMany({ userId: senderId, type: "open", isActive: true }, { isActive: false });
+                            if (!res.modifiedCount) return sock.sendMessage(chatId, { text: "❌ No active open-ended goal to cancel." }, { quoted: msg });
+                            return sock.sendMessage(chatId, { text: "🚫 *Open-Ended Goal Cancelled.*" }, { quoted: msg });
+                        }
+                        if (targetType === "all") {
+                            const res = await PersonalGoal.updateMany({ userId: senderId, isActive: true }, { isActive: false });
+                            if (!res.modifiedCount) return sock.sendMessage(chatId, { text: "❌ No active goals to cancel." }, { quoted: msg });
+                            return sock.sendMessage(chatId, { text: "🚫 *All Active Goals Cancelled.*" }, { quoted: msg });
+                        }
+
+                        // If type not specified, check active goals
+                        const userGoals = await PersonalGoal.find({ userId: senderId, isActive: true });
+                        if (!userGoals.length) return sock.sendMessage(chatId, { text: "❌ No active goals to cancel." }, { quoted: msg });
+                        if (userGoals.length === 1) {
+                            userGoals[0].isActive = false;
+                            await userGoals[0].save();
+                            return sock.sendMessage(chatId, { text: `🚫 *${userGoals[0].type ? userGoals[0].type.toUpperCase() : 'OPEN'} Goal Cancelled.*` }, { quoted: msg });
+                        }
                         return sock.sendMessage(chatId, {
-                            text: `🎯 *Goal Updated!*\n👤 ${g.name}\nNew Target: *${g.target.toLocaleString()} words*\nProgress: \`${g.current.toLocaleString()} / ${g.target.toLocaleString()}\` (${rawPct.toFixed(1)}%)\n${bar}`
+                            text: `❌ Please specify which goal to cancel:\n• \`!goal cancel day\`\n• \`!goal cancel week\`\n• \`!goal cancel month\`\n• \`!goal cancel open\`\n• \`!goal cancel all\``
                         }, { quoted: msg });
                     }
-                    if (sub === "cancel" || sub === "stop" || sub === "delete") {
-                        const g = await PersonalGoal.findOne({ userId: senderId, isActive: true });
-                        if (!g) return sock.sendMessage(chatId, { text: "❌ No active goal to cancel." }, { quoted: msg });
-                        g.isActive = false;
-                        await g.save();
-                        return sock.sendMessage(chatId, { text: `🚫 *Goal Cancelled.*\nYour target of *${g.target.toLocaleString()} words* has been cancelled.` }, { quoted: msg });
-                    }
+
+                    // 6. !goal history
                     if (sub === "history") {
-                        const history = await PersonalGoal.find({ userId: senderId, isActive: false }).sort({ _id: -1 }).limit(5);
+                        const history = await PersonalGoal.find({ userId: senderId, isActive: false }).sort({ _id: -1 }).limit(6);
                         if (!history.length) return sock.sendMessage(chatId, { text: "📜 No past goals." }, { quoted: msg });
                         let txt = `📜 *GOAL HISTORY*\n━━━━━━━━━━━━━━\n`;
                         history.forEach(g => {
-                            const pct = Math.min(100, (g.current / g.target) * 100).toFixed(1);
-                            const win = g.current >= g.target;
+                            const target = g.target || 0;
+                            const current = g.current || 0;
+                            const pct = target > 0 ? Math.min(100, (current / target) * 100).toFixed(1) : '0';
+                            const win = current >= target;
                             const dur = g.completedAt ? getDurationString(g.startedAt, g.completedAt) : null;
-                            txt += `\n${win ? '✅' : '❌'} ${g.startDate} | ${g.target.toLocaleString()} words\n   ${g.current.toLocaleString()} (${pct}%)${win && dur ? ` — ${dur}` : ''}\n`;
+                            const typeTag = g.type ? `[${g.type.toUpperCase()}] ` : '';
+                            txt += `\n${win ? '✅' : '❌'} ${typeTag}${g.startDate || 'Past'} | ${target.toLocaleString()} words\n   ${current.toLocaleString()} (${pct}%)${win && dur ? ` — ${dur}` : ''}\n`;
                         });
                         return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
                     }
-                    const g = await PersonalGoal.findOne({ userId: senderId, isActive: true });
-                    if (!g) return sock.sendMessage(chatId, { text: "❌ No active goal. Use `!goal set [number]`" }, { quoted: msg });
-                    const rawPct = (g.current / g.target) * 100;
-                    const pct    = Math.min(100, Math.max(0, rawPct));
-                    const bar    = "🟩".repeat(Math.round(pct / 10)) + "⬜".repeat(10 - Math.round(pct / 10));
-                    return sock.sendMessage(chatId, {
-                        text: `🎯 *Goal Progress*\n👤 ${g.name}\n\`${g.current.toLocaleString()} / ${g.target.toLocaleString()}\`\n${bar} (${rawPct.toFixed(1)}%)\n📅 Started: ${g.startDate}\n⏱️ Running for: ${getDurationString(g.startedAt)}`
-                    }, { quoted: msg });
+
+                    // 7. Check / Dashboard (default: !goal or !goal check / status)
+                    const activeGoals = await getActiveGoalsProgress(senderId, todayStr);
+                    if (!activeGoals.length) {
+                        return sock.sendMessage(chatId, {
+                            text: `🎯 *NO ACTIVE GOALS*\n\nSet your writing targets with:\n• \`!goal day 1000\` — Daily target (resets midnight)\n• \`!goal week 5000\` — Weekly target (resets Monday)\n• \`!goal month 20000\` — Monthly target (resets 1st)\n• \`!goal set 50000\` — Open-ended milestone`
+                        }, { quoted: msg });
+                    }
+
+                    let txt = `🎯 *YOUR WRITING GOALS*\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
+                    activeGoals.forEach((g, i) => {
+                        txt += `${g.icon} *${g.label.toUpperCase()}:* \`${g.current.toLocaleString()} / ${g.target.toLocaleString()}\` (${g.pct}%)\n${g.bar}\n`;
+                        if (i < activeGoals.length - 1) txt += `\n`;
+                    });
+                    txt += `\n━━━━━━━━━━━━━━━━━━━━━━━\nLog progress with *!log [words]* ✍️`;
+                    return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
                 }
 
                 // ── !REPORT ─────────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ require("dotenv").config();
 // =======================
 //   HELPER FUNCTIONS
 // =======================
-const { toSuperscript, getRank, getNextRank, getMaxFreezes, getDurationString, getLagosDateString, getLagosMonthName, BADGE_DEFS } = require('./src/utils/helpers');
+const { toSuperscript, getRank, getNextRank, getMaxFreezes, getDurationString, getLagosDateString, getLagosMonthName, BADGE_DEFS, checkAndUpdateGoals } = require('./src/utils/helpers');
 
 // =======================
 //   CONFIG & SERVER SETUP
@@ -422,24 +422,16 @@ mongoose.connect(MONGO_URI).then(async () => {
                     } catch (e) {}
                 }
 
-                // Goals with milestones
-                const g = await PersonalGoal.findOne({ userId: p.uid, isActive: true });
-                if (g) {
-                    const prevPct = (g.current / g.target) * 100;
-                    g.current += p.words;
-                    const newPct = (g.current / g.target) * 100;
-                    if (g.current >= g.target) {
-                        g.isActive = false; g.completedAt = new Date(); await g.save();
-                        txt += `   └─ 🎉 *GOAL HIT!* (${getDurationString(g.startedAt)})\n`;
-                    } else {
-                        await g.save();
-                        for (const m of [25, 50, 75]) {
-                            if (prevPct < m && newPct >= m) {
-                                const e = { 25: '🌱', 50: '🔥', 75: '⚡' };
-                                await sock.sendMessage(chatId, { text: `${e[m]} *${m}% MILESTONE!* @${p.uid.split('@')[0]} is ${m}% of their goal! 💪`, mentions: [p.uid] });
-                            }
+                // Goals with 50% and 100% milestones (appended to tree without spamming)
+                try {
+                    const goalResult = await checkAndUpdateGoals(p.uid, p.words, p.name, todayStr);
+                    if (goalResult?.sprintMessages?.length) {
+                        for (const sMsg of goalResult.sprintMessages) {
+                            txt += `   └─ ${sMsg}\n`;
                         }
                     }
+                } catch (e) {
+                    console.error("Sprint goal update error:", e);
                 }
 
                 // Both challenges
