@@ -72,11 +72,16 @@ module.exports = function(appState) {
                                 } catch (e) {}
                             }
 
+                            let textToSend = broadcast.message || "";
+                            if (broadcast.tagAll && !/@all|@everyone/i.test(textToSend)) {
+                                textToSend = `📢 @all\n\n${textToSend}`.trim();
+                            }
+
                             if (broadcast.image) {
                                 const buffer = Buffer.from(broadcast.image.split(",")[1], 'base64');
-                                await appState.sock.sendMessage(gid, { image: buffer, caption: broadcast.message || "", mentions });
+                                await appState.sock.sendMessage(gid, { image: buffer, caption: textToSend, mentions });
                             } else {
-                                await appState.sock.sendMessage(gid, { text: broadcast.message, mentions });
+                                await appState.sock.sendMessage(gid, { text: textToSend, mentions });
                             }
                             await new Promise(r => setTimeout(r, 500));
                         } catch (e) {}

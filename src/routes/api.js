@@ -711,13 +711,18 @@ router.post('/api/admin/broadcast', requireAdmin, async (req, res) => {
                     }
                 }
 
+                let textToSend = message || "";
+                if (isTagAllRequested && !/@all|@everyone/i.test(textToSend)) {
+                    textToSend = `📢 @all\n\n${textToSend}`.trim();
+                }
+
                 const msgOptions = {};
                 if (image) {
                     const buffer = Buffer.from(image.split(",")[1], 'base64');
                     msgOptions.image = buffer;
-                    msgOptions.caption = message || "";
+                    msgOptions.caption = textToSend;
                 } else {
-                    msgOptions.text = message;
+                    msgOptions.text = textToSend;
                 }
 
                 if (mentions.length > 0) {
