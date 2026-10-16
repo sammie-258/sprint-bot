@@ -10,7 +10,7 @@ const Feedback       = require('../models/Feedback');
 const SprintRecord   = require('../models/SprintRecord');
 const StreakFreeze   = require('../models/StreakFreeze');
 const ActiveSprint   = require('../models/ActiveSprint');
-const { getDurationString, getNextRank, getRank, getMaxFreezes, toSuperscript, BADGE_DEFS, getLagosDateString, getLagosMonthName, checkAndUpdateGoals, getActiveGoalsProgress } = require('../utils/helpers');
+const { getDurationString, getNextRank, getRank, getMaxFreezes, toSuperscript, BADGE_DEFS, getLagosDateString, getLagosMonthName, checkAndUpdateGoals, getActiveGoalsProgress, calculateUserWrapped } = require('../utils/helpers');
 
 const BASE_URL     = process.env.BASE_URL || 'https://sprint-bot-9bll.onrender.com';
 const TIMEZONE     = 'Africa/Lagos';
@@ -115,7 +115,15 @@ module.exports = async function(m, appState) {
                     } catch (e) {}
                 }
 
-                if (!body || !body.startsWith("!")) return;
+                if (!body) return;
+                const trimmedBody = body.trim();
+                if (!trimmedBody.startsWith("!")) {
+                    if (trimmedBody.toLowerCase().startsWith("wrapped")) {
+                        body = "!" + trimmedBody;
+                    } else {
+                        return;
+                    }
+                }
 
                 if (maintenanceMode && !isOwner) {
                     await sock.sendMessage(chatId, { text: "⚠️ Bot is in Maintenance Mode. Check back soon!" }, { quoted: msg });
@@ -235,6 +243,7 @@ module.exports = async function(m, appState) {
 
 📊 *Stats & Profile*
 *!profile* → Your full stats
+*!wrapped [year]* → Your Year in Review & 9:16 Story Card
 *!wpm* → Sprint speed history
 *!daily [all]* → Today's Leaderboard
 *!yesterday [all]* → Yesterday's Leaderboard
@@ -893,6 +902,59 @@ module.exports = async function(m, appState) {
                             txt += `\n• ${g.icon} *${g.label}:* \`${g.current.toLocaleString()} / ${g.target.toLocaleString()}\` (${g.pct}%)\n  ${g.bar}`;
                         }
                     }
+                    return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
+                }
+
+                // ── !WRAPPED ────────────────────────────────────────────────────────
+                if (command === "!wrapped") {
+                    const rawYearArg = args[1]?.toLowerCase();
+                    const targetYear = rawYearArg === "all" ? "all" : (rawYearArg && /^\d{4}$/.test(rawYearArg) ? rawYearArg : null);
+                    
+                    const wrappedData = await calculateUserWrapped(senderId, targetYear);
+                    if (!wrappedData) {
+                        return sock.sendMessage(chatId, { text: "❌ Unable to calculate Wrapped data right now." }, { quoted: msg });
+                    }
+
+                    const yearLabel = wrappedData.year.toString().toUpperCase();
+                    const wrappedLink = `${BASE_URL}/wrapped/${senderId.split('@')[0]}${wrappedData.year ? `?year=${encodeURIComponent(wrappedData.year)}` : ''}`;
+
+                    let txt = `🎁 *${yearLabel} SPRINT-BOT WRAPPED* 🎁\n━━━━━━━━━━━━━━━━━━━━\n`;
+                    txt += `👤 *Writer:* ${wrappedData.userName}\n`;
+                    txt += `🎖️ *Persona:* ${wrappedData.persona?.title || 'The Passionate Storyteller ✍️'}\n`;
+                    if (wrappedData.persona?.tagline) {
+                        txt += `💬 _"${wrappedData.persona.tagline}"_\n`;
+                    }
+
+                    txt += `\n📊 *THE BIG NUMBERS*\n`;
+                    txt += `• Words Written: *${wrappedData.totalWords.toLocaleString()}*\n`;
+                    txt += `• Equivalent: *${wrappedData.novelText}*\n`;
+                    txt += `• Active Writing Days: *${wrappedData.activeDays}* days\n`;
+                    txt += `• Longest Streak: *${wrappedData.bestStreak}* days 🔥\n`;
+
+                    txt += `\n⚡ *SPRINT STATS*\n`;
+                    txt += `• Sprints Completed: *${wrappedData.totalSprints}*\n`;
+                    txt += `• Time in Focus: *${wrappedData.sprintHours} hrs* ⏱️\n`;
+                    if (wrappedData.peakSprintWords > 0) {
+                        txt += `• Peak Sprint: *${wrappedData.peakSprintWords.toLocaleString()} words* (${wrappedData.peakSprintWpm} WPM)\n`;
+                    }
+                    if (wrappedData.totalSprints > 0 && wrappedData.topCompanion) {
+                        txt += `• Top Sprint Partner: *${wrappedData.topCompanion}*\n`;
+                    }
+
+                    txt += `\n🏆 *SUPERLATIVES*\n`;
+                    txt += `• Peak Writing Day: *${wrappedData.bestDay.date}* (${Number(wrappedData.bestDay.words || 0).toLocaleString()} words)\n`;
+                    txt += `• Power Day: *${wrappedData.favoriteDay}*\n`;
+                    if (wrappedData.goalsCrushed > 0) {
+                        txt += `• Goals Crushed: *${wrappedData.goalsCrushed}* 🎯\n`;
+                    }
+                    if (wrappedData.badgesCount > 0) {
+                        const badgeIcons = (wrappedData.badges || []).map(b => b.icon).join(' ');
+                        txt += `• Badges Unlocked: ${badgeIcons} (${wrappedData.badgesCount})\n`;
+                    }
+
+                    txt += `\n📲 *YOUR 9:16 WRAPPED STORY CARD:*\n${wrappedLink}\n\n`;
+                    txt += `_(Tap link to pick from 10 aesthetic themes, download your 9:16 Story card, or share directly to your WhatsApp Status!)_`;
+
                     return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
                 }
 

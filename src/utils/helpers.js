@@ -281,6 +281,254 @@ const getActiveGoalsProgress = async (userId, todayStr) => {
     return result;
 };
 
+// ==========================================
+// SPRINT-BOT WRAPPED ANALYTICS ENGINE
+// ==========================================
+const calculateUserWrapped = async (userId, targetYear = null) => {
+    const DailyStats = require('../models/DailyStats');
+    const SprintRecord = require('../models/SprintRecord');
+    const UserProfile = require('../models/UserProfile');
+    const PersonalGoal = require('../models/PersonalGoal');
+
+    const year = targetYear && targetYear !== 'all' ? String(targetYear) : new Date().getFullYear().toString();
+    const isAllTime = targetYear === 'all';
+
+    const potentialJids = [
+        userId,
+        userId.includes('@') ? userId.split('@')[0] : userId,
+        userId.includes('@') ? userId : userId + '@s.whatsapp.net',
+        userId.includes('@') ? userId : userId + '@lid',
+        userId.includes('@') ? userId : userId + '@c.us'
+    ];
+    const profile = await UserProfile.findOne({ userId: { $in: potentialJids } });
+    const resolvedUserId = profile ? profile.userId : (userId.includes('@') ? userId : userId + '@s.whatsapp.net');
+    const allUserIds = [...new Set([resolvedUserId, ...potentialJids])];
+
+    // 1. Date filter
+    const statsMatch = { userId: { $in: allUserIds } };
+    const sprintMatch = { 'participants.userId': { $in: allUserIds } };
+
+    if (!isAllTime) {
+        statsMatch.date = { $regex: `^${year}-` };
+        const startOfYear = new Date(`${year}-01-01T00:00:00.000Z`);
+        const endOfYear   = new Date(`${year}-12-31T23:59:59.999Z`);
+        sprintMatch.timestamp = { $gte: startOfYear, $lte: endOfYear };
+    }
+
+    // 2. Fetch User Profile, DailyStats, Sprints & Goals
+    const [allDailyStats, userSprints, completedGoals] = await Promise.all([
+        DailyStats.aggregate([
+            { $match: statsMatch },
+            { $group: {
+                _id: "$date",
+                words: { $sum: "$words" },
+                firstTimestamp: { $first: "$timestamp" }
+            }},
+            { $sort: { _id: 1 } }
+        ]),
+        SprintRecord.find(sprintMatch).sort({ timestamp: -1 }),
+        PersonalGoal.find({ userId: { $in: allUserIds }, isActive: false, completedAt: { $ne: null } })
+    ]);
+
+    const userName = profile?.name || userId.split('@')[0];
+    const totalWords = allDailyStats.reduce((acc, d) => acc + (d.words || 0), 0);
+    const activeDays = allDailyStats.filter(d => d.words > 0).length;
+
+    // Best single day
+    let bestDay = { date: '—', words: 0 };
+    if (allDailyStats.length > 0) {
+        const sortedDays = [...allDailyStats].sort((a, b) => b.words - a.words);
+        bestDay = {
+            date: sortedDays[0]._id,
+            words: sortedDays[0].words
+        };
+    }
+
+    // Favorite Day of the Week & Time of Day Analysis
+    const dayCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    let nightWords = 0;   // 21:00 - 04:59
+    let morningWords = 0; // 05:00 - 11:59
+    let afternoonWords = 0; // 12:00 - 20:59
+    let weekendWords = 0;
+
+    allDailyStats.forEach(d => {
+        const parts = d._id.split('-');
+        if (parts.length === 3) {
+            const dt = new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
+            const dow = dt.getUTCDay();
+            dayCounts[dow] = (dayCounts[dow] || 0) + d.words;
+            if (dow === 0 || dow === 6) {
+                weekendWords += d.words;
+            }
+        }
+
+        if (d.firstTimestamp) {
+            const h = new Date(new Date(d.firstTimestamp).getTime() + 3600000).getUTCHours();
+            if (h >= 21 || h < 5) nightWords += d.words;
+            else if (h >= 5 && h < 12) morningWords += d.words;
+            else afternoonWords += d.words;
+        }
+    });
+
+    let topDow = 0;
+    let maxDowWords = -1;
+    for (let i = 0; i < 7; i++) {
+        if (dayCounts[i] > maxDowWords) {
+            maxDowWords = dayCounts[i];
+            topDow = i;
+        }
+    }
+    const favoriteDay = maxDowWords > 0 ? dayNames[topDow] + 's' : 'Everyday';
+
+    // Sprint analytics
+    let totalSprintMinutes = 0;
+    let totalSprintWords = 0;
+    let peakSprintWpm = 0;
+    let peakSprintWords = 0;
+    const companionMap = new Map();
+
+    userSprints.forEach(s => {
+        totalSprintMinutes += (s.duration || 0);
+        const myP = s.participants.find(p => allUserIds.includes(p.userId));
+        if (myP) {
+            totalSprintWords += (myP.words || 0);
+            if ((myP.wpm || 0) > peakSprintWpm) peakSprintWpm = myP.wpm;
+            if ((myP.words || 0) > peakSprintWords) peakSprintWords = myP.words;
+        }
+        s.participants.forEach(p => {
+            if (!allUserIds.includes(p.userId)) {
+                const companionName = p.name || p.userId.split('@')[0];
+                companionMap.set(companionName, (companionMap.get(companionName) || 0) + 1);
+            }
+        });
+    });
+
+    let topCompanion = 'The Community';
+    let maxCompanionSprints = 0;
+    for (const [comp, cnt] of companionMap.entries()) {
+        if (cnt > maxCompanionSprints) {
+            maxCompanionSprints = cnt;
+            topCompanion = comp;
+        }
+    }
+
+    const avgWpm = userSprints.length > 0 && totalSprintMinutes > 0
+        ? Math.round(totalSprintWords / totalSprintMinutes)
+        : (profile?.bestSprintWpm || 0);
+
+    // Novel equivalent
+    const novelEquiv = (totalWords / 80000).toFixed(1);
+    let novelText = '';
+    if (totalWords >= 80000) {
+        novelText = `~${novelEquiv} full novels! 📚`;
+    } else if (totalWords >= 20000) {
+        novelText = `~${Math.round(totalWords / 20000)} novellas! 📖`;
+    } else if (totalWords > 0) {
+        novelText = `~${Math.round(totalWords / 3000)} chapters! ✍️`;
+    } else {
+        novelText = `0 chapters`;
+    }
+
+    // Persona Calculation
+    let persona = {
+        title: "The Passionate Storyteller ✍️",
+        name: "Passionate Storyteller",
+        tagline: "Every word you put down brings imagination into reality.",
+        badge: "✍️"
+    };
+
+    const nightPct = totalWords > 0 ? (nightWords / totalWords) * 100 : 0;
+    const morningPct = totalWords > 0 ? (morningWords / totalWords) * 100 : 0;
+    const weekendPct = totalWords > 0 ? (weekendWords / totalWords) * 100 : 0;
+
+    if (totalWords >= 500000) {
+        persona = {
+            title: "The Novel Titan ⚡",
+            name: "Novel Titan",
+            tagline: "You don't just write stories, you manufacture entire universes.",
+            badge: "⚡"
+        };
+    } else if (nightPct >= 40) {
+        persona = {
+            title: "The Midnight Machine 🦉",
+            name: "Midnight Machine",
+            tagline: "The world goes to sleep; your characters awaken.",
+            badge: "🦉"
+        };
+    } else if (morningPct >= 35) {
+        persona = {
+            title: "The Dawn Scribe 🌅",
+            name: "Dawn Scribe",
+            tagline: "First light, hot coffee, and unbroken inspiration.",
+            badge: "🌅"
+        };
+    } else if (weekendPct >= 55) {
+        persona = {
+            title: "The Weekend Warrior ⚔️",
+            name: "Weekend Warrior",
+            tagline: "Weekdays are for surviving; weekends are for storytelling.",
+            badge: "⚔️"
+        };
+    } else if ((profile?.bestStreak || 0) >= 30) {
+        persona = {
+            title: "The Relentless Scribe 🔥",
+            name: "Relentless Scribe",
+            tagline: "Unstoppable momentum. Day in, day out, the words flow.",
+            badge: "🔥"
+        };
+    } else if (avgWpm >= 35 || peakSprintWpm >= 45) {
+        persona = {
+            title: "The Speed Demon 💨",
+            name: "Speed Demon",
+            tagline: "Your fingers fly faster than your inner critic can think.",
+            badge: "💨"
+        };
+    } else if (activeDays >= 90) {
+        persona = {
+            title: "The Steady Architect 🏗️",
+            name: "Steady Architect",
+            tagline: "Showing up brick by brick, word by word, constructing greatness.",
+            badge: "🏗️"
+        };
+    }
+
+    const resolvedBadges = (profile?.badges || []).map(bKey => {
+        const found = BADGE_DEFS.find(d => d.key === bKey);
+        return {
+            key: bKey,
+            icon: found?.icon || '🏅',
+            label: found?.label || bKey
+        };
+    });
+
+    return {
+        userId,
+        userName,
+        year: isAllTime ? 'All-Time' : year,
+        totalWords,
+        novelText,
+        novelEquiv,
+        activeDays,
+        bestDay,
+        favoriteDay,
+        persona,
+        bestStreak: profile?.bestStreak || 0,
+        currentStreak: profile?.currentStreak || 0,
+        rank: getRank(profile?.totalWordsAllTime || totalWords),
+        totalSprints: userSprints.length,
+        sprintHours: (totalSprintMinutes / 60).toFixed(1),
+        peakSprintWpm: Math.max(peakSprintWpm, profile?.bestSprintWpm || 0),
+        peakSprintWords: Math.max(peakSprintWords, profile?.bestSprintWords || 0),
+        avgWpm,
+        topCompanion,
+        topCompanionSprints: maxCompanionSprints,
+        badgesCount: resolvedBadges.length,
+        badges: resolvedBadges,
+        goalsCrushed: completedGoals.length
+    };
+};
+
 module.exports = {
     toSuperscript,
     getRank,
@@ -294,5 +542,6 @@ module.exports = {
     getLagosMonthName,
     checkAndUpdateGoals,
     getActiveGoalsProgress,
+    calculateUserWrapped,
     BADGE_DEFS
 };

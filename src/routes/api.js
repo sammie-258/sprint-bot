@@ -16,7 +16,7 @@ const ScheduledBroadcast = require('../models/ScheduledBroadcast');
 const SprintRecord = require('../models/SprintRecord');
 const StreakFreeze = require('../models/StreakFreeze');
 
-const { getRank, getNextRank, getDurationString, getActiveGoalsProgress } = require('../utils/helpers');
+const { getRank, getNextRank, getDurationString, getActiveGoalsProgress, calculateUserWrapped } = require('../utils/helpers');
 
 const TIMEZONE = "Africa/Lagos";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
@@ -54,6 +54,14 @@ try {
         profileTemplateCache = fs.readFileSync(templatePath, 'utf8');
     }
 } catch (e) { console.error("⚠️ Error caching profile.html template:", e); }
+
+const wrappedTemplatePath = path.join(__dirname, '../../wrapped.html');
+let wrappedTemplateCache = null;
+try {
+    if (fs.existsSync(wrappedTemplatePath)) {
+        wrappedTemplateCache = fs.readFileSync(wrappedTemplatePath, 'utf8');
+    }
+} catch (e) { console.error("⚠️ Error caching wrapped.html template:", e); }
 
 module.exports = function(appState) {
     const { updateGroupCache } = appState;
@@ -148,6 +156,51 @@ router.get('/profile/:userId', async (req, res) => {
         }
         res.send(html);
     } catch (e) { console.error(e); res.status(500).send("Error"); }
+});
+
+// Wrapped story page (1080x1920 interactive card with 10 themes)
+router.get('/wrapped/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const targetYear = req.query.year || null;
+        const wrappedData = await calculateUserWrapped(userId, targetYear);
+        if (!wrappedData) return res.status(404).send(`<h1>Wrapped Not Found</h1>`);
+
+        let html = wrappedTemplateCache;
+        if (!html) {
+            if (!fs.existsSync(wrappedTemplatePath)) return res.status(500).send("<h1>Wrapped Template Missing</h1>");
+            html = fs.readFileSync(wrappedTemplatePath, 'utf8');
+        }
+
+        const safeName = escapeHtml(wrappedData.userName);
+        html = html
+            .replace(/{{USER_NAME}}/g, safeName)
+            .replace(/{{YEAR}}/g, escapeHtml(String(wrappedData.year)))
+            .replace(/{{TOTAL_WORDS}}/g, wrappedData.totalWords.toLocaleString())
+            .replace(/{{NOVEL_TEXT}}/g, escapeHtml(wrappedData.novelText))
+            .replace(/{{PERSONA_TITLE}}/g, escapeHtml(wrappedData.persona?.title || 'The Passionate Storyteller ✍️'))
+            .replace(/{{WRAPPED_DATA_JSON}}/g, JSON.stringify(wrappedData));
+
+        res.setHeader('Content-Type', 'text/html');
+        res.send(html);
+    } catch (e) {
+        console.error("Error serving wrapped page:", e);
+        res.status(500).send("Error loading wrapped card");
+    }
+});
+
+// Wrapped JSON API
+router.get('/api/wrapped/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const targetYear = req.query.year || null;
+        const wrappedData = await calculateUserWrapped(userId, targetYear);
+        if (!wrappedData) return res.status(404).json({ error: "Wrapped not found" });
+        res.json(wrappedData);
+    } catch (e) {
+        console.error("Error serving wrapped api:", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // Public stats (dashboard)

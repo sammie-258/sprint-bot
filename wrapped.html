@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{{USER_NAME}}'s {{YEAR}} Sprint-Bot Wrapped</title>
+    
+    <!-- Meta tags for rich link previews on WhatsApp / Twitter -->
+    <meta property="og:title" content="{{USER_NAME}}'s {{YEAR}} Writing Wrapped 🎁">
+    <meta property="og:description" content="Total: {{TOTAL_WORDS}} words • {{NOVEL_TEXT}} • Persona: {{PERSONA_TITLE}}">
+    <meta property="og:type" content="website">
+    <meta name="theme-color" content="#060b12">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Playfair+Display:ital,wght@0,600..900;1,600..900&family=Space+Grotesk:wght@500;700&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        :root {
+            --bg-color: #060b12;
+            --card-bg: #0d1425;
+            --accent: #22d3a0;
+            --accent2: #6366f1;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #ffffff;
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 9:16 Canvas Phone Frame Preview */
+        .story-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 410px;
+            margin: 0 auto;
+            padding: 16px 12px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .canvas-container {
+            width: 100%;
+            aspect-ratio: 9 / 16;
+            border-radius: 28px;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+            background: #000;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #wrappedCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+        }
+
+        /* Theme selector swatches */
+        .theme-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+
+        .theme-pill:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+
+        .theme-pill.active {
+            background: rgba(255, 255, 255, 0.16);
+            border-color: #ffffff;
+            color: #ffffff;
+            box-shadow: 0 0 18px rgba(255, 255, 255, 0.18);
+        }
+
+        .theme-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* Hide scrollbars */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Confetti / Sparkle glow animation */
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.04); }
+        }
+        .pulse-ambient { animation: pulseGlow 4s infinite ease-in-out; }
+    </style>
+</head>
+<body class="p-0 m-0">
+
+    <!-- Top Header -->
+    <header class="w-full max-w-md flex justify-between items-center px-5 pt-5 pb-3">
+        <div class="flex items-center gap-2">
+            <span class="text-xl">🎁</span>
+            <span class="font-extrabold text-sm tracking-wider uppercase text-slate-300" style="font-family:'Syne'">Sprint-Bot Wrapped</span>
+        </div>
+        <span class="px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            {{YEAR}}
+        </span>
+    </header>
+
+    <!-- Main Story Card Area -->
+    <main class="story-wrapper">
+        <div class="canvas-container">
+            <canvas id="wrappedCanvas" width="1080" height="1920"></canvas>
+        </div>
+
+        <!-- Template Selector Section -->
+        <div class="w-full mt-4">
+            <div class="flex items-center justify-between mb-2.5 px-1">
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <span>🎨</span> Choose Your Aesthetic
+                </span>
+                <span id="theme-counter" class="text-[11px] font-bold text-slate-500">1 of 10</span>
+            </div>
+
+            <!-- Horizontal Themes Carousel -->
+            <div id="theme-carousel" class="flex gap-2.5 overflow-x-auto no-scrollbar py-1 px-1">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="w-full grid grid-cols-2 gap-3 mt-4">
+            <button id="downloadBtn" class="flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-extrabold text-sm text-slate-900 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 active:scale-95 transition shadow-lg shadow-emerald-500/20 cursor-pointer">
+                <span>📲</span> Download Story
+            </button>
+            <button id="shareBtn" class="flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-extrabold text-sm text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 active:scale-95 transition cursor-pointer">
+                <span>💬</span> WhatsApp Status
+            </button>
+        </div>
+
+        <p class="text-[11px] text-slate-500 text-center mt-3">
+            Tip: Download image and post directly to your WhatsApp Status or Instagram Stories!
+        </p>
+    </main>
+
+    <!-- Data Injection -->
+    <script>
+        const WRAPPED_DATA = {{WRAPPED_DATA_JSON}};
+
+        // 10 Curated Aesthetic Themes
+        const THEMES = [
+            {
+                id: 'midnight',
+                name: 'Midnight Neon',
+                dot: 'linear-gradient(135deg, #22d3a0, #6366f1)',
+                bg: '#060b12',
+                card: '#0d1425',
+                border: 'rgba(255, 255, 255, 0.08)',
+                accent: '#22d3a0',
+                accent2: '#6366f1',
+                text: '#ffffff',
+                sub: '#94a3b8',
+                fontHeading: "'Syne', sans-serif",
+                fontBody: "'DM Sans', sans-serif",
+                style: 'cyber'
+            },
+            {
+                id: 'manuscript',
+                name: 'Vintage Manuscript',
+                dot: 'linear-gradient(135deg, #92400e, #d97706)',
+                bg: '#fbf7ee',
+                card: '#fffdfa',
+                border: 'rgba(120, 53, 15, 0.12)',
+                accent: '#92400e',
+                accent2: '#b45309',
+                text: '#1c1917',
+                sub: '#78716c',
+                fontHeading: "'Playfair Display', Georgia, serif",
+                fontBody: "'Playfair Display', Georgia, serif",
+                style: 'parchment'
+            },
+            {
+                id: 'cosmic',
+                name: 'Cosmic Starlight',
+                dot: 'linear-gradient(135deg, #c084fc, #38bdf8)',
+                bg: '#09081a',
+                card: '#13112b',
+                border: 'rgba(192, 132, 252, 0.18)',
+                accent: '#c084fc',
+                accent2: '#38bdf8',
+                text: '#ffffff',
+                sub: '#a5b4fc',
+                fontHeading: "'Syne', sans-serif",
+                fontBody: "'DM Sans', sans-serif",
+                style: 'stars'
+            },
+            {
+                id: 'blood_ink',
+                name: 'Blood & Ink',
+                dot: 'linear-gradient(135deg, #f43f5e, #881337)',
+                bg: '#0c0205',
+                card: '#1a060d',
+                border: 'rgba(244, 63, 94, 0.18)',
+                accent: '#f43f5e',
+                accent2: '#fb7185',
+                text: '#ffffff',
+                sub: '#fda4af',
+                fontHeading: "'Playfair Display', Georgia, serif",
+                fontBody: "'DM Sans', sans-serif",
+                style: 'crimson'
+            },
+            {
+                id: 'golden_hour',
+                name: 'Golden Hour',
+                dot: 'linear-gradient(135deg, #f59e0b, #fb923c)',
+                bg: '#140a03',
+                card: '#221206',
+                border: 'rgba(245, 158, 11, 0.16)',
+                accent: '#f59e0b',
+                accent2: '#fb923c',
+                text: '#ffffff',
+                sub: '#fed7aa',
+                fontHeading: "'Syne', sans-serif",
+                fontBody: "'DM Sans', sans-serif",
+                style: 'sunset'
+            },
+            {
+                id: 'minimal',
+                name: 'Minimal Editorial',
+                dot: 'linear-gradient(135deg, #ffffff, #71717a)',
+                bg: '#000000',
+                card: '#0d0d0d',
+                border: 'rgba(255, 255, 255, 0.12)',
+                accent: '#ffffff',
+                accent2: '#a1a1aa',
+                text: '#ffffff',
+                sub: '#71717a',
+                fontHeading: "'Playfair Display', Georgia, serif",
+                fontBody: "'DM Sans', sans-serif",
+                style: 'editorial'
+            },
+            {
+                id: 'cyber',
+                name: 'Cyber Scribe',
+                dot: 'linear-gradient(135deg, #06b6d4, #ec4899)',
+                bg: '#040714',
+                card: '#081026',
+                border: 'rgba(6, 182, 212, 0.18)',
+                accent: '#06b6d4',
+                accent2: '#ec4899',
+                text: '#ffffff',
+                sub: '#67e8f9',
+                fontHeading: "'Space Grotesk', sans-serif",
+                fontBody: "'Space Grotesk', sans-serif",
+                style: 'grid'
+            },
+            {
+                id: 'emerald',
+                name: 'Emerald Enclave',
+                dot: 'linear-gradient(135deg, #34d399, #059669)',
+                bg: '#021a13',
+                card: '#052a20',
+                border: 'rgba(52, 211, 153, 0.16)',
+                accent: '#34d399',
+                accent2: '#a7f3d0',
+                text: '#ffffff',
+                sub: '#6ee7b7',
+                fontHeading: "'Syne', sans-serif",
+                fontBody: "'DM Sans', sans-serif",
+                style: 'forest'
+            },
+            {
+                id: 'gold',
+                name: 'Obsidian Gold',
+                dot: 'linear-gradient(135deg, #fbbf24, #d97706)',
+                bg: '#09090d',
+                card: '#14141d',
+                border: 'rgba(251, 191, 36, 0.2)',
+                accent: '#fbbf24',
+                accent2: '#fef08a',
+                text: '#ffffff',
+                sub: '#fde68a',
+                fontHeading: "'Playfair Display', Georgia, serif",
+                fontBody: "'DM Sans', sans-serif",
+                style: 'royal'
+            },
+            {
+                id: 'bubblegum',
+                name: 'Y2K Bubblegum',
+                dot: 'linear-gradient(135deg, #f472b6, #38bdf8)',
+                bg: '#180b1e',
+                card: '#291233',
+                border: 'rgba(244, 114, 182, 0.2)',
+                accent: '#f472b6',
+                accent2: '#38bdf8',
+                text: '#ffffff',
+                sub: '#fbcfe8',
+                fontHeading: "'Syne', sans-serif",
+                fontBody: "'DM Sans', sans-serif",
+                style: 'bubble'
+            }
+        ];
+
+        let currentThemeIndex = 0;
+
+        // Render Carousel Swatches
+        const carousel = document.getElementById('theme-carousel');
+        THEMES.forEach((t, i) => {
+            const btn = document.createElement('button');
+            btn.className = `theme-pill ${i === 0 ? 'active' : ''}`;
+            btn.innerHTML = `<span class="theme-dot" style="background:${t.dot}"></span><span>${t.name}</span>`;
+            btn.onclick = () => selectTheme(i);
+            carousel.appendChild(btn);
+        });
+
+        function selectTheme(index) {
+            currentThemeIndex = index;
+            document.querySelectorAll('.theme-pill').forEach((el, i) => {
+                el.classList.toggle('active', i === index);
+            });
+            document.getElementById('theme-counter').textContent = `${index + 1} of ${THEMES.length}`;
+            drawStoryCard();
+        }
+
+        // Helper: Rounded Rectangle
+        function rr(ctx, x, y, w, h, r, fill, stroke, strokeWidth) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+            if (stroke && strokeWidth > 0) {
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = strokeWidth;
+                ctx.stroke();
+            }
+        }
+
+        // ==========================================
+        // 1080x1920 CANVAS STORY RENDERER
+        // ==========================================
+        async function drawStoryCard() {
+            await document.fonts.ready;
+            const canvas = document.getElementById('wrappedCanvas');
+            const ctx = canvas.getContext('2d');
+            const t = THEMES[currentThemeIndex];
+            const d = WRAPPED_DATA;
+
+            const W = 1080, H = 1920;
+            canvas.width = W; canvas.height = H;
+
+            // 1. Background fill
+            ctx.fillStyle = t.bg;
+            ctx.fillRect(0, 0, W, H);
+
+            // 2. Atmospheric Ambient Gradients & Style Accents
+            const g1 = ctx.createRadialGradient(W / 2, 280, 0, W / 2, 280, 750);
+            g1.addColorStop(0, t.accent + '22');
+            g1.addColorStop(1, 'transparent');
+            ctx.fillStyle = g1;
+            ctx.fillRect(0, 0, W, H);
+
+            const g2 = ctx.createRadialGradient(W - 150, H - 400, 0, W - 150, H - 400, 600);
+            g2.addColorStop(0, t.accent2 + '18');
+            g2.addColorStop(1, 'transparent');
+            ctx.fillStyle = g2;
+            ctx.fillRect(0, 0, W, H);
+
+            // Optional subtle geometric grid for cyber/modern
+            if (t.style === 'grid' || t.style === 'cyber') {
+                ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+                ctx.lineWidth = 1;
+                for (let x = 0; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+                for (let y = 0; y < H; y += 60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+            }
+
+            const BX = 70, BW = W - 140;
+
+            // ── TOP HEADER / BRANDING ────────────────────────
+            let curY = 95;
+            ctx.fillStyle = t.accent;
+            ctx.font = `bold 28px ${t.fontBody}`;
+            ctx.textAlign = 'left';
+            ctx.fillText("🎁 SPRINT-BOT WRAPPED", BX, curY);
+
+            ctx.textAlign = 'right';
+            ctx.fillStyle = t.sub;
+            ctx.fillText(`${d.year.toUpperCase()}`, BX + BW, curY);
+
+            // ── AUTHOR & PERSONA HERO ────────────────────────
+            curY += 55;
+            const heroH = 340;
+            rr(ctx, BX, curY, BW, heroH, 36, t.card, t.border, 2);
+
+            // Avatar initial box
+            const avS = 130;
+            const avX = BX + 45;
+            const avY = curY + 45;
+            const avGrad = ctx.createLinearGradient(avX, avY, avX + avS, avY + avS);
+            avGrad.addColorStop(0, t.accent);
+            avGrad.addColorStop(1, t.accent2);
+            rr(ctx, avX, avY, avS, avS, 28, avGrad, '', 0);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `800 68px ${t.fontHeading}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const initial = (d.userName || 'W').charAt(0).toUpperCase();
+            ctx.fillText(initial, avX + avS / 2, avY + avS / 2 + 3);
+            ctx.textBaseline = 'alphabetic';
+
+            // Author Name & Rank
+            ctx.textAlign = 'left';
+            ctx.fillStyle = t.text;
+            let nSize = 58;
+            ctx.font = `800 ${nSize}px ${t.fontHeading}`;
+            while (ctx.measureText(d.userName).width > (BW - 240) && nSize > 34) {
+                nSize -= 2;
+                ctx.font = `800 ${nSize}px ${t.fontHeading}`;
+            }
+            ctx.fillText(d.userName, BX + 205, avY + 50);
+
+            ctx.fillStyle = t.accent;
+            ctx.font = `bold 26px ${t.fontBody}`;
+            ctx.fillText(`👑 ${d.rank.toUpperCase()}`, BX + 205, avY + 95);
+
+            // Persona Banner inside Hero
+            const pyY = curY + 205;
+            rr(ctx, BX + 35, pyY, BW - 70, 105, 20, t.bg, t.border, 1.5);
+
+            ctx.fillStyle = t.accent;
+            ctx.font = `800 32px ${t.fontHeading}`;
+            ctx.fillText(`🎭 ${d.persona?.title || 'The Passionate Storyteller ✍️'}`, BX + 60, pyY + 46);
+
+            ctx.fillStyle = t.sub;
+            ctx.font = `500 22px ${t.fontBody}`;
+            let tagline = d.persona?.tagline || "Every word written brings your story closer to life.";
+            if (ctx.measureText(tagline).width > (BW - 120)) {
+                tagline = tagline.slice(0, 52) + '...';
+            }
+            ctx.fillText(tagline, BX + 60, pyY + 82);
+
+            // ── BIG VOLUME HERO CARD ────────────────────────
+            curY += heroH + 35;
+            const volH = 360;
+            rr(ctx, BX, curY, BW, volH, 36, t.card, t.border, 2);
+
+            // Ambient inner glow
+            const volGlow = ctx.createRadialGradient(BX + BW / 2, curY + 140, 0, BX + BW / 2, curY + 140, 320);
+            volGlow.addColorStop(0, t.accent + '15');
+            volGlow.addColorStop(1, 'transparent');
+            ctx.fillStyle = volGlow;
+            ctx.fillRect(BX, curY, BW, volH);
+
+            ctx.textAlign = 'center';
+            ctx.fillStyle = t.sub;
+            ctx.font = `bold 24px ${t.fontBody}`;
+            ctx.fillText("WORDS WRITTEN THIS YEAR", BX + BW / 2, curY + 65);
+
+            // Large word count
+            ctx.fillStyle = t.text;
+            const wordsFormatted = Number(d.totalWords || 0).toLocaleString();
+            let wSz = 110;
+            ctx.font = `900 ${wSz}px ${t.fontHeading}`;
+            while (ctx.measureText(wordsFormatted).width > (BW - 80) && wSz > 50) {
+                wSz -= 4;
+                ctx.font = `900 ${wSz}px ${t.fontHeading}`;
+            }
+            ctx.fillText(wordsFormatted, BX + BW / 2, curY + 185);
+
+            // Novel Equivalent Pill
+            const novY = curY + 235;
+            const novW = 460, novH = 75;
+            rr(ctx, (W - novW) / 2, novY, novW, novH, 999, t.accent + '22', t.accent, 2);
+
+            ctx.fillStyle = t.accent;
+            ctx.font = `bold 28px ${t.fontBody}`;
+            ctx.fillText(`That's ${d.novelText}`, W / 2, novY + 47);
+
+            // ── 2x2 STAT TILES ──────────────────────────────
+            curY += volH + 35;
+            const tileW = (BW - 25) / 2;
+            const tileH = 205;
+
+            // Tile 1: Active Days
+            rr(ctx, BX, curY, tileW, tileH, 28, t.card, t.border, 2);
+            ctx.textAlign = 'left';
+            ctx.fillStyle = t.sub;
+            ctx.font = `bold 22px ${t.fontBody}`;
+            ctx.fillText("📅 ACTIVE DAYS", BX + 35, curY + 50);
+            ctx.fillStyle = t.text;
+            ctx.font = `800 56px ${t.fontHeading}`;
+            ctx.fillText(`${d.activeDays}`, BX + 35, curY + 125);
+            ctx.fillStyle = t.accent;
+            ctx.font = `600 22px ${t.fontBody}`;
+            const pctYear = Math.round((d.activeDays / 365) * 100);
+            ctx.fillText(`${pctYear}% of the year!`, BX + 35, curY + 165);
+
+            // Tile 2: Best Streak
+            rr(ctx, BX + tileW + 25, curY, tileW, tileH, 28, t.card, t.border, 2);
+            ctx.fillStyle = t.sub;
+            ctx.font = `bold 22px ${t.fontBody}`;
+            ctx.fillText("🔥 BEST STREAK", BX + tileW + 60, curY + 50);
+            ctx.fillStyle = '#f97316';
+            ctx.font = `800 56px ${t.fontHeading}`;
+            ctx.fillText(`${d.bestStreak} Days`, BX + tileW + 60, curY + 125);
+            ctx.fillStyle = t.sub;
+            ctx.font = `500 22px ${t.fontBody}`;
+            ctx.fillText("Unbroken momentum", BX + tileW + 60, curY + 165);
+
+            // Row 2 of Tiles: Peak Sprint & Focus Time
+            curY += tileH + 25;
+
+            // Tile 3: Sprint Speed
+            rr(ctx, BX, curY, tileW, tileH, 28, t.card, t.border, 2);
+            ctx.fillStyle = t.sub;
+            ctx.font = `bold 22px ${t.fontBody}`;
+            ctx.fillText("⚡ PEAK SPEED", BX + 35, curY + 50);
+            ctx.fillStyle = t.accent2;
+            ctx.font = `800 56px ${t.fontHeading}`;
+            ctx.fillText(`${d.peakSprintWpm} WPM`, BX + 35, curY + 125);
+            ctx.fillStyle = t.sub;
+            ctx.font = `500 22px ${t.fontBody}`;
+            ctx.fillText(`Top Sprint: ${d.peakSprintWords.toLocaleString()}w`, BX + 35, curY + 165);
+
+            // Tile 4: Sprints & Hours
+            rr(ctx, BX + tileW + 25, curY, tileW, tileH, 28, t.card, t.border, 2);
+            ctx.fillStyle = t.sub;
+            ctx.font = `bold 22px ${t.fontBody}`;
+            ctx.fillText("⏱️ TIME SPRINTING", BX + tileW + 60, curY + 50);
+            ctx.fillStyle = t.accent;
+            ctx.font = `800 56px ${t.fontHeading}`;
+            ctx.fillText(`${d.sprintHours}h`, BX + tileW + 60, curY + 125);
+            ctx.fillStyle = t.sub;
+            ctx.font = `500 22px ${t.fontBody}`;
+            ctx.fillText(`${d.totalSprints} sprints completed`, BX + tileW + 60, curY + 165);
+
+            // ── SUPERLATIVES (Best Day & Habits) ───────────
+            curY += tileH + 30;
+            const supH = 175;
+            rr(ctx, BX, curY, BW, supH, 30, t.card, t.border, 2);
+
+            ctx.textAlign = 'left';
+            ctx.fillStyle = t.sub;
+            ctx.font = `bold 22px ${t.fontBody}`;
+            ctx.fillText("🏆 WRITING SUPERLATIVES", BX + 35, curY + 48);
+
+            ctx.fillStyle = t.text;
+            ctx.font = `700 26px ${t.fontHeading}`;
+            ctx.fillText(`🌟 Peak Writing Day:`, BX + 35, curY + 98);
+            ctx.fillStyle = t.accent;
+            ctx.fillText(`${d.bestDay?.date || '—'} (${Number(d.bestDay?.words || 0).toLocaleString()} words)`, BX + 330, curY + 98);
+
+            ctx.fillStyle = t.text;
+            ctx.fillText(`🗓️ Power Day:`, BX + 35, curY + 142);
+            ctx.fillStyle = t.accent2;
+            ctx.fillText(`${d.favoriteDay}`, BX + 225, curY + 142);
+
+            // ── FOOTER WATERMARK ─────────────────────────────
+            curY += supH + 50;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = t.sub;
+            ctx.font = `bold 22px ${t.fontBody}`;
+            ctx.fillText("Created with Sprint-Bot • Track your writing journey", W / 2, curY);
+        }
+
+        // Initialize Card
+        drawStoryCard();
+
+        // Download Action
+        document.getElementById('downloadBtn').onclick = () => {
+            const canvas = document.getElementById('wrappedCanvas');
+            const link = document.createElement('a');
+            link.download = `${WRAPPED_DATA.userName}-SprintBot-Wrapped-${WRAPPED_DATA.year}.png`;
+            link.href = canvas.toDataURL('image/png', 1.0);
+            link.click();
+        };
+
+        // WhatsApp Share Action
+        document.getElementById('shareBtn').onclick = async () => {
+            const canvas = document.getElementById('wrappedCanvas');
+            const shareText = `Check out my ${WRAPPED_DATA.year} Writing Wrapped on Sprint-Bot! 🎁\n\nTotal Words: ${WRAPPED_DATA.totalWords.toLocaleString()} (${WRAPPED_DATA.novelText})\nPersona: ${WRAPPED_DATA.persona?.title || 'Writer'}\nLongest Streak: ${WRAPPED_DATA.bestStreak} days 🔥\n\nView yours here: ${window.location.href}`;
+            
+            if (navigator.share) {
+                try {
+                    canvas.toBlob(async (blob) => {
+                        const file = new File([blob], `wrapped-${WRAPPED_DATA.year}.png`, { type: 'image/png' });
+                        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                            await navigator.share({
+                                title: `${WRAPPED_DATA.userName}'s Writing Wrapped`,
+                                text: shareText,
+                                files: [file]
+                            });
+                        } else {
+                            await navigator.share({
+                                title: `${WRAPPED_DATA.userName}'s Writing Wrapped`,
+                                text: shareText,
+                                url: window.location.href
+                            });
+                        }
+                    }, 'image/png');
+                } catch (e) {
+                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank');
+                }
+            } else {
+                window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank');
+            }
+        };
+    </script>
+</body>
+</html>
