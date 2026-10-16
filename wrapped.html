@@ -11,26 +11,26 @@
     <meta property="og:type" content="website">
     <meta name="theme-color" content="#060b12">
 
-    <!-- Fonts: Expanded with distinct AuthorRealm genre families -->
+    <!-- Fonts inspired by AuthorRealm: Cinzel, Noto Serif, Playfair, Syncopate, Space Grotesk, Montserrat, Outfit, Great Vibes -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Cinzel+Decorative:wght@700;900&family=Dancing+Script:wght@700&family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Great+Vibes&family=Montserrat:wght@400;600;700;800;900&family=Playfair+Display:ital,wght@0,600..900;1,600..900&family=Share+Tech+Mono&family=Space+Grotesk:wght@500;700&family=Syncopate:wght@700&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700;900&family=Great+Vibes&family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;600;700;800&family=Noto+Serif:ital,wght@0,400;0,700;1,400&family=Outfit:wght@500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,600;1,700&family=Space+Grotesk:wght@500;700&family=Syncopate:wght@700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- JSZip for 1-Tap All Stories Download -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
         :root {
-            --bg-color: #060b12;
-            --card-bg: #0d1527;
-            --accent: #22d3a0;
+            --bg-color: #05050a;
+            --card-bg: #0d1425;
+            --accent: #D4AF37;
             --accent2: #6366f1;
         }
 
         body {
             background-color: var(--bg-color);
             color: #ffffff;
-            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             margin: 0;
             padding: 0;
             min-height: 100vh;
@@ -47,7 +47,7 @@
             width: 100%;
             max-width: 410px;
             margin: 0 auto;
-            padding: 10px 12px 24px 12px;
+            padding: 12px 12px 24px 12px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
@@ -58,7 +58,7 @@
             width: 100%;
             aspect-ratio: 9 / 16;
             border-radius: 28px;
-            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
             overflow: hidden;
             background: #000;
             position: relative;
@@ -76,7 +76,7 @@
             object-fit: cover;
         }
 
-        /* Story Progress Bars (Instagram / Spotify Style) */
+        /* Story Progress Bars */
         .story-progress-bar {
             display: flex;
             gap: 5px;
@@ -124,7 +124,7 @@
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             color: #94a3b8;
-            font-size: 11px;
+            font-size: 11.5px;
             font-weight: 700;
             white-space: nowrap;
             cursor: pointer;
@@ -163,9 +163,9 @@
     <header class="w-full max-w-md flex justify-between items-center px-5 pt-4 pb-2">
         <div class="flex items-center gap-2">
             <span class="text-xl">🎁</span>
-            <span class="font-extrabold text-xs tracking-wider uppercase text-slate-300" style="font-family:'Syne'">Sprint-Bot Wrapped</span>
+            <span class="font-extrabold text-xs tracking-wider uppercase text-slate-300" style="font-family:'Cinzel', serif">Sprint-Bot Wrapped</span>
         </div>
-        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20">
             {{YEAR}}
         </span>
     </header>
@@ -203,7 +203,7 @@
         <div class="w-full mt-4">
             <div class="flex items-center justify-between mb-2 px-1">
                 <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <span>🎨</span> Choose Aesthetic
+                    <span>🎨</span> AuthorRealm Aesthetic & Textures
                 </span>
                 <span id="theme-counter" class="text-[11px] font-bold text-slate-500">1 of 10</span>
             </div>
@@ -216,7 +216,7 @@
 
         <!-- Action Buttons -->
         <div class="w-full grid grid-cols-2 gap-2.5 mt-4">
-            <button id="downloadThisBtn" class="flex items-center justify-center gap-1.5 py-3 px-3 rounded-xl font-extrabold text-xs text-slate-900 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 active:scale-95 transition shadow-lg shadow-emerald-500/20 cursor-pointer">
+            <button id="downloadThisBtn" class="flex items-center justify-center gap-1.5 py-3 px-3 rounded-xl font-extrabold text-xs text-slate-900 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 active:scale-95 transition shadow-lg shadow-amber-500/20 cursor-pointer">
                 <span>📲</span> Save This Slide
             </button>
             <button id="downloadAllBtn" class="flex items-center justify-center gap-1.5 py-3 px-3 rounded-xl font-extrabold text-xs text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 active:scale-95 transition shadow-lg shadow-indigo-500/20 cursor-pointer">
@@ -229,7 +229,7 @@
         </button>
 
         <p class="text-[11px] text-slate-500 text-center mt-3">
-            Tip: Tap left or right on the card to flip through your stories. Choose any template!
+            Tip: Tap left or right on the card to flip through your stories. Choose any texture!
         </p>
     </main>
 
@@ -237,167 +237,157 @@
     <script>
         const WRAPPED_DATA = {{WRAPPED_DATA_JSON}};
 
-        // 10 Curated Aesthetic Themes (Directly adapted from AuthorRealm genres)
+        // 10 Curated Aesthetic Themes (Inspired by AuthorRealm templates)
         const THEMES = [
             {
-                id: 'monarch',
-                name: 'The Monarch System',
-                genre: 'Solo Leveling / System LitRPG',
-                dot: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
-                bg: '#040814',
-                card: 'rgba(8, 22, 52, 0.85)',
-                border: '#3b82f6',
-                accent: '#38bdf8',
-                accent2: '#60a5fa',
-                text: '#f0f9ff',
-                sub: '#93c5fd',
-                fontHeading: "'Share Tech Mono', monospace",
-                fontBody: "'Space Grotesk', sans-serif",
-                style: 'monarch'
+                id: 'celestial',
+                name: 'Celestial Starlight',
+                dot: 'linear-gradient(135deg, #D4AF37, #1e1b4b)',
+                bg: '#05050a',
+                card: 'rgba(18, 16, 38, 0.82)',
+                border: 'rgba(212, 175, 55, 0.35)',
+                accent: '#D4AF37',
+                accent2: '#FFE58F',
+                text: '#ffffff',
+                sub: '#cbd5e1',
+                fontHeading: "'Cinzel', serif",
+                fontBody: "'Montserrat', sans-serif",
+                texture: 'celestial'
             },
             {
-                id: 'scroll',
-                name: 'The Elemental Scroll',
-                genre: 'High Fantasy / Ancient Grimoire',
-                dot: 'linear-gradient(135deg, #b45309, #d97706)',
-                bg: '#f7f1e3',
-                card: '#fffcf5',
-                border: 'rgba(180, 83, 9, 0.3)',
-                accent: '#92400e',
+                id: 'manuscript',
+                name: 'Ancient Grimoire',
+                dot: 'linear-gradient(135deg, #8b4513, #f4ecd8)',
+                bg: '#f4ecd8',
+                card: '#ede1c7',
+                border: 'rgba(120, 53, 15, 0.3)',
+                accent: '#8b4513',
                 accent2: '#b45309',
-                text: '#291b10',
-                sub: '#78563c',
-                fontHeading: "'Cinzel Decorative', Georgia, serif",
-                fontBody: "'Cinzel', Georgia, serif",
-                style: 'scroll'
+                text: '#2c1e16',
+                sub: '#6e5443',
+                fontHeading: "'Cinzel Decorative', serif",
+                fontBody: "'Noto Serif', serif",
+                texture: 'parchment'
             },
             {
                 id: 'gothic',
-                name: 'Mystic Falls',
-                genre: 'Dark Romance / Vampire Diaries',
-                dot: 'linear-gradient(135deg, #8a0303, #e11d48)',
-                bg: '#080103',
-                card: '#160408',
-                border: '#8a0303',
+                name: 'Mystic Blood & Velvet',
+                dot: 'linear-gradient(135deg, #f43f5e, #1a0308)',
+                bg: '#090103',
+                card: '#190308',
+                border: 'rgba(138, 3, 3, 0.5)',
                 accent: '#f43f5e',
-                accent2: '#fb7185',
-                text: '#fdf2f4',
-                sub: '#fda4af',
-                fontHeading: "'Great Vibes', cursive",
-                fontBody: "'Playfair Display', Georgia, serif",
-                style: 'gothic'
-            },
-            {
-                id: 'terminal',
-                name: 'SYS.OVERRIDE',
-                genre: 'Sci-Fi / Matrix Terminal',
-                dot: 'linear-gradient(135deg, #00ff41, #08f7fe)',
-                bg: '#020502',
-                card: '#041006',
-                border: '#00ff41',
-                accent: '#00ff41',
-                accent2: '#08f7fe',
-                text: '#f0fff4',
-                sub: '#86efac',
-                fontHeading: "'Share Tech Mono', monospace",
-                fontBody: "'Share Tech Mono', monospace",
-                style: 'terminal'
-            },
-            {
-                id: 'celestial',
-                name: 'Celestial Pantheon',
-                genre: 'Mythology / Royal Olympian',
-                dot: 'linear-gradient(135deg, #D4AF37, #fef08a)',
-                bg: '#040409',
-                card: '#0d0d18',
-                border: '#D4AF37',
-                accent: '#D4AF37',
-                accent2: '#fde047',
-                text: '#ffffff',
-                sub: '#fef08a',
-                fontHeading: "'Cinzel', Georgia, serif",
-                fontBody: "'Montserrat', sans-serif",
-                style: 'celestial'
-            },
-            {
-                id: 'cozy',
-                name: 'Writer’s Journal',
-                genre: 'Cozy Romance / Slice of Life',
-                dot: 'linear-gradient(135deg, #ec4899, #a855f7)',
-                bg: '#fff7f9',
-                card: '#ffffff',
-                border: 'rgba(236, 72, 153, 0.25)',
-                accent: '#db2777',
-                accent2: '#9333ea',
-                text: '#1f2937',
-                sub: '#6b7280',
-                fontHeading: "'Dancing Script', cursive",
-                fontBody: "'DM Sans', sans-serif",
-                style: 'cozy'
-            },
-            {
-                id: 'editorial',
-                name: 'The Villa',
-                genre: 'Billionaire Romance / Luxury Minimal',
-                dot: 'linear-gradient(135deg, #ffffff, #71717a)',
-                bg: '#09090b',
-                card: '#121215',
-                border: 'rgba(255, 255, 255, 0.15)',
-                accent: '#ffffff',
-                accent2: '#cbd5e1',
-                text: '#ffffff',
-                sub: '#94a3b8',
-                fontHeading: "'Montserrat', sans-serif",
-                fontBody: "'Montserrat', sans-serif",
-                style: 'editorial'
+                accent2: '#8a0303',
+                text: '#fce7e7',
+                sub: '#c49d9d',
+                fontHeading: "'Playfair Display', serif",
+                fontBody: "'Playfair Display', serif",
+                texture: 'gothic'
             },
             {
                 id: 'cyber',
-                name: 'Cyber Scribe',
-                genre: 'Cyberpunk 2077',
-                dot: 'linear-gradient(135deg, #06b6d4, #ec4899)',
+                name: 'Cyber Scribe HUD',
+                dot: 'linear-gradient(135deg, #00f3ff, #ec4899)',
                 bg: '#030712',
-                card: '#081126',
-                border: '#06b6d4',
-                accent: '#06b6d4',
+                card: '#091124',
+                border: 'rgba(6, 182, 212, 0.45)',
+                accent: '#00f3ff',
                 accent2: '#ec4899',
                 text: '#ffffff',
-                sub: '#67e8f9',
+                sub: '#7dd3fc',
                 fontHeading: "'Syncopate', sans-serif",
                 fontBody: "'Space Grotesk', sans-serif",
-                style: 'cyber'
+                texture: 'cyber'
             },
             {
-                id: 'alchemist',
-                name: 'Emerald Guild',
-                genre: 'Progression / Arcane Academy',
-                dot: 'linear-gradient(135deg, #10b981, #d97706)',
-                bg: '#02160e',
-                card: '#05291b',
-                border: 'rgba(16, 185, 129, 0.35)',
-                accent: '#34d399',
-                accent2: '#f59e0b',
-                text: '#ecfdf5',
+                id: 'villa',
+                name: 'The Villa Sunset',
+                dot: 'linear-gradient(135deg, #ff007f, #f97316)',
+                bg: '#1f041e',
+                card: 'rgba(255, 255, 255, 0.12)',
+                border: 'rgba(255, 255, 255, 0.35)',
+                accent: '#ff007f',
+                accent2: '#00f3ff',
+                text: '#ffffff',
+                sub: '#fbcfe8',
+                fontHeading: "'Montserrat', sans-serif",
+                fontBody: "'Montserrat', sans-serif",
+                texture: 'sunset_villa'
+            },
+            {
+                id: 'solaris',
+                name: 'Solaris Modern Glass',
+                dot: 'linear-gradient(135deg, #38bdf8, #10b981)',
+                bg: '#080d1a',
+                card: 'rgba(18, 28, 52, 0.75)',
+                border: 'rgba(59, 130, 246, 0.35)',
+                accent: '#38bdf8',
+                accent2: '#34d399',
+                text: '#ffffff',
+                sub: '#94a3b8',
+                fontHeading: "'Outfit', sans-serif",
+                fontBody: "'Montserrat', sans-serif",
+                texture: 'solaris'
+            },
+            {
+                id: 'editorial',
+                name: 'Minimal Broadsheet',
+                dot: 'linear-gradient(135deg, #ffffff, #27272a)',
+                bg: '#0a0a0a',
+                card: '#141416',
+                border: 'rgba(255, 255, 255, 0.25)',
+                accent: '#ffffff',
+                accent2: '#a1a1aa',
+                text: '#ffffff',
+                sub: '#a1a1aa',
+                fontHeading: "'Playfair Display', serif",
+                fontBody: "'Inter', sans-serif",
+                texture: 'editorial'
+            },
+            {
+                id: 'emerald',
+                name: 'Enchanted Grove',
+                dot: 'linear-gradient(135deg, #10b981, #064e3b)',
+                bg: '#02160f',
+                card: '#06271c',
+                border: 'rgba(52, 211, 153, 0.35)',
+                accent: '#10b981',
+                accent2: '#a7f3d0',
+                text: '#ffffff',
                 sub: '#6ee7b7',
-                fontHeading: "'Cinzel', Georgia, serif",
-                fontBody: "'DM Sans', sans-serif",
-                style: 'alchemist'
+                fontHeading: "'Cinzel', serif",
+                fontBody: "'Inter', sans-serif",
+                texture: 'botanical'
             },
             {
                 id: 'gold',
-                name: 'Obsidian Royalty',
-                genre: 'Imperial Court / Historical Romance',
-                dot: 'linear-gradient(135deg, #eab308, #ca8a04)',
-                bg: '#08080c',
-                card: '#14141d',
-                border: 'rgba(234, 179, 8, 0.4)',
+                name: 'Imperial Obsidian Gold',
+                dot: 'linear-gradient(135deg, #fbbf24, #78350f)',
+                bg: '#07070a',
+                card: '#13131c',
+                border: 'rgba(251, 191, 36, 0.45)',
                 accent: '#fbbf24',
                 accent2: '#fef08a',
                 text: '#ffffff',
                 sub: '#fde68a',
-                fontHeading: "'Playfair Display', Georgia, serif",
-                fontBody: "'Cinzel', Georgia, serif",
-                style: 'gold'
+                fontHeading: "'Cinzel', serif",
+                fontBody: "'Cinzel', serif",
+                texture: 'gold_marble'
+            },
+            {
+                id: 'midnight',
+                name: 'Midnight Synthwave',
+                dot: 'linear-gradient(135deg, #22d3ee, #6366f1)',
+                bg: '#060717',
+                card: '#0e122b',
+                border: 'rgba(99, 102, 241, 0.35)',
+                accent: '#22d3ee',
+                accent2: '#818cf8',
+                text: '#ffffff',
+                sub: '#a5b4fc',
+                fontHeading: "'Syne', sans-serif",
+                fontBody: "'Space Grotesk', sans-serif",
+                texture: 'synthwave'
             }
         ];
 
@@ -487,7 +477,7 @@
             ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
             ctx.lineTo(x + r, y + h);
             ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-            ctx.lineTo(x, y + r);
+            ctx.lineTo(x + r, y);
             ctx.quadraticCurveTo(x, y, x + r, y);
             ctx.closePath();
             if (fill) { ctx.fillStyle = fill; ctx.fill(); }
@@ -498,165 +488,291 @@
             }
         }
 
-        // Custom Card Renderer matching each AuthorRealm Genre Aesthetic
-        function drawThemeCard(ctx, t, x, y, w, h, options = {}) {
-            ctx.save();
-            const style = t.style || 'default';
-
-            if (style === 'monarch') {
-                // Solo Leveling Blue Holographic Window
-                rr(ctx, x, y, w, h, 16, t.card, t.border, 2);
-                // Corner tech notches
-                ctx.strokeStyle = t.accent;
-                ctx.lineWidth = 3;
-                const cL = 14;
-                ctx.beginPath(); ctx.moveTo(x, y + cL); ctx.lineTo(x, y); ctx.lineTo(x + cL, y); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(x + w - cL, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + cL); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(x, y + h - cL); ctx.lineTo(x, y + h); ctx.lineTo(x + cL, y + h); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(x + w - cL, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - cL); ctx.stroke();
-
-                if (options.badge) {
-                    ctx.fillStyle = t.accent + '22';
-                    ctx.fillRect(x + 25, y - 12, 175, 24);
-                    ctx.strokeStyle = t.accent;
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(x + 25, y - 12, 175, 24);
-                    ctx.fillStyle = t.accent;
-                    ctx.font = "bold 12px 'Share Tech Mono', monospace";
-                    ctx.textAlign = 'center';
-                    ctx.fillText(options.badge, x + 112, y + 4);
-                }
-            } else if (style === 'terminal') {
-                // Retro CRT Phosphor Terminal
-                ctx.fillStyle = t.card;
-                ctx.fillRect(x, y, w, h);
-                ctx.strokeStyle = t.accent;
-                ctx.lineWidth = 2;
-                ctx.strokeRect(x, y, w, h);
-                // Corner ASCII markers
-                ctx.fillStyle = t.accent;
-                ctx.font = "bold 15px 'Share Tech Mono', monospace";
-                ctx.textAlign = 'left';
-                ctx.fillText('[+]', x + 8, y + 20);
-                ctx.textAlign = 'right';
-                ctx.fillText('[+]', x + w - 8, y + 20);
-            } else if (style === 'scroll') {
-                // Ancient Fantasy Manuscript Scroll
-                rr(ctx, x, y, w, h, 16, t.card, t.border, 2.5);
-                rr(ctx, x + 7, y + 7, w - 14, h - 14, 12, null, t.accent + '66', 1);
-                ctx.fillStyle = t.accent;
-                ctx.font = "16px 'Cinzel Decorative', serif";
-                ctx.textAlign = 'center';
-                ctx.fillText('✦', x + 22, y + 26);
-                ctx.fillText('✦', x + w - 22, y + 26);
-                ctx.fillText('✦', x + 22, y + h - 14);
-                ctx.fillText('✦', x + w - 22, y + h - 14);
-            } else if (style === 'gothic') {
-                // Mystic Falls Dark Romance Wrought-Iron Frame
-                rr(ctx, x, y, w, h, 18, t.card, '#580205', 2.5);
-                rr(ctx, x + 6, y + 6, w - 12, h - 12, 14, null, t.accent + '55', 1);
-                ctx.fillStyle = t.accent;
-                ctx.font = "18px 'Playfair Display', serif";
-                ctx.textAlign = 'center';
-                ctx.fillText('❦', x + 22, y + 26);
-                ctx.fillText('❦', x + w - 22, y + 26);
-            } else if (style === 'celestial') {
-                // 24K Gold Celestial Frame with Stars
-                rr(ctx, x, y, w, h, 20, t.card, t.accent, 2);
-                rr(ctx, x + 6, y + 6, w - 12, h - 12, 16, null, t.accent + '44', 1);
-                ctx.fillStyle = t.accent;
-                ctx.font = "15px 'Cinzel', serif";
-                ctx.textAlign = 'center';
-                ctx.fillText('★', x + 20, y + 25);
-                ctx.fillText('★', x + w - 20, y + 25);
-                ctx.fillText('★', x + 20, y + h - 13);
-                ctx.fillText('★', x + w - 20, y + h - 13);
-            } else if (style === 'editorial') {
-                // Luxury Minimalist Hairline Frame
-                ctx.fillStyle = t.card;
-                ctx.fillRect(x, y, w, h);
-                ctx.strokeStyle = t.border;
-                ctx.lineWidth = 1;
-                ctx.strokeRect(x, y, w, h);
-            } else if (style === 'cyber') {
-                // Cyberpunk 45-degree Angled Chamfered Corners
-                const cut = 22;
-                ctx.beginPath();
-                ctx.moveTo(x + cut, y);
-                ctx.lineTo(x + w, y);
-                ctx.lineTo(x + w, y + h - cut);
-                ctx.lineTo(x + w - cut, y + h);
-                ctx.lineTo(x, y + h);
-                ctx.lineTo(x, y + cut);
-                ctx.closePath();
-                ctx.fillStyle = t.card;
-                ctx.fill();
-                ctx.strokeStyle = t.accent;
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            } else if (style === 'cozy') {
-                // Cozy Romance Clean Photo Card with Washi Tape
-                rr(ctx, x, y, w, h, 20, t.card, t.border, 1.5);
-                const tapeW = Math.min(130, w / 3);
-                ctx.fillStyle = t.accent + '44';
-                ctx.fillRect(x + (w - tapeW) / 2, y - 6, tapeW, 14);
-            } else {
-                // Default / Imperial Royalty
-                rr(ctx, x, y, w, h, 22, t.card, t.border, 2);
-                if (style === 'gold') {
-                    rr(ctx, x + 6, y + 6, w - 12, h - 12, 18, null, t.accent + '33', 1);
-                }
-            }
-            ctx.restore();
-        }
-
-        // Draw Ambient Backdrop tailored to each genre
-        function drawBackdrop(ctx, t, W, H) {
+        // ==========================================
+        // TEXTURE ENGINES (AuthorRealm-Inspired)
+        // ==========================================
+        function drawThemeTexture(ctx, t, W, H) {
             ctx.fillStyle = t.bg;
             ctx.fillRect(0, 0, W, H);
 
-            const style = t.style || 'default';
+            // 1. CELESTIAL STARLIGHT (Stars, constellations, orbital astrolabe)
+            if (t.texture === 'celestial') {
+                // Nebula glow
+                const neb = ctx.createRadialGradient(W / 2, 380, 0, W / 2, 380, 750);
+                neb.addColorStop(0, 'rgba(212, 175, 55, 0.12)');
+                neb.addColorStop(0.5, 'rgba(99, 102, 241, 0.08)');
+                neb.addColorStop(1, 'transparent');
+                ctx.fillStyle = neb;
+                ctx.fillRect(0, 0, W, H);
 
-            if (style === 'terminal') {
-                // Subtle CRT Scanlines
-                ctx.fillStyle = 'rgba(0, 255, 65, 0.03)';
-                for (let y = 0; y < H; y += 6) {
-                    ctx.fillRect(0, y, W, 2);
-                }
-            } else if (style === 'monarch') {
-                // Blueprint holographic grid
-                ctx.strokeStyle = 'rgba(56, 189, 248, 0.03)';
+                // Celestial Astrolabe Rings
+                ctx.save();
+                ctx.strokeStyle = 'rgba(212, 175, 55, 0.14)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([8, 12]);
+                ctx.beginPath();
+                ctx.arc(W - 80, 260, 340, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(W - 80, 260, 220, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+
+                // Starfield
+                const stars = [
+                    [140, 160, 2, 0.8], [320, 240, 3, 0.9], [860, 190, 2.5, 0.7],
+                    [920, 520, 3.5, 0.95], [210, 780, 2, 0.6], [820, 940, 3, 0.85],
+                    [150, 1250, 2.5, 0.7], [740, 1450, 3, 0.9], [280, 1680, 2, 0.75],
+                    [890, 1720, 2.5, 0.8], [540, 1100, 1.8, 0.5]
+                ];
+                stars.forEach(([x, y, rad, op]) => {
+                    ctx.fillStyle = `rgba(255, 235, 160, ${op})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, rad, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // Constellation Lines connecting key stars
+                ctx.strokeStyle = 'rgba(212, 175, 55, 0.18)';
                 ctx.lineWidth = 1;
-                for (let x = 0; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-                for (let y = 0; y < H; y += 60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+                ctx.beginPath();
+                ctx.moveTo(140, 160); ctx.lineTo(320, 240); ctx.lineTo(540, 300); ctx.lineTo(860, 190);
+                ctx.stroke();
             }
 
-            // Atmospheric ambient radial gradient
-            const g1 = ctx.createRadialGradient(W / 2, 320, 0, W / 2, 320, 720);
-            g1.addColorStop(0, t.accent + '18');
-            g1.addColorStop(1, 'transparent');
-            ctx.fillStyle = g1;
-            ctx.fillRect(0, 0, W, H);
+            // 2. ANCIENT PARCHMENT / GRIMOIRE (Parchment noise, tea stains, double rule)
+            else if (t.texture === 'parchment') {
+                // Corner paper stains
+                const s1 = ctx.createRadialGradient(80, 80, 0, 80, 80, 420);
+                s1.addColorStop(0, 'rgba(139, 69, 19, 0.08)');
+                s1.addColorStop(1, 'transparent');
+                ctx.fillStyle = s1;
+                ctx.fillRect(0, 0, W, H);
 
-            const g2 = ctx.createRadialGradient(W - 120, H - 380, 0, W - 120, H - 380, 650);
-            g2.addColorStop(0, t.accent2 + '12');
-            g2.addColorStop(1, 'transparent');
-            ctx.fillStyle = g2;
-            ctx.fillRect(0, 0, W, H);
+                const s2 = ctx.createRadialGradient(W - 80, H - 120, 0, W - 80, H - 120, 480);
+                s2.addColorStop(0, 'rgba(139, 69, 19, 0.09)');
+                s2.addColorStop(1, 'transparent');
+                ctx.fillStyle = s2;
+                ctx.fillRect(0, 0, W, H);
+
+                // Procedural paper grain specks
+                ctx.fillStyle = 'rgba(100, 60, 20, 0.035)';
+                for (let i = 0; i < 350; i++) {
+                    const rx = (Math.sin(i * 99) * 0.5 + 0.5) * W;
+                    const ry = (Math.cos(i * 33) * 0.5 + 0.5) * H;
+                    ctx.fillRect(rx, ry, (i % 3) + 1, (i % 2) + 1);
+                }
+
+                // Antique framing rules
+                ctx.strokeStyle = 'rgba(120, 53, 15, 0.2)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(35, 35, W - 70, H - 70);
+                ctx.strokeStyle = 'rgba(120, 53, 15, 0.1)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(42, 42, W - 84, H - 84);
+
+                // Corner cross markers
+                ctx.strokeStyle = 'rgba(120, 53, 15, 0.35)';
+                ctx.lineWidth = 2;
+                const corners = [[35, 35], [W - 35, 35], [35, H - 35], [W - 35, H - 35]];
+                corners.forEach(([cx, cy]) => {
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 10, cy); ctx.lineTo(cx + 10, cy);
+                    ctx.moveTo(cx, cy - 10); ctx.lineTo(cx, cy + 10);
+                    ctx.stroke();
+                });
+            }
+
+            // 3. MYSTIC GOTHIC BLOOD & VELVET
+            else if (t.texture === 'gothic') {
+                // Crimson velvet radial aura
+                const rad = ctx.createRadialGradient(W / 2, 700, 50, W / 2, 700, 850);
+                rad.addColorStop(0, 'rgba(138, 3, 3, 0.28)');
+                rad.addColorStop(0.6, 'rgba(43, 0, 0, 0.45)');
+                rad.addColorStop(1, '#090103');
+                ctx.fillStyle = rad;
+                ctx.fillRect(0, 0, W, H);
+
+                // Velvet grain flecks
+                ctx.fillStyle = 'rgba(244, 63, 94, 0.025)';
+                for (let i = 0; i < 280; i++) {
+                    const rx = (Math.sin(i * 47) * 0.5 + 0.5) * W;
+                    const ry = (Math.cos(i * 73) * 0.5 + 0.5) * H;
+                    ctx.fillRect(rx, ry, 2, 2);
+                }
+
+                // Gothic double border
+                ctx.strokeStyle = 'rgba(138, 3, 3, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(36, 36, W - 72, H - 72);
+                ctx.strokeStyle = 'rgba(244, 63, 94, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(44, 44, W - 88, H - 88);
+            }
+
+            // 4. CYBER SCRIBE HUD (Matrix terminal, perspective grid, scanlines)
+            else if (t.texture === 'cyber') {
+                // Perspective grid floor at bottom
+                ctx.strokeStyle = 'rgba(0, 243, 255, 0.06)';
+                ctx.lineWidth = 1;
+                const gridTop = H - 550;
+                for (let x = 0; x <= W; x += 80) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, gridTop);
+                    ctx.lineTo(W / 2 + (x - W / 2) * 2.8, H);
+                    ctx.stroke();
+                }
+                for (let y = gridTop; y <= H; y += 45) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(W, y);
+                    ctx.stroke();
+                }
+
+                // Horizontal Scanlines
+                ctx.fillStyle = 'rgba(0, 243, 255, 0.015)';
+                for (let y = 0; y < H; y += 5) {
+                    ctx.fillRect(0, y, W, 1.5);
+                }
+
+                // Ambient cyan glow
+                const g = ctx.createRadialGradient(W / 2, 350, 0, W / 2, 350, 650);
+                g.addColorStop(0, 'rgba(0, 243, 255, 0.1)');
+                g.addColorStop(1, 'transparent');
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, W, H);
+            }
+
+            // 5. THE VILLA SUNSET (Love Island Miami Sunset Gradient & Frosted Orbs)
+            else if (t.texture === 'sunset_villa') {
+                const sunGrad = ctx.createLinearGradient(0, 0, W, H);
+                sunGrad.addColorStop(0, '#ff007f');
+                sunGrad.addColorStop(0.45, '#ff5e00');
+                sunGrad.addColorStop(0.85, '#8a2be2');
+                sunGrad.addColorStop(1, '#1b0024');
+                ctx.fillStyle = sunGrad;
+                ctx.fillRect(0, 0, W, H);
+
+                // Frosted light bokeh orbs
+                const orbs = [
+                    [180, 280, 220, 'rgba(255, 255, 255, 0.08)'],
+                    [W - 120, 650, 260, 'rgba(255, 240, 0, 0.1)'],
+                    [W / 2, 1200, 320, 'rgba(0, 243, 255, 0.08)'],
+                    [150, 1600, 250, 'rgba(255, 0, 127, 0.12)']
+                ];
+                orbs.forEach(([ox, oy, orad, ocolor]) => {
+                    const og = ctx.createRadialGradient(ox, oy, 0, ox, oy, orad);
+                    og.addColorStop(0, ocolor);
+                    og.addColorStop(1, 'transparent');
+                    ctx.fillStyle = og;
+                    ctx.fillRect(0, 0, W, H);
+                });
+            }
+
+            // 6. SOLARIS MODERN GLASS
+            else if (t.texture === 'solaris') {
+                const sg = ctx.createRadialGradient(160, 260, 0, 160, 260, 650);
+                sg.addColorStop(0, 'rgba(56, 189, 248, 0.16)');
+                sg.addColorStop(1, 'transparent');
+                ctx.fillStyle = sg;
+                ctx.fillRect(0, 0, W, H);
+
+                const sg2 = ctx.createRadialGradient(W - 140, 950, 0, W - 140, 950, 600);
+                sg2.addColorStop(0, 'rgba(52, 211, 153, 0.12)');
+                sg2.addColorStop(1, 'transparent');
+                ctx.fillStyle = sg2;
+                ctx.fillRect(0, 0, W, H);
+            }
+
+            // 7. MINIMAL BROADSHEET (Newspaper Halftone & Sharp Double Rules)
+            else if (t.texture === 'editorial') {
+                // Halftone grid dots
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
+                for (let x = 40; x < W; x += 32) {
+                    for (let y = 40; y < H; y += 32) {
+                        ctx.fillRect(x, y, 1.5, 1.5);
+                    }
+                }
+                // Editorial border
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(36, 36, W - 72, H - 72);
+                ctx.lineWidth = 1;
+                ctx.strokeRect(44, 44, W - 88, H - 88);
+            }
+
+            // 8. ENCHANTED GROVE (Botanical forest spores)
+            else if (t.texture === 'botanical') {
+                const fg = ctx.createRadialGradient(W / 2, 450, 0, W / 2, 450, 720);
+                fg.addColorStop(0, 'rgba(16, 185, 129, 0.15)');
+                fg.addColorStop(1, 'transparent');
+                ctx.fillStyle = fg;
+                ctx.fillRect(0, 0, W, H);
+
+                // Bioluminescent firefly spores
+                const spores = [
+                    [150, 320, 4], [880, 410, 5], [260, 750, 3.5], [810, 890, 4.5],
+                    [180, 1280, 4], [720, 1520, 5], [420, 1720, 3]
+                ];
+                spores.forEach(([sx, sy, srad]) => {
+                    const spg = ctx.createRadialGradient(sx, sy, 0, sx, sy, srad * 4);
+                    spg.addColorStop(0, 'rgba(167, 243, 208, 0.8)');
+                    spg.addColorStop(0.4, 'rgba(16, 185, 129, 0.3)');
+                    spg.addColorStop(1, 'transparent');
+                    ctx.fillStyle = spg;
+                    ctx.fillRect(sx - srad * 4, sy - srad * 4, srad * 8, srad * 8);
+                });
+            }
+
+            // 9. IMPERIAL OBSIDIAN GOLD
+            else if (t.texture === 'gold_marble') {
+                // Gold marble veining / flecks
+                const mg = ctx.createRadialGradient(W / 2, 380, 0, W / 2, 380, 750);
+                mg.addColorStop(0, 'rgba(251, 191, 36, 0.16)');
+                mg.addColorStop(1, 'transparent');
+                ctx.fillStyle = mg;
+                ctx.fillRect(0, 0, W, H);
+
+                ctx.fillStyle = 'rgba(251, 191, 36, 0.08)';
+                for (let i = 0; i < 200; i++) {
+                    const rx = (Math.sin(i * 61) * 0.5 + 0.5) * W;
+                    const ry = (Math.cos(i * 83) * 0.5 + 0.5) * H;
+                    ctx.fillRect(rx, ry, (i % 3) + 1.5, (i % 3) + 1.5);
+                }
+
+                // Beveled gold outer border
+                ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(38, 38, W - 76, H - 76);
+            }
+
+            // 10. SYNTHWAVE RETRO
+            else {
+                const sg = ctx.createRadialGradient(W / 2, 280, 0, W / 2, 280, 700);
+                sg.addColorStop(0, 'rgba(34, 211, 238, 0.14)');
+                sg.addColorStop(1, 'transparent');
+                ctx.fillStyle = sg;
+                ctx.fillRect(0, 0, W, H);
+
+                const sg2 = ctx.createRadialGradient(W - 120, H - 350, 0, W - 120, H - 350, 600);
+                sg2.addColorStop(0, 'rgba(129, 140, 248, 0.14)');
+                sg2.addColorStop(1, 'transparent');
+                ctx.fillStyle = sg2;
+                ctx.fillRect(0, 0, W, H);
+            }
         }
 
         // Draw Standard Header
         function drawHeader(ctx, t, d, slideNum, totalSlides, W, BX, BW) {
             const curY = 95;
             ctx.fillStyle = t.accent;
-            ctx.font = `bold 22px ${t.fontBody}`;
+            ctx.font = `bold 24px ${t.fontBody}`;
             ctx.textAlign = 'left';
-            const headBrand = t.style === 'terminal' ? '> SPRINT_BOT.WRAPPED' : (t.style === 'monarch' ? '◈ SPRINT-BOT WRAPPED' : '🎁 SPRINT-BOT WRAPPED');
-            ctx.fillText(headBrand, BX, curY);
+            ctx.fillText("🎁 SPRINT-BOT WRAPPED", BX, curY);
 
             ctx.textAlign = 'right';
             ctx.fillStyle = t.sub;
-            ctx.font = `bold 20px ${t.fontBody}`;
+            ctx.font = `bold 22px ${t.fontBody}`;
             ctx.fillText(`${d.year.toUpperCase()} • ${slideNum}/${totalSlides}`, BX + BW, curY);
         }
 
@@ -664,8 +780,8 @@
         function drawFooter(ctx, t, W, H) {
             ctx.textAlign = 'center';
             ctx.fillStyle = t.sub;
-            ctx.font = `500 19px ${t.fontBody}`;
-            ctx.fillText("Sprint-Bot Wrapped • Track your writing journey", W / 2, H - 75);
+            ctx.font = `bold 20px ${t.fontBody}`;
+            ctx.fillText("Created with Sprint-Bot • Track your writing journey", W / 2, H - 70);
         }
 
         // ==========================================
@@ -682,7 +798,7 @@
             canvas.width = W; canvas.height = H;
             const BX = 75, BW = W - 150;
 
-            drawBackdrop(ctx, t, W, H);
+            drawThemeTexture(ctx, t, W, H);
             drawHeader(ctx, t, d, slideIdx + 1, SLIDES.length, W, BX, BW);
             drawFooter(ctx, t, W, H);
 
@@ -701,46 +817,47 @@
         function renderSlideVolume(ctx, t, d, W, H, BX, BW) {
             let curY = 160;
 
-            // Author Header Pill
-            const pillW = Math.min(BW, ctx.measureText(d.userName).width + 220);
-            rr(ctx, BX, curY, pillW, 60, 30, t.card, t.border, 1.5);
+            // Author Badge Mini-Pill
+            const pillW = Math.min(BW, 460);
+            rr(ctx, BX, curY, pillW, 64, 32, t.card, t.border, 1.5);
             ctx.fillStyle = t.accent;
             ctx.font = `bold 22px ${t.fontBody}`;
             ctx.textAlign = 'left';
-            ctx.fillText(`✍️ ${d.userName} • 👑 ${d.rank}`, BX + 24, curY + 38);
+            ctx.fillText(`✍️ ${d.userName} • 👑 ${d.rank}`, BX + 26, curY + 40);
 
-            curY += 110;
+            curY += 120;
             ctx.fillStyle = t.sub;
             ctx.font = `bold 26px ${t.fontBody}`;
             ctx.fillText("THIS YEAR, YOU POURED DOWN...", BX, curY);
 
-            // Giant Words Hero Box
+            // Words Hero Box
             curY += 40;
             const boxH = 430;
-            drawThemeCard(ctx, t, BX, curY, BW, boxH, { label: 'VOLUME QUEST' });
+            rr(ctx, BX, curY, BW, boxH, 36, t.card, t.border, 2);
 
+            // Words Number (Cleanly scaled, not gigantic)
             const wordsFormatted = Number(d.totalWords || 0).toLocaleString();
             ctx.textAlign = 'center';
             ctx.fillStyle = t.text;
-            let wSz = 95;
+            let wSz = 96;
             ctx.font = `900 ${wSz}px ${t.fontHeading}`;
             while (ctx.measureText(wordsFormatted).width > (BW - 70) && wSz > 50) {
                 wSz -= 4;
                 ctx.font = `900 ${wSz}px ${t.fontHeading}`;
             }
-            ctx.fillText(wordsFormatted, BX + BW / 2, curY + 190);
+            ctx.fillText(wordsFormatted, BX + BW / 2, curY + 185);
 
             ctx.fillStyle = t.accent;
-            ctx.font = `bold 28px ${t.fontHeading}`;
-            ctx.fillText("TOTAL WORDS WRITTEN", BX + BW / 2, curY + 255);
+            ctx.font = `800 28px ${t.fontHeading}`;
+            ctx.fillText("TOTAL WORDS WRITTEN", BX + BW / 2, curY + 250);
 
             // Novel Equivalent Pill
             const novY = curY + 310;
-            const novW = Math.min(BW - 80, 520), novH = 65;
+            const novW = Math.min(BW - 80, 520), novH = 70;
             rr(ctx, (W - novW) / 2, novY, novW, novH, novH / 2, t.accent + '22', t.accent, 2);
             ctx.fillStyle = t.accent;
             ctx.font = `bold 26px ${t.fontBody}`;
-            ctx.fillText(`That's ${d.novelText}`, W / 2, novY + 42);
+            ctx.fillText(`That's ${d.novelText}`, W / 2, novY + 45);
 
             // Breakdown Tiles
             curY += boxH + 40;
@@ -748,116 +865,116 @@
             const chapters = Math.round(d.totalWords / 3000);
 
             const rowH = 150;
-            const colW = (BW - 25) / 2;
+            const colW = (BW - 24) / 2;
 
             // Box 1: Novellas
-            drawThemeCard(ctx, t, BX, curY, colW, rowH);
+            rr(ctx, BX, curY, colW, rowH, 26, t.card, t.border, 1.5);
             ctx.textAlign = 'left';
             ctx.fillStyle = t.sub;
-            ctx.font = `bold 19px ${t.fontBody}`;
-            ctx.fillText("📖 IN NOVELLAS", BX + 30, curY + 46);
+            ctx.font = `bold 18px ${t.fontBody}`;
+            ctx.fillText("📖 IN NOVELLAS", BX + 30, curY + 44);
             ctx.fillStyle = t.text;
             ctx.font = `800 46px ${t.fontHeading}`;
-            ctx.fillText(`~${novellas}`, BX + 30, curY + 110);
+            ctx.fillText(`~${novellas}`, BX + 30, curY + 106);
 
             // Box 2: Chapters
-            drawThemeCard(ctx, t, BX + colW + 25, curY, colW, rowH);
+            rr(ctx, BX + colW + 24, curY, colW, rowH, 26, t.card, t.border, 1.5);
             ctx.fillStyle = t.sub;
-            ctx.font = `bold 19px ${t.fontBody}`;
-            ctx.fillText("📑 IN CHAPTERS", BX + colW + 55, curY + 46);
+            ctx.font = `bold 18px ${t.fontBody}`;
+            ctx.fillText("📑 IN CHAPTERS", BX + colW + 54, curY + 44);
             ctx.fillStyle = t.accent2;
             ctx.font = `800 46px ${t.fontHeading}`;
-            ctx.fillText(`~${chapters}`, BX + colW + 55, curY + 110);
+            ctx.fillText(`~${chapters}`, BX + colW + 54, curY + 106);
 
             // Narrative Quote Card
-            curY += rowH + 40;
-            drawThemeCard(ctx, t, BX, curY, BW, 200);
+            curY += rowH + 35;
+            rr(ctx, BX, curY, BW, 200, 30, t.bg, t.border, 2);
             ctx.fillStyle = t.text;
             ctx.font = `italic 26px ${t.fontHeading}`;
             ctx.textAlign = 'center';
-            ctx.fillText("“You didn't just write words this year —", W / 2, curY + 80);
+            ctx.fillText("“You didn't just write stories this year —", W / 2, curY + 80);
             ctx.fillStyle = t.accent;
             ctx.fillText("you manufactured entire universes.”", W / 2, curY + 130);
         }
 
         // ── SLIDE 1: CONSISTENCY & MOMENTUM ──────────────────────────────
         function renderSlideConsistency(ctx, t, d, W, H, BX, BW) {
-            let curY = 170;
+            let curY = 180;
 
             ctx.fillStyle = t.accent;
-            ctx.font = `800 40px ${t.fontHeading}`;
+            ctx.font = `800 42px ${t.fontHeading}`;
             ctx.textAlign = 'left';
             ctx.fillText("SHOWING UP IS", BX, curY);
             ctx.fillStyle = t.text;
             ctx.fillText("HALF THE BATTLE 🔥", BX, curY + 52);
 
-            curY += 105;
-            const cBoxH = 390;
-            drawThemeCard(ctx, t, BX, curY, BW, cBoxH, { label: 'HABIT LOG' });
+            curY += 110;
+            const cBoxH = 400;
+            rr(ctx, BX, curY, BW, cBoxH, 36, t.card, t.border, 2);
 
             ctx.fillStyle = t.sub;
             ctx.font = `bold 22px ${t.fontBody}`;
-            ctx.fillText("ACTIVE WRITING DAYS", BX + 40, curY + 60);
+            ctx.fillText("ACTIVE WRITING DAYS", BX + 40, curY + 55);
 
             ctx.fillStyle = t.accent;
             ctx.font = `900 90px ${t.fontHeading}`;
             ctx.fillText(`${d.activeDays}`, BX + 40, curY + 170);
 
             ctx.fillStyle = t.text;
-            ctx.font = `800 32px ${t.fontHeading}`;
+            ctx.font = `800 34px ${t.fontHeading}`;
             ctx.fillText("DAYS LOGGED", BX + 40, curY + 230);
 
             // Progress bar
             const pct = Math.min(100, Math.round((d.activeDays / 365) * 100));
             const pBarY = curY + 280;
             const pBarW = BW - 80;
-            rr(ctx, BX + 40, pBarY, pBarW, 16, 8, 'rgba(255,255,255,0.1)', '', 0);
-            rr(ctx, BX + 40, pBarY, pBarW * (pct / 100), 16, 8, t.accent, '', 0);
+            rr(ctx, BX + 40, pBarY, pBarW, 18, 9, 'rgba(255,255,255,0.1)', '', 0);
+            rr(ctx, BX + 40, pBarY, pBarW * (pct / 100), 18, 9, t.accent, '', 0);
 
             ctx.fillStyle = t.sub;
-            ctx.font = `bold 21px ${t.fontBody}`;
+            ctx.font = `bold 22px ${t.fontBody}`;
             ctx.fillText(`${pct}% of the entire year spent writing!`, BX + 40, curY + 345);
 
             // Best Streak Card
             curY += cBoxH + 40;
-            const sBoxH = 370;
-            drawThemeCard(ctx, t, BX, curY, BW, sBoxH, { label: 'STREAK POWER' });
+            const sBoxH = 380;
+            rr(ctx, BX, curY, BW, sBoxH, 36, t.card, t.border, 2);
 
             ctx.fillStyle = '#f97316';
             ctx.font = `bold 22px ${t.fontBody}`;
-            ctx.fillText("🔥 LONGEST WRITING STREAK", BX + 40, curY + 60);
+            ctx.fillText("🔥 LONGEST WRITING STREAK", BX + 40, curY + 55);
 
             ctx.fillStyle = '#f97316';
             ctx.font = `900 90px ${t.fontHeading}`;
             ctx.fillText(`${d.bestStreak}`, BX + 40, curY + 170);
 
             ctx.fillStyle = t.text;
-            ctx.font = `800 32px ${t.fontHeading}`;
-            ctx.fillText("CONSECUTIVE DAYS", BX + 40, curY + 230);
+            ctx.font = `800 34px ${t.fontHeading}`;
+            ctx.fillText("DAYS IN A ROW", BX + 40, curY + 230);
 
             ctx.fillStyle = t.sub;
-            ctx.font = `500 22px ${t.fontBody}`;
+            ctx.font = `500 24px ${t.fontBody}`;
             ctx.fillText("Unbroken creative momentum.", BX + 40, curY + 295);
-            ctx.fillText("Rain, shine, or writer's block — you sat down and wrote.", BX + 40, curY + 330);
+            ctx.fillText("Rain or shine — you sat down and put words on paper.", BX + 40, curY + 335);
         }
 
         // ── SLIDE 2: SPEED & FOCUS (SPRINTS) ─────────────────────────────
         function renderSlideSprints(ctx, t, d, W, H, BX, BW) {
-            let curY = 170;
+            let curY = 180;
 
             ctx.fillStyle = t.accent2;
-            ctx.font = `800 40px ${t.fontHeading}`;
+            ctx.font = `800 42px ${t.fontHeading}`;
             ctx.textAlign = 'left';
             ctx.fillText("WHEN THE TIMER STARTS,", BX, curY);
             ctx.fillStyle = t.text;
             ctx.fillText("THE MAGIC FLOWS ⚡", BX, curY + 52);
 
-            curY += 105;
-            const rowH = 300;
-            const colW = (BW - 25) / 2;
+            curY += 110;
+            const rowH = 310;
+            const colW = (BW - 24) / 2;
 
             // Speed Tile
-            drawThemeCard(ctx, t, BX, curY, colW, rowH);
+            rr(ctx, BX, curY, colW, rowH, 30, t.card, t.border, 2);
             ctx.fillStyle = t.accent2;
             ctx.font = `bold 20px ${t.fontBody}`;
             ctx.fillText("⚡ PEAK SPEED", BX + 30, curY + 50);
@@ -867,50 +984,50 @@
             ctx.fillText(`${d.peakSprintWpm}`, BX + 30, curY + 145);
 
             ctx.fillStyle = t.accent2;
-            ctx.font = `800 24px ${t.fontHeading}`;
+            ctx.font = `800 26px ${t.fontHeading}`;
             ctx.fillText("WORDS / MIN", BX + 30, curY + 195);
 
             ctx.fillStyle = t.sub;
-            ctx.font = `500 19px ${t.fontBody}`;
-            ctx.fillText(`Top: ${d.peakSprintWords.toLocaleString()}w`, BX + 30, curY + 250);
+            ctx.font = `500 20px ${t.fontBody}`;
+            ctx.fillText(`Top: ${d.peakSprintWords.toLocaleString()}w`, BX + 30, curY + 255);
 
             // Focus Hours Tile
-            drawThemeCard(ctx, t, BX + colW + 25, curY, colW, rowH);
+            rr(ctx, BX + colW + 24, curY, colW, rowH, 30, t.card, t.border, 2);
             ctx.fillStyle = t.accent;
             ctx.font = `bold 20px ${t.fontBody}`;
-            ctx.fillText("⏱️ FOCUS TIME", BX + colW + 55, curY + 50);
+            ctx.fillText("⏱️ FOCUS TIME", BX + colW + 54, curY + 50);
 
             ctx.fillStyle = t.text;
             ctx.font = `900 70px ${t.fontHeading}`;
-            ctx.fillText(`${d.sprintHours}h`, BX + colW + 55, curY + 145);
+            ctx.fillText(`${d.sprintHours}h`, BX + colW + 54, curY + 145);
 
             ctx.fillStyle = t.accent;
-            ctx.font = `800 24px ${t.fontHeading}`;
-            ctx.fillText("TOTAL HOURS", BX + colW + 55, curY + 195);
+            ctx.font = `800 26px ${t.fontHeading}`;
+            ctx.fillText("TOTAL HOURS", BX + colW + 54, curY + 195);
 
             ctx.fillStyle = t.sub;
-            ctx.font = `500 19px ${t.fontBody}`;
-            ctx.fillText(`${d.totalSprints} sprints finished`, BX + colW + 55, curY + 250);
+            ctx.font = `500 20px ${t.fontBody}`;
+            ctx.fillText(`${d.totalSprints} sprints completed`, BX + colW + 54, curY + 255);
 
             // Sprint Companion Card
             curY += rowH + 40;
             const compH = 340;
-            drawThemeCard(ctx, t, BX, curY, BW, compH, { label: 'SQUAD ALLY' });
+            rr(ctx, BX, curY, BW, compH, 34, t.card, t.border, 2);
 
             ctx.fillStyle = t.sub;
             ctx.font = `bold 22px ${t.fontBody}`;
-            ctx.fillText("🤝 TOP SPRINT PARTNER", BX + 40, curY + 55);
+            ctx.fillText("🤝 TOP SPRINT PARTNER", BX + 40, curY + 60);
 
             ctx.fillStyle = t.text;
-            ctx.font = `800 46px ${t.fontHeading}`;
-            ctx.fillText(d.topCompanion || 'The Writing Community', BX + 40, curY + 135);
+            ctx.font = `800 44px ${t.fontHeading}`;
+            ctx.fillText(d.topCompanion || 'The Writing Community', BX + 40, curY + 140);
 
             ctx.fillStyle = t.accent;
-            ctx.font = `bold 23px ${t.fontBody}`;
+            ctx.font = `bold 24px ${t.fontBody}`;
             if (d.topCompanionSprints > 0) {
-                ctx.fillText(`Sprinted side-by-side ${d.topCompanionSprints} times!`, BX + 40, curY + 190);
+                ctx.fillText(`Sprinted side-by-side ${d.topCompanionSprints} times!`, BX + 40, curY + 195);
             } else {
-                ctx.fillText(`Cheered on by fellow writers worldwide!`, BX + 40, curY + 190);
+                ctx.fillText(`Cheered on by writers worldwide!`, BX + 40, curY + 195);
             }
 
             ctx.fillStyle = t.sub;
@@ -918,111 +1035,113 @@
             ctx.fillText("“Writing is solitary, but sprinting together makes it unstoppable.”", BX + 40, curY + 270);
         }
 
-        // ── SLIDE 3: WRITING SUPERLATIVES (CLEAN, PROPERLY SPACED) ───────
+        // ── SLIDE 3: WRITING SUPERLATIVES (CLEAN SEPARATE BOXES) ─────────
         function renderSlideSuperlatives(ctx, t, d, W, H, BX, BW) {
-            let curY = 160;
+            let curY = 170;
 
             ctx.fillStyle = t.accent;
-            ctx.font = `800 40px ${t.fontHeading}`;
+            ctx.font = `800 42px ${t.fontHeading}`;
             ctx.textAlign = 'left';
             ctx.fillText("YOUR CREATIVE DNA", BX, curY);
             ctx.fillStyle = t.text;
             ctx.fillText("SUPERLATIVES & HABITS 🏆", BX, curY + 52);
 
-            // 1. Peak Writing Day Card
-            curY += 95;
-            const pDayH = 250;
-            drawThemeCard(ctx, t, BX, curY, BW, pDayH, { label: 'RECORD HIGH' });
+            // 1. Peak Writing Day (Spacious Box)
+            curY += 100;
+            const pDayH = 260;
+            rr(ctx, BX, curY, BW, pDayH, 34, t.card, t.border, 2);
 
             ctx.fillStyle = t.accent;
-            ctx.font = `bold 20px ${t.fontBody}`;
+            ctx.font = `bold 22px ${t.fontBody}`;
             ctx.fillText("🌟 MOST PROLIFIC DAY OF THE YEAR", BX + 40, curY + 50);
 
             ctx.fillStyle = t.text;
-            ctx.font = `900 56px ${t.fontHeading}`;
+            ctx.font = `900 58px ${t.fontHeading}`;
             const peakWordsFormatted = Number(d.bestDay?.words || 0).toLocaleString();
             ctx.fillText(`${peakWordsFormatted} WORDS`, BX + 40, curY + 130);
 
             ctx.fillStyle = t.sub;
             ctx.font = `bold 24px ${t.fontBody}`;
-            ctx.fillText(`Date: ${d.bestDay?.date || '—'}`, BX + 40, curY + 180);
+            ctx.fillText(`Logged on: ${d.bestDay?.date || '—'}`, BX + 40, curY + 185);
 
             ctx.fillStyle = t.accent;
-            ctx.font = `italic 19px ${t.fontBody}`;
-            ctx.fillText("Your highest word output in a single 24-hour cycle.", BX + 40, curY + 218);
+            ctx.font = `italic 20px ${t.fontBody}`;
+            ctx.fillText("The ink never dried on this unforgettable writing spree.", BX + 40, curY + 225);
 
-            // 2. Power Day Card (Separated & Spacious)
-            curY += pDayH + 30;
+            // 2. Power Day (Spacious Box)
+            curY += pDayH + 35;
             const powH = 230;
-            drawThemeCard(ctx, t, BX, curY, BW, powH, { label: 'PEAK MOMENTUM' });
+            rr(ctx, BX, curY, BW, powH, 34, t.card, t.border, 2);
 
             ctx.fillStyle = t.accent2;
-            ctx.font = `bold 20px ${t.fontBody}`;
+            ctx.font = `bold 22px ${t.fontBody}`;
             ctx.fillText("🗓️ YOUR POWER DAY", BX + 40, curY + 50);
 
             ctx.fillStyle = t.text;
-            ctx.font = `900 52px ${t.fontHeading}`;
-            ctx.fillText(`${d.favoriteDay.toUpperCase()}`, BX + 40, curY + 125);
+            ctx.font = `900 54px ${t.fontHeading}`;
+            ctx.fillText(`${d.favoriteDay.toUpperCase()}`, BX + 40, curY + 130);
 
             ctx.fillStyle = t.sub;
             ctx.font = `500 22px ${t.fontBody}`;
-            ctx.fillText("Your most prolific writing day of the week.", BX + 40, curY + 175);
+            ctx.fillText(`Your highest average word production clustered on this day.`, BX + 40, curY + 180);
 
             // 3. Goals & Badges Row
-            curY += powH + 30;
+            curY += powH + 35;
             const gRowH = 180;
-            const colW = (BW - 25) / 2;
+            const colW = (BW - 24) / 2;
 
-            drawThemeCard(ctx, t, BX, curY, colW, gRowH);
+            // Box 1: Goals Crushed
+            rr(ctx, BX, curY, colW, gRowH, 28, t.card, t.border, 1.5);
             ctx.fillStyle = t.sub;
-            ctx.font = `bold 19px ${t.fontBody}`;
+            ctx.font = `bold 20px ${t.fontBody}`;
             ctx.fillText("🎯 GOALS CRUSHED", BX + 30, curY + 45);
             ctx.fillStyle = t.accent;
-            ctx.font = `800 50px ${t.fontHeading}`;
-            ctx.fillText(`${d.goalsCrushed || 0}`, BX + 30, curY + 115);
+            ctx.font = `800 52px ${t.fontHeading}`;
+            ctx.fillText(`${d.goalsCrushed || 0}`, BX + 30, curY + 118);
             ctx.fillStyle = t.sub;
             ctx.font = `500 18px ${t.fontBody}`;
-            ctx.fillText("Targets surpassed", BX + 30, curY + 150);
+            ctx.fillText("Milestones achieved", BX + 30, curY + 152);
 
-            drawThemeCard(ctx, t, BX + colW + 25, curY, colW, gRowH);
+            // Box 2: Badges Unlocked
+            rr(ctx, BX + colW + 24, curY, colW, gRowH, 28, t.card, t.border, 1.5);
             ctx.fillStyle = t.sub;
-            ctx.font = `bold 19px ${t.fontBody}`;
-            ctx.fillText("🏅 BADGES EARNED", BX + colW + 55, curY + 45);
+            ctx.font = `bold 20px ${t.fontBody}`;
+            ctx.fillText("🏅 BADGES EARNED", BX + colW + 54, curY + 45);
             ctx.fillStyle = t.accent2;
-            ctx.font = `800 50px ${t.fontHeading}`;
-            ctx.fillText(`${d.badgesCount || 0}`, BX + colW + 55, curY + 115);
+            ctx.font = `800 52px ${t.fontHeading}`;
+            ctx.fillText(`${d.badgesCount || 0}`, BX + colW + 54, curY + 118);
             ctx.fillStyle = t.sub;
             ctx.font = `500 18px ${t.fontBody}`;
             const bIcons = (d.badges || []).slice(0, 4).map(b => b.icon).join(' ') || '🏅';
-            ctx.fillText(bIcons, BX + colW + 55, curY + 150);
+            ctx.fillText(bIcons, BX + colW + 54, curY + 152);
         }
 
         // ── SLIDE 4: WRITER PERSONA REVEAL ───────────────────────────────
         function renderSlidePersona(ctx, t, d, W, H, BX, BW) {
-            let curY = 170;
+            let curY = 180;
 
             ctx.fillStyle = t.sub;
-            ctx.font = `bold 22px ${t.fontBody}`;
+            ctx.font = `bold 24px ${t.fontBody}`;
             ctx.textAlign = 'center';
             ctx.fillText("THE DATA HAS SPOKEN", W / 2, curY);
 
             ctx.fillStyle = t.text;
             ctx.font = `800 42px ${t.fontHeading}`;
-            ctx.fillText("YOUR 2026 PERSONA IS...", W / 2, curY + 55);
+            ctx.fillText("YOUR 2026 PERSONA IS...", W / 2, curY + 54);
 
             // Giant Hero Persona Card
-            curY += 105;
-            const pH = 760;
-            drawThemeCard(ctx, t, BX, curY, BW, pH, { label: 'ARCHETYPE MATRIX' });
+            curY += 100;
+            const pH = 780;
+            rr(ctx, BX, curY, BW, pH, 38, t.card, t.border, 2);
 
-            // Badge Avatar
+            // Giant Badge Avatar
             const bSize = 190;
             const bX = (W - bSize) / 2;
             const bY = curY + 60;
             const pGrad = ctx.createLinearGradient(bX, bY, bX + bSize, bY + bSize);
             pGrad.addColorStop(0, t.accent);
             pGrad.addColorStop(1, t.accent2);
-            rr(ctx, bX, bY, bSize, bSize, 38, pGrad, '', 0);
+            rr(ctx, bX, bY, bSize, bSize, 40, pGrad, '', 0);
 
             ctx.fillStyle = '#ffffff';
             ctx.font = `95px ${t.fontHeading}`;
@@ -1033,61 +1152,61 @@
             // Persona Title
             ctx.fillStyle = t.text;
             const title = d.persona?.title || 'The Novel Titan ⚡';
-            let tSz = 48;
+            let tSz = 50;
             ctx.font = `900 ${tSz}px ${t.fontHeading}`;
-            while (ctx.measureText(title).width > (BW - 60) && tSz > 28) {
+            while (ctx.measureText(title).width > (BW - 60) && tSz > 30) {
                 tSz -= 2;
                 ctx.font = `900 ${tSz}px ${t.fontHeading}`;
             }
-            ctx.fillText(title, W / 2, curY + 330);
+            ctx.fillText(title, W / 2, curY + 335);
 
             // Tagline Box
-            const tagY = curY + 375;
-            rr(ctx, BX + 35, tagY, BW - 70, 130, 20, t.bg, t.border, 1.5);
+            const tagY = curY + 380;
+            rr(ctx, BX + 35, tagY, BW - 70, 130, 22, t.bg, t.border, 1.5);
             ctx.fillStyle = t.sub;
-            ctx.font = `italic 23px ${t.fontBody}`;
+            ctx.font = `italic 24px ${t.fontBody}`;
             const tagline = d.persona?.tagline || "You don't just write stories, you manufacture entire universes.";
-            ctx.fillText(`“${tagline}”`, W / 2, tagY + 72);
+            ctx.fillText(`“${tagline}”`, W / 2, tagY + 75);
 
             // Trait Badges
             curY = tagY + 170;
-            const trW = (BW - 100) / 3;
+            const trW = (BW - 110) / 3;
             const traits = [
-                { k: 'VOLUME', v: `${(d.totalWords / 1000).toFixed(0)}K+` },
+                { k: 'OUTPUT', v: `${(d.totalWords / 1000).toFixed(0)}K+` },
                 { k: 'STREAK', v: `${d.bestStreak}d` },
                 { k: 'SPEED', v: `${d.peakSprintWpm} wpm` }
             ];
 
             traits.forEach((tr, i) => {
-                const trX = BX + 35 + i * (trW + 15);
-                rr(ctx, trX, curY, trW, 100, 18, t.card, t.border, 1.5);
+                const trX = BX + 35 + i * (trW + 20);
+                rr(ctx, trX, curY, trW, 105, 18, t.card, t.border, 1.5);
                 ctx.fillStyle = t.sub;
                 ctx.font = `bold 16px ${t.fontBody}`;
-                ctx.fillText(tr.k, trX + trW / 2, curY + 36);
+                ctx.fillText(tr.k, trX + trW / 2, curY + 38);
                 ctx.fillStyle = t.accent;
                 ctx.font = `800 28px ${t.fontHeading}`;
-                ctx.fillText(tr.v, trX + trW / 2, curY + 76);
+                ctx.fillText(tr.v, trX + trW / 2, curY + 80);
             });
         }
 
-        // ── SLIDE 5: FULL MASTER SUMMARY (BALANCED, NO CRAMPING) ─────────
+        // ── SLIDE 5: FULL MASTER SUMMARY (PROPORTIONATE & BALANCED) ────────
         function renderSlideSummary(ctx, t, d, W, H, BX, BW) {
-            let curY = 140;
+            let curY = 145;
 
-            // 1. Author Hero Card
-            const heroH = 280;
-            drawThemeCard(ctx, t, BX, curY, BW, heroH, { label: 'OFFICIAL RECORD' });
+            // 1. Author & Persona Hero Card (Sleek 260px height)
+            const heroH = 265;
+            rr(ctx, BX, curY, BW, heroH, 32, t.card, t.border, 2);
 
-            const avS = 105;
+            const avS = 100;
             const avX = BX + 35;
-            const avY = curY + 35;
+            const avY = curY + 30;
             const avGrad = ctx.createLinearGradient(avX, avY, avX + avS, avY + avS);
             avGrad.addColorStop(0, t.accent);
             avGrad.addColorStop(1, t.accent2);
-            rr(ctx, avX, avY, avS, avS, 24, avGrad, '', 0);
+            rr(ctx, avX, avY, avS, avS, 22, avGrad, '', 0);
 
             ctx.fillStyle = '#ffffff';
-            ctx.font = `800 56px ${t.fontHeading}`;
+            ctx.font = `800 52px ${t.fontHeading}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             const initial = (d.userName || 'W').charAt(0).toUpperCase();
@@ -1097,24 +1216,24 @@
             // Author Name & Rank
             ctx.textAlign = 'left';
             ctx.fillStyle = t.text;
-            let nSize = 46;
+            let nSize = 42;
             ctx.font = `800 ${nSize}px ${t.fontHeading}`;
-            while (ctx.measureText(d.userName).width > (BW - 200) && nSize > 28) {
+            while (ctx.measureText(d.userName).width > (BW - 190) && nSize > 26) {
                 nSize -= 2;
                 ctx.font = `800 ${nSize}px ${t.fontHeading}`;
             }
-            ctx.fillText(d.userName, BX + 165, avY + 44);
+            ctx.fillText(d.userName, BX + 160, avY + 40);
 
             ctx.fillStyle = t.accent;
             ctx.font = `bold 22px ${t.fontBody}`;
-            ctx.fillText(`👑 ${d.rank.toUpperCase()}`, BX + 165, avY + 85);
+            ctx.fillText(`👑 ${d.rank.toUpperCase()}`, BX + 160, avY + 80);
 
             // Persona Banner inside Hero
-            const pyY = curY + 165;
+            const pyY = curY + 155;
             rr(ctx, BX + 25, pyY, BW - 50, 85, 18, t.bg, t.border, 1.5);
             ctx.fillStyle = t.accent;
             ctx.font = `800 24px ${t.fontHeading}`;
-            ctx.fillText(`🎭 ${d.persona?.title || 'The Passionate Storyteller ✍️'}`, BX + 45, pyY + 36);
+            ctx.fillText(`🎭 ${d.persona?.title || 'The Passionate Storyteller ✍️'}`, BX + 45, pyY + 38);
 
             ctx.fillStyle = t.sub;
             ctx.font = `500 18px ${t.fontBody}`;
@@ -1122,121 +1241,125 @@
             if (ctx.measureText(tagline).width > (BW - 90)) tagline = tagline.slice(0, 48) + '...';
             ctx.fillText(tagline, BX + 45, pyY + 66);
 
-            // 2. Big Volume Card
+            // 2. Big Volume Card (Sleek 280px height)
             curY += heroH + 25;
-            const volH = 300;
-            drawThemeCard(ctx, t, BX, curY, BW, volH);
+            const volH = 285;
+            rr(ctx, BX, curY, BW, volH, 32, t.card, t.border, 2);
 
             ctx.textAlign = 'center';
             ctx.fillStyle = t.sub;
             ctx.font = `bold 20px ${t.fontBody}`;
-            ctx.fillText("WORDS WRITTEN THIS YEAR", BX + BW / 2, curY + 52);
+            ctx.fillText("WORDS WRITTEN THIS YEAR", BX + BW / 2, curY + 50);
 
+            // Large word count (scaled nicely to ~78px)
             ctx.fillStyle = t.text;
             const wordsFormatted = Number(d.totalWords || 0).toLocaleString();
-            let wSz = 85;
+            let wSz = 78;
             ctx.font = `900 ${wSz}px ${t.fontHeading}`;
-            while (ctx.measureText(wordsFormatted).width > (BW - 70) && wSz > 46) {
+            while (ctx.measureText(wordsFormatted).width > (BW - 60) && wSz > 40) {
                 wSz -= 4;
                 ctx.font = `900 ${wSz}px ${t.fontHeading}`;
             }
-            ctx.fillText(wordsFormatted, BX + BW / 2, curY + 155);
+            ctx.fillText(wordsFormatted, BX + BW / 2, curY + 145);
 
             // Novel Equivalent Pill
-            const novY = curY + 205;
-            const novW = Math.min(BW - 70, 480), novH = 60;
-            rr(ctx, (W - novW) / 2, novY, novW, novH, novH / 2, t.accent + '22', t.accent, 2);
+            const novY = curY + 190;
+            const novW = Math.min(BW - 60, 480), novH = 62;
+            rr(ctx, (W - novW) / 2, novY, novW, novH, novH / 2, t.accent + '22', t.accent, 1.8);
             ctx.fillStyle = t.accent;
-            ctx.font = `bold 24px ${t.fontBody}`;
-            ctx.fillText(`That's ${d.novelText}`, W / 2, novY + 39);
+            ctx.font = `bold 23px ${t.fontBody}`;
+            ctx.fillText(`That's ${d.novelText}`, W / 2, novY + 40);
 
-            // 3. 2x2 Stat Tiles
+            // 3. 2x2 Stat Tiles (Compact 175px height)
             curY += volH + 25;
             const tileW = (BW - 20) / 2;
             const tileH = 175;
 
             // Tile 1: Active Days
-            drawThemeCard(ctx, t, BX, curY, tileW, tileH);
+            rr(ctx, BX, curY, tileW, tileH, 24, t.card, t.border, 1.8);
             ctx.textAlign = 'left';
             ctx.fillStyle = t.sub;
             ctx.font = `bold 18px ${t.fontBody}`;
-            ctx.fillText("📅 ACTIVE DAYS", BX + 25, curY + 40);
+            ctx.fillText("📅 ACTIVE DAYS", BX + 26, curY + 42);
             ctx.fillStyle = t.text;
             ctx.font = `800 44px ${t.fontHeading}`;
-            ctx.fillText(`${d.activeDays}`, BX + 25, curY + 102);
+            ctx.fillText(`${d.activeDays}`, BX + 26, curY + 104);
             ctx.fillStyle = t.accent;
             ctx.font = `600 18px ${t.fontBody}`;
             const pctYear = Math.round((d.activeDays / 365) * 100);
-            ctx.fillText(`${pctYear}% of year`, BX + 25, curY + 140);
+            ctx.fillText(`${pctYear}% of the year!`, BX + 26, curY + 140);
 
             // Tile 2: Best Streak
-            drawThemeCard(ctx, t, BX + tileW + 20, curY, tileW, tileH);
+            rr(ctx, BX + tileW + 20, curY, tileW, tileH, 24, t.card, t.border, 1.8);
             ctx.fillStyle = t.sub;
             ctx.font = `bold 18px ${t.fontBody}`;
-            ctx.fillText("🔥 BEST STREAK", BX + tileW + 45, curY + 40);
+            ctx.fillText("🔥 BEST STREAK", BX + tileW + 46, curY + 42);
             ctx.fillStyle = '#f97316';
             ctx.font = `800 44px ${t.fontHeading}`;
-            ctx.fillText(`${d.bestStreak}d`, BX + tileW + 45, curY + 102);
+            ctx.fillText(`${d.bestStreak}d`, BX + tileW + 46, curY + 104);
             ctx.fillStyle = t.sub;
             ctx.font = `500 18px ${t.fontBody}`;
-            ctx.fillText("Unbroken flow", BX + tileW + 45, curY + 140);
+            ctx.fillText("Unbroken streak", BX + tileW + 46, curY + 140);
 
             // Row 2 of Tiles: Peak Sprint & Focus Time
             curY += tileH + 18;
 
             // Tile 3: Sprint Speed
-            drawThemeCard(ctx, t, BX, curY, tileW, tileH);
+            rr(ctx, BX, curY, tileW, tileH, 24, t.card, t.border, 1.8);
             ctx.fillStyle = t.sub;
             ctx.font = `bold 18px ${t.fontBody}`;
-            ctx.fillText("⚡ PEAK SPEED", BX + 25, curY + 40);
+            ctx.fillText("⚡ PEAK SPEED", BX + 26, curY + 42);
             ctx.fillStyle = t.accent2;
             ctx.font = `800 44px ${t.fontHeading}`;
-            ctx.fillText(`${d.peakSprintWpm} WPM`, BX + 25, curY + 102);
+            ctx.fillText(`${d.peakSprintWpm} WPM`, BX + 26, curY + 104);
             ctx.fillStyle = t.sub;
             ctx.font = `500 18px ${t.fontBody}`;
-            ctx.fillText(`Top: ${d.peakSprintWords.toLocaleString()}w`, BX + 25, curY + 140);
+            ctx.fillText(`Top: ${d.peakSprintWords.toLocaleString()}w`, BX + 26, curY + 140);
 
             // Tile 4: Sprints & Hours
-            drawThemeCard(ctx, t, BX + tileW + 20, curY, tileW, tileH);
+            rr(ctx, BX + tileW + 20, curY, tileW, tileH, 24, t.card, t.border, 1.8);
             ctx.fillStyle = t.sub;
             ctx.font = `bold 18px ${t.fontBody}`;
-            ctx.fillText("⏱️ TIME SPRINTING", BX + tileW + 45, curY + 40);
+            ctx.fillText("⏱️ TIME SPRINTING", BX + tileW + 46, curY + 42);
             ctx.fillStyle = t.accent;
             ctx.font = `800 44px ${t.fontHeading}`;
-            ctx.fillText(`${d.sprintHours}h`, BX + tileW + 45, curY + 102);
+            ctx.fillText(`${d.sprintHours}h`, BX + tileW + 46, curY + 104);
             ctx.fillStyle = t.sub;
             ctx.font = `500 18px ${t.fontBody}`;
-            ctx.fillText(`${d.totalSprints} sprints`, BX + tileW + 45, curY + 140);
+            ctx.fillText(`${d.totalSprints} sprints completed`, BX + tileW + 46, curY + 140);
 
-            // 4. Superlatives (Completely resolved layout with distinct rows)
-            curY += tileH + 25;
-            const supH = 190;
-            drawThemeCard(ctx, t, BX, curY, BW, supH);
+            // 4. SUPERLATIVES (Clean Side-by-Side Cards: ZERO COLLISION)
+            curY += tileH + 22;
+            const supCardH = 155;
 
-            ctx.textAlign = 'left';
-            ctx.fillStyle = t.sub;
-            ctx.font = `bold 18px ${t.fontBody}`;
-            ctx.fillText("🏆 WRITING SUPERLATIVES", BX + 30, curY + 38);
-
-            // Row 1: Peak Day
-            const pDayY = curY + 88;
-            ctx.fillStyle = t.text;
-            ctx.font = `700 21px ${t.fontHeading}`;
-            ctx.fillText("🌟 Peak Day:", BX + 30, pDayY);
+            // Box A: Peak Writing Day (Left Column)
+            rr(ctx, BX, curY, tileW, supCardH, 24, t.card, t.border, 1.8);
             ctx.fillStyle = t.accent;
-            ctx.font = `bold 21px ${t.fontBody}`;
-            const peakDate = d.bestDay?.date || '—';
-            const peakW = Number(d.bestDay?.words || 0).toLocaleString();
-            ctx.fillText(`${peakDate}  (${peakW} words)`, BX + 165, pDayY);
+            ctx.font = `bold 17px ${t.fontBody}`;
+            ctx.fillText("🌟 PEAK WRITING DAY", BX + 24, curY + 38);
 
-            // Row 2: Power Day
-            const powY = curY + 144;
             ctx.fillStyle = t.text;
-            ctx.font = `700 21px ${t.fontHeading}`;
-            ctx.fillText("🗓️ Power Day:", BX + 30, powY);
+            ctx.font = `800 24px ${t.fontHeading}`;
+            ctx.fillText(`${d.bestDay?.date || '—'}`, BX + 24, curY + 82);
+
+            ctx.fillStyle = t.sub;
+            ctx.font = `600 20px ${t.fontBody}`;
+            const peakW = Number(d.bestDay?.words || 0).toLocaleString();
+            ctx.fillText(`${peakW} words logged`, BX + 24, curY + 120);
+
+            // Box B: Power Day (Right Column)
+            rr(ctx, BX + tileW + 20, curY, tileW, supCardH, 24, t.card, t.border, 1.8);
             ctx.fillStyle = t.accent2;
-            ctx.font = `bold 21px ${t.fontBody}`;
-            ctx.fillText(`${d.favoriteDay} (Most prolific)`, BX + 175, powY);
+            ctx.font = `bold 17px ${t.fontBody}`;
+            ctx.fillText("🗓️ POWER DAY", BX + tileW + 44, curY + 38);
+
+            ctx.fillStyle = t.accent2;
+            ctx.font = `900 28px ${t.fontHeading}`;
+            ctx.fillText(`${d.favoriteDay.toUpperCase()}`, BX + tileW + 44, curY + 84);
+
+            ctx.fillStyle = t.sub;
+            ctx.font = `500 18px ${t.fontBody}`;
+            ctx.fillText("Most active day of week", BX + tileW + 44, curY + 120);
         }
 
         // Initialize Card
@@ -1263,6 +1386,7 @@
             zipText.textContent = "Rendering All...";
 
             try {
+                // Check if JSZip is loaded
                 if (window.JSZip) {
                     const zip = new JSZip();
                     const offCanvas = document.createElement('canvas');
@@ -1286,6 +1410,7 @@
                     link.click();
                     setTimeout(() => URL.revokeObjectURL(link.href), 10000);
                 } else {
+                    // Fallback if JSZip is offline: sequential individual downloads
                     const offCanvas = document.createElement('canvas');
                     offCanvas.width = 1080;
                     offCanvas.height = 1920;
@@ -1305,6 +1430,7 @@
             } finally {
                 zipIcon.textContent = "📦";
                 zipText.textContent = originalText;
+                // Restore current slide view
                 drawStoryCard(currentSlideIndex);
             }
         };
