@@ -98,9 +98,9 @@ module.exports = function(appState) {
     }, { timezone: TIMEZONE });
 
     // ==========================================
-    // 2. STREAK REMINDER (23:00)
+    // 2. STREAK REMINDERS (17:00 & 23:00)
     // ==========================================
-    cron.schedule('0 23 * * *', async () => {
+    const runStreakReminder = async (type = 'final') => {
         if (!appState.isConnected || !appState.sock) return;
         try {
             const today = getTodayDateGMT1();
@@ -116,8 +116,9 @@ module.exports = function(appState) {
 
             const atRiskProfiles = rawAtRiskProfiles.filter(p => !activeToday.has(p.userId));
 
-            console.log(`🔥 Streak Reminder: ${atRiskProfiles.length} authors at risk...`);
-            pushActivity('system', `Running streak reminder for ${atRiskProfiles.length} authors`, '🔥');
+            const label = type === 'evening' ? 'Evening Check-in (17:00)' : 'Final Warning (23:00)';
+            console.log(`🔥 Streak Reminder [${label}]: ${atRiskProfiles.length} authors at risk...`);
+            pushActivity('system', `Running streak reminder [${label}] for ${atRiskProfiles.length} authors`, '🔥');
 
             if (!atRiskProfiles.length) return;
 
@@ -159,7 +160,12 @@ module.exports = function(appState) {
                 const listText = profiles.map(p => `- @${p.userId.split('@')[0]} (${p.currentStreak}-day streak 🔥)`).join('\n');
                 const mentions = profiles.map(p => p.userId);
 
-                const txt = `⚠️ *STREAK AT RISK!* ⚠️\n━━━━━━━━━━━━━━━━\nThe following writers have less than 1 hour to log their words or risk losing their streaks:\n${listText}\n\nType *!log [number]* or start a *!sprint* NOW! ✍️`;
+                let txt = '';
+                if (type === 'evening') {
+                    txt = `🌆 *EVENING WORD CHECK-IN* 🌆\n━━━━━━━━━━━━━━━━\nThe following writers haven't logged words today:\n${listText}\n\nDon't let your streak slip before bedtime! Drop your words with *!log [number]* or jump into a *!sprint* ✍️🔥`;
+                } else {
+                    txt = `⚠️ *FINAL CALL — 1 HOUR LEFT!* ⚠️\n━━━━━━━━━━━━━━━━\nThe following writers have less than 1 hour to log their words or risk losing their streaks:\n${listText}\n\nType *!log [number]* or start a *!sprint* NOW! ✍️`;
+                }
 
                 try {
                     await appState.sock.sendMessage(gid, { text: txt, mentions });
@@ -170,9 +176,15 @@ module.exports = function(appState) {
                 }
             }
 
-            pushActivity('system', `Streak reminders delivered to ${sentCount} authors`, '📢');
+            pushActivity('system', `Streak reminders [${label}] delivered to ${sentCount} authors`, '📢');
         } catch (e) { console.error("Streak reminder job error:", e); }
-    }, { timezone: TIMEZONE });
+    };
+
+    // 5:00 PM (17:00) Evening Nudge
+    cron.schedule('0 17 * * *', () => runStreakReminder('evening'), { timezone: TIMEZONE });
+
+    // 11:00 PM (23:00) Final 1-Hour Call
+    cron.schedule('0 23 * * *', () => runStreakReminder('final'), { timezone: TIMEZONE });
 
     // ==========================================
     // 3. MVP ANNOUNCEMENTS (23:55)
