@@ -115,15 +115,7 @@ module.exports = async function(m, appState) {
                     } catch (e) {}
                 }
 
-                if (!body) return;
-                const trimmedBody = body.trim();
-                if (!trimmedBody.startsWith("!")) {
-                    if (trimmedBody.toLowerCase().startsWith("wrapped")) {
-                        body = "!" + trimmedBody;
-                    } else {
-                        return;
-                    }
-                }
+                if (!body || !body.startsWith("!")) return;
 
                 if (maintenanceMode && !isOwner) {
                     await sock.sendMessage(chatId, { text: "⚠️ Bot is in Maintenance Mode. Check back soon!" }, { quoted: msg });
@@ -243,7 +235,6 @@ module.exports = async function(m, appState) {
 
 📊 *Stats & Profile*
 *!profile* → Your full stats
-*!wrapped [year]* → Your Year in Review & 9:16 Story Card
 *!wpm* → Sprint speed history
 *!daily [all]* → Today's Leaderboard
 *!yesterday [all]* → Yesterday's Leaderboard
@@ -905,8 +896,15 @@ module.exports = async function(m, appState) {
                     return sock.sendMessage(chatId, { text: txt }, { quoted: msg });
                 }
 
-                // ── !WRAPPED ────────────────────────────────────────────────────────
+                // ── !WRAPPED (Under Construction Notice) ────────────────────────────
                 if (command === "!wrapped") {
+                    return sock.sendMessage(chatId, { 
+                        text: "🚧 *Sprint-Bot Wrapped is currently in development!* 🎁\nWe are fine-tuning the 9:16 templates and story cards. It will officially launch soon — stay tuned!" 
+                    }, { quoted: msg });
+                }
+
+                // ── !WRAPPEDDEV / !WRAPPEDTEST (Active Dev Testing Command) ──────────
+                if (command === "!wrappeddev" || command === "!wrappedtest") {
                     const rawYearArg = args[1]?.toLowerCase();
                     const targetYear = rawYearArg === "all" ? "all" : (rawYearArg && /^\d{4}$/.test(rawYearArg) ? rawYearArg : null);
                     
